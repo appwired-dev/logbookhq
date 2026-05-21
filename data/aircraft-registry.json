@@ -1,0 +1,5 @@
+{
+  "C-FTEST": { "make": "Cessna", "model": "172", "year": "2015", "source": "TC" },
+  "C-GDEMO": { "make": "Diamond", "model": "DA40", "year": "2020", "source": "TC" },
+  "N12345":  { "make": "Piper",   "model": "PA-28", "year": "1998", "source": "FAA" }
+}

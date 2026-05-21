@@ -1,0 +1,191 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body { height: 100%; }
+  html { font-feature-settings: "cv02", "cv03", "cv04", "cv11"; -webkit-font-smoothing: antialiased; }
+  body {
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    /* Warm off-white with a hint of cream — softer than pure slate, pairs
+       nicely with the amber/yellow card accents used on the badges page. */
+    background-color: #faf6ef;
+    background-image:
+      /* Layer 1: very fine pores for tactile texture (low opacity) */
+      url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='fp'><feTurbulence type='fractalNoise' baseFrequency='1.6' numOctaves='2' seed='4'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.4 0'/></filter><rect width='100%25' height='100%25' filter='url(%23fp)' opacity='0.10'/></svg>"),
+      /* Warm cream highlight patches for depth */
+      radial-gradient(ellipse 60% 50% at 22% 18%, rgba(255,253,245,0.65), transparent 70%),
+      radial-gradient(ellipse 50% 45% at 80% 80%, rgba(234,217,184,0.25), transparent 70%),
+      /* Edge vignette — subtle warm tint */
+      radial-gradient(ellipse 120% 120% at 50% 50%, transparent 55%, rgba(180,150,100,0.10) 100%),
+      /* Base diagonal cream gradient */
+      linear-gradient(135deg, #fefcf6 0%, #faf6ef 50%, #f4ecdb 100%);
+    background-blend-mode: overlay, normal, normal, normal, normal;
+    background-attachment: fixed;
+    color: #0f172a;
+    letter-spacing: -0.011em;
+  }
+
+  /* Slim, modern scrollbars */
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.35); border-radius: 10px; border: 2px solid transparent; background-clip: padding-box; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(148, 163, 184, 0.6); background-clip: padding-box; }
+}
+
+/* `.scrollbar-always` — force a permanently-visible scrollbar with a clear
+   track. Use on wide horizontal-scroll containers (e.g., the Flights table)
+   where macOS's default auto-hide hides the affordance entirely. */
+.scrollbar-always {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(71, 85, 105, 0.55) rgba(226, 232, 240, 0.7);
+}
+.scrollbar-always::-webkit-scrollbar { height: 12px; width: 12px; }
+.scrollbar-always::-webkit-scrollbar-track {
+  background: rgba(226, 232, 240, 0.7);
+  border-radius: 6px;
+}
+.scrollbar-always::-webkit-scrollbar-thumb {
+  background: rgba(71, 85, 105, 0.55);
+  border-radius: 6px;
+  border: 2px solid rgba(226, 232, 240, 0.7);
+  background-clip: padding-box;
+  min-width: 40px;
+}
+.scrollbar-always::-webkit-scrollbar-thumb:hover {
+  background: rgba(51, 65, 85, 0.75);
+  background-clip: padding-box;
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium
+           border border-slate-300/60 bg-white/90 text-slate-800
+           hover:bg-white hover:border-slate-400 hover:shadow-md
+           active:translate-y-[0.5px]
+           disabled:opacity-50 disabled:cursor-not-allowed
+           shadow-sm transition-all duration-200;
+  }
+  .btn-primary {
+    @apply text-white border-transparent bg-gradient-aviation
+           hover:shadow-lg hover:brightness-110 active:brightness-95
+           shadow-[0_4px_14px_rgba(7,89,133,0.35)];
+  }
+  .btn-danger {
+    @apply text-white border-transparent bg-gradient-rose
+           hover:shadow-lg hover:brightness-110;
+  }
+  .input {
+    @apply block w-full rounded-lg border border-slate-200 bg-white
+           px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400
+           focus:outline-none focus:ring-4 focus:ring-sky-400/20 focus:border-sky-500
+           shadow-[inset_0_1px_2px_rgba(15,23,42,0.04)] transition-all duration-150;
+  }
+  .label {
+    @apply block text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500 mb-1.5;
+  }
+  .card {
+    @apply rounded-2xl border border-slate-200/70 bg-white/95 backdrop-blur-md
+           shadow-[0_1px_2px_rgba(15,23,42,0.04),_0_4px_16px_rgba(15,23,42,0.05)]
+           transition-all duration-300;
+  }
+  .card-hover {
+    @apply hover:shadow-[0_1px_2px_rgba(15,23,42,0.06),_0_12px_32px_rgba(15,23,42,0.10)] hover:-translate-y-0.5;
+  }
+  .pill {
+    @apply inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-[0.06em];
+  }
+  .pill-pic       { @apply pill bg-blue-50 text-blue-700 border border-blue-200; }
+  .pill-dual      { @apply pill bg-amber-50 text-amber-700 border border-amber-200; }
+  .pill-fo        { @apply pill bg-emerald-50 text-emerald-700 border border-emerald-200; }
+  .pill-sic-role  { @apply pill bg-violet-50 text-violet-700 border border-violet-300; }
+  .pill-aug       { @apply pill bg-violet-100 text-violet-800 border border-violet-300; }
+  .pill-check     { @apply pill bg-fuchsia-50 text-fuchsia-700 border border-fuchsia-300; }
+  .pill-se        { @apply pill bg-slate-100 text-slate-700 border border-slate-200; }
+  .pill-me        { @apply pill bg-indigo-50 text-indigo-700 border border-indigo-200; }
+  .pill-sim       { @apply pill bg-rose-50 text-rose-700 border border-rose-200; }
+}
+
+/* Currency progress bar with smoother, animated gradient fill */
+.bar-track {
+  background: linear-gradient(180deg, rgba(226,232,240,0.7), rgba(203,213,225,0.7));
+  box-shadow: inset 0 1px 2px rgba(15,23,42,0.08);
+}
+.bar-fill-good {
+  background: linear-gradient(90deg, #34d399, #10b981 60%, #059669);
+  box-shadow: 0 0 16px rgba(16,185,129,0.55), 0 0 4px rgba(16,185,129,0.35);
+}
+.bar-fill-warn {
+  background: linear-gradient(90deg, #fcd34d, #f59e0b 60%, #d97706);
+  box-shadow: 0 0 16px rgba(245,158,11,0.55), 0 0 4px rgba(245,158,11,0.35);
+}
+.bar-fill-bad {
+  background: linear-gradient(90deg, #fb7185, #ef4444 60%, #b91c1c);
+  box-shadow: 0 0 18px rgba(239,68,68,0.6), 0 0 4px rgba(239,68,68,0.4);
+}
+
+/* Animated shimmer on bar fills */
+.bar-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+.bar-shimmer::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent);
+  animation: shimmer 2.6s ease-in-out infinite;
+  transform: translateX(-100%);
+}
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  60% { transform: translateX(100%); }
+  100% { transform: translateX(100%); }
+}
+
+/* Floating orb decoration for hero cards — gives subtle depth */
+.orb {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(40px);
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+/* Page-load cascade — apply to a parent, children fade up in sequence */
+.cascade > * { animation: fadeUp 0.5s ease-out both; }
+.cascade > *:nth-child(1) { animation-delay: 0.00s; }
+.cascade > *:nth-child(2) { animation-delay: 0.05s; }
+.cascade > *:nth-child(3) { animation-delay: 0.10s; }
+.cascade > *:nth-child(4) { animation-delay: 0.15s; }
+.cascade > *:nth-child(5) { animation-delay: 0.20s; }
+.cascade > *:nth-child(6) { animation-delay: 0.25s; }
+.cascade > *:nth-child(7) { animation-delay: 0.30s; }
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.chart-stage {
+  position: relative;
+  border-radius: 16px;
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  padding: 1.5rem;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.97) 0%, rgba(241,245,249,0.97) 78%, rgba(226,232,240,0.93) 100%),
+    radial-gradient(120% 80% at 50% 100%, rgba(15,23,42,0.06), transparent 60%);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.7) inset,
+    0 1px 2px rgba(15,23,42,0.04),
+    0 12px 32px -10px rgba(15,23,42,0.18);
+  transition: all 0.3s;
+}
+.chart-stage:hover { box-shadow: 0 1px 0 rgba(255,255,255,0.7) inset, 0 4px 8px rgba(15,23,42,0.06), 0 20px 40px -10px rgba(15,23,42,0.22); }
+
+.react-calendar-heatmap text { font-size: 7px; fill: #64748b; }
+.react-calendar-heatmap .color-empty { fill: #f1f5f9; }
+.react-calendar-heatmap .color-scale-1 { fill: #bae6fd; }
+.react-calendar-heatmap .color-scale-2 { fill: #38bdf8; }
+.react-calendar-heatmap .color-scale-3 { fill: #0284c7; }
+.react-calendar-heatmap .color-scale-4 { fill: #0c4a6e; }
+.react-calendar-heatmap rect { rx: 1.5; }
+.react-calendar-heatmap rect:hover { stroke: #0f172a; stroke-width: 1.5px; }
