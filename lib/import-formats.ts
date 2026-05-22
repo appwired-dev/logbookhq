@@ -113,48 +113,128 @@ export function parseAnyLogbook(text: string): { format: SourceFormat; flights: 
 // ============================================================
 
 /**
- * Parse a date in any of the common pilot-logbook formats:
- *   2024-09-27, 9/27/2024, 27/9/2024, "Sep 27, 2024".
- * Returns ISO YYYY-MM-DD or null.
+ * Parse a date in any of the common pilot-logbook formats. Returns ISO
+ * YYYY-MM-DD or null.
+ *
+ * Supports (case-insensitive month abbreviations):
+ *   - ISO:                   2024-09-27
+ *   - US slash:              9/27/2024, 9/27/24
+ *   - European dot:          27.09.2024, 27.9.24
+ *   - Asian dot:             2024.09.27, 2024.9.27
+ *   - European slash:        27/09/2024, 27/9/24       (only when day > 12, else US wins)
+ *   - European dash:         27-09-2024, 27-9-24       (only when day > 12, else ISO wins)
+ *   - Long form:             "Sep 27, 2024", "September 27, 2024"
+ *   - Military / EU long:    "27 SEP 2024", "27 September 2024"
+ *   - Compact:               "06-Jun-13", "06-Jun-2013"
+ *   - Reverse compact:       "13-Jun-06" (year first by length heuristic)
+ *
+ * Two-digit year: 00-50 → 2000s, 51-99 → 1900s. Pre-1951 pilot logbooks
+ * are vanishingly rare; calibrate further if it ever matters.
  */
 function parseAnyDate(s: string): string | null {
-  const t = s.trim();
+  const t = (s ?? "").trim();
   if (!t) return null;
   const MONTHS: Record<string, string> = {
     jan: "01", feb: "02", mar: "03", apr: "04", may: "05", jun: "06",
     jul: "07", aug: "08", sep: "09", oct: "10", nov: "11", dec: "12",
   };
-  // ISO
+  const expandYY = (yy: string) => (parseInt(yy, 10) > 50 ? "19" : "20") + yy;
+
+  // ISO 2024-09-27 (year first, 4 digits)
   let m = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
   if (m) return `${m[1]}-${m[2].padStart(2, "0")}-${m[3].padStart(2, "0")}`;
+
+  // Asian YYYY.MM.DD or YYYY/MM/DD (year first, 4 digits with dot/slash)
+  m = t.match(/^(\d{4})[./](\d{1,2})[./](\d{1,2})$/);
+  if (m) return `${m[1]}-${m[2].padStart(2, "0")}-${m[3].padStart(2, "0")}`;
+
   // US M/D/YYYY
-  m = t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-  if (m) return `${m[3]}-${m[1].padStart(2, "0")}-${m[2].padStart(2, "0")}`;
-  // US M/D/YY (2-digit year). 00-50 → 2000s, 51-99 → 1900s. Same heuristic
-  // as the DD-MMM-YY branch below.
+  m = t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (m) {
+    const a = parseInt(m[1], 10), b = parseInt(m[2], 10);
+    // If first part > 12, must be a day (European DD/MM/YYYY)
+    if (a > 12 && b <= 12) return `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+    return `${m[3]}-${m[1].padStart(2, "0")}-${m[2].padStart(2, "0")}`;
+  }
+  // US M/D/YY (2-digit year). Same European fallback as above.
   m = t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})$/);
   if (m) {
-    const yyyy = (parseInt(m[3], 10) > 50 ? "19" : "20") + m[3];
+    const a = parseInt(m[1], 10), b = parseInt(m[2], 10);
+    const yyyy = expandYY(m[3]);
+    if (a > 12 && b <= 12) return `${yyyy}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
     return `${yyyy}-${m[1].padStart(2, "0")}-${m[2].padStart(2, "0")}`;
   }
-  // "Sep 27, 2024"
+
+  // European DD.MM.YYYY or DD.MM.YY (dot separator)
+  m = t.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2,4})$/);
+  if (m) {
+    const yyyy = m[3].length === 2 ? expandYY(m[3]) : m[3];
+    return `${yyyy}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+  }
+
+  // European DD-MM-YYYY (only when day > 12 — otherwise ambiguous with YYYY-MM-DD if year is 2-digit)
+  m = t.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+  if (m && parseInt(m[1], 10) > 12) {
+    return `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+  }
+
+  // "Sep 27, 2024" or "September 27, 2024"
   m = t.match(/^([A-Za-z]+)\s+(\d{1,2}),?\s+(\d{4})/);
   if (m) {
     const mm = MONTHS[m[1].slice(0, 3).toLowerCase()];
     if (mm) return `${m[3]}-${mm}-${m[2].padStart(2, "0")}`;
   }
-  // "06-Jun-13" or "06-Jun-2013" (Numbers-multihead format).
-  // Two-digit year heuristic: 00-50 → 2000s, 51-99 → 1900s. Pre-1951 pilot
-  // logbooks would be edge-case rare; calibrate further if it ever matters.
+
+  // Military / European long: "27 SEP 2024" or "27 September 2024"
+  m = t.match(/^(\d{1,2})\s+([A-Za-z]+)\s+(\d{2,4})$/);
+  if (m) {
+    const mm = MONTHS[m[2].slice(0, 3).toLowerCase()];
+    if (mm) {
+      const yyyy = m[3].length === 2 ? expandYY(m[3]) : m[3];
+      return `${yyyy}-${mm}-${m[1].padStart(2, "0")}`;
+    }
+  }
+
+  // Compact "06-Jun-13" or "06-Jun-2013"
   m = t.match(/^(\d{1,2})-([A-Za-z]+)-(\d{2,4})$/);
   if (m) {
     const mm = MONTHS[m[2].slice(0, 3).toLowerCase()];
-    if (!mm) return null;
-    let yyyy = m[3];
-    if (yyyy.length === 2) yyyy = (parseInt(yyyy, 10) > 50 ? "19" : "20") + yyyy;
-    return `${yyyy}-${mm}-${m[1].padStart(2, "0")}`;
+    if (mm) {
+      const yyyy = m[3].length === 2 ? expandYY(m[3]) : m[3];
+      return `${yyyy}-${mm}-${m[1].padStart(2, "0")}`;
+    }
   }
+
   return null;
+}
+
+/**
+ * Parse a time-of-duration value. Returns hours as a decimal, or 0 if unparseable.
+ * Supports:
+ *   - Decimal:        "1.5", "12.3"
+ *   - European comma: "1,5"
+ *   - HH:MM:          "1:30" → 1.5,  "12:45" → 12.75
+ *   - HHMM (4 digits):"0130"  → 1.5,  "1245"  → 12.75   (only if all 4 digits and minutes < 60)
+ *   - Plain integer:  "1", "12"
+ */
+function parseTimeValue(s: string): number {
+  const t = (s ?? "").toString().trim();
+  if (!t) return 0;
+  // HH:MM duration (most common international format)
+  const hm = t.match(/^(\d{1,3}):(\d{1,2})$/);
+  if (hm) {
+    const h = parseInt(hm[1], 10);
+    const mm = parseInt(hm[2], 10);
+    if (mm < 60) return h + mm / 60;
+  }
+  // HHMM 4-digit compact (military style, only if it parses as a valid duration < 24h)
+  if (/^\d{4}$/.test(t)) {
+    const h = parseInt(t.slice(0, 2), 10);
+    const mm = parseInt(t.slice(2), 10);
+    if (h < 24 && mm < 60) return h + mm / 60;
+  }
+  // European comma or US decimal — delegate to num() which handles both.
+  return num(t);
 }
 
 /** Build a header → column-index map, normalising spaces and case. */
@@ -775,34 +855,116 @@ type SmartField =
 /**
  * Header-name patterns the smart parser recognizes. First match wins, so order
  * matters when patterns could overlap (more specific first). All match against
- * the trimmed, lowercased cell content via `RegExp.test`.
+ * the trimmed cell content via `RegExp.test`.
+ *
+ * Covers English variants, common international labels (German Datum,
+ * French/Spanish Fecha, Korean 날짜, Chinese 日期), and airline/airline-style
+ * abbreviations (BLK = block, ACFT = aircraft, etc.).
  */
 const FIELD_PATTERNS: ReadonlyArray<{ field: SmartField; patterns: RegExp[] }> = [
-  { field: "date",          patterns: [/^date$/i, /^flight\s*date/i, /^date\s*flown/i, /year.?month.?day/i, /^year$/i, /^month.?day/i] },
-  { field: "make_model",    patterns: [/^make.*model/i, /^aircraft\s*type/i, /^aircraft$/i, /^type$/i, /^model$/i, /^make$/i] },
-  { field: "registration",  patterns: [/^reg/i, /^tail/i, /^ident/i, /^aircraft\s*id/i, /^n.?number/i] },
-  { field: "from",          patterns: [/^from$/i, /^dep/i, /^origin/i] },
-  { field: "to",            patterns: [/^to$/i, /^dest/i, /^arr/i] },
-  { field: "route",         patterns: [/^route$/i, /^city.pair/i] },
-  { field: "pic",           patterns: [/^p\.?\s*i\.?\s*c\.?(\s*time)?$/i, /^pic\s*time/i, /^pic$/i, /^captain/i] },
-  { field: "sic",           patterns: [/^s\.?\s*i\.?\s*c\.?(\s*time)?$/i, /^sic$/i, /^second.in.command/i] },
-  { field: "fo",            patterns: [/^f\.?\s*o\.?(\s*time)?$/i, /^fo$/i, /^first.officer/i, /^co.?pilot/i] },
-  { field: "dual",          patterns: [/^dual$/i, /^dual\s*received/i, /^dual.given/i] },
-  { field: "solo",          patterns: [/^solo/i] },
-  { field: "day",           patterns: [/^day(\s*time)?$/i] },
-  { field: "night",         patterns: [/^night(\s*time)?$/i] },
-  { field: "sel",           patterns: [/^sel\.?$/i, /single.?engine.*land/i] },
-  { field: "mel",           patterns: [/^mel\.?$/i, /multi.?engine.*land/i] },
-  { field: "ses",           patterns: [/^ses\.?$/i, /single.?engine.*sea/i] },
-  { field: "mes",           patterns: [/^mes\.?$/i, /multi.?engine.*sea/i] },
-  { field: "heli",          patterns: [/^heli/i, /^helicopter/i, /^rotor/i] },
-  { field: "instrument",    patterns: [/^actual\s*inst/i, /^imc$/i, /^instrument$/i, /^inst$/i] },
-  { field: "hood",          patterns: [/^hood$/i, /^simulated\s*inst/i, /^sim\s*inst/i] },
-  { field: "sim",           patterns: [/^sim$/i, /^simulator$/i, /^ftd$/i, /^aatd$/i] },
-  { field: "cross_country", patterns: [/cross.?country/i, /^xc$/i, /^x.?country/i] },
-  { field: "total",         patterns: [/^total\s*time$/i, /^total$/i, /^due\s*time/i] },
-  { field: "approaches",    patterns: [/^approaches?/i, /^ifr\s*app/i, /#\s*ifr/i] },
-  { field: "remarks",       patterns: [/^remarks?$/i, /^comments?$/i, /^notes?$/i] },
+  { field: "date",          patterns: [
+    /^date$/i, /^flight\s*date/i, /^date\s*flown/i, /^date\s*of\s*flight/i,
+    /year.?month.?day/i, /^year$/i, /^month.?day/i,
+    /^datum$/i,       // German
+    /^fecha$/i,       // Spanish / Portuguese
+    /^날짜$/,         // Korean
+    /^日期$/,         // Chinese
+    /^日付$/,         // Japanese
+    /^dt$/i, /^dato$/i, /^dt\.?$/i,
+  ] },
+  { field: "make_model",    patterns: [
+    /^make.*model/i, /^aircraft\s*type/i, /^aircraft$/i, /^a\/?c$/i, /^acft$/i, /^a\/?c\s*type$/i,
+    /^type$/i, /^model$/i, /^make$/i,
+    /^flugzeugtyp$/i, /^muster$/i,           // German
+    /^tipo.*aerona/i, /^aeronave$/i,         // Spanish/Portuguese
+    /^항공기/, /^기종/,                       // Korean
+    /^飞机/, /^机型/, /^型号/,               // Chinese
+    /^機種$/, /^航空機$/,                    // Japanese
+    /^plane/i,
+  ] },
+  { field: "registration",  patterns: [
+    /^reg/i, /^tail/i, /^ident/i, /^aircraft\s*id/i, /^a\/?c\s*reg/i,
+    /^n.?number/i, /^n#/i, /^tail#/i, /^registration$/i,
+    /^kennzeichen$/i,     // German
+    /^matricula$/i, /^matrícula$/i, /^matrícula$/i, // Spanish
+    /^등록번호/,           // Korean
+    /^注册号/, /^机号/,    // Chinese
+    /^登録記号$/,          // Japanese
+  ] },
+  { field: "from",          patterns: [
+    /^from$/i, /^dep/i, /^origin/i, /^orig/i, /^takeoff$/i, /^block.?off/i, /^out$/i,
+    /^von$/i,    // German
+    /^desde$/i,  // Spanish
+    /^출발/, /^起飞/, /^出発/, // Korean/Chinese/Japanese
+  ] },
+  { field: "to",            patterns: [
+    /^to$/i, /^dest/i, /^arr/i, /^landing/i, /^block.?on/i, /^in$/i,
+    /^nach$/i,   // German
+    /^hasta$/i, /^a$/i, // Spanish
+    /^도착/, /^降落/, /^到着/, // Korean/Chinese/Japanese
+  ] },
+  { field: "route",         patterns: [
+    /^route$/i, /^city.?pair/i, /^city.?pairs/i, /^segment/i,
+    /^strecke$/i, /^ruta$/i, /^항로/,
+  ] },
+  { field: "pic",           patterns: [
+    /^p\.?\s*i\.?\s*c\.?(\s*time)?$/i, /^pic\s*time/i, /^pic$/i, /^captain/i, /^cpt$/i,
+    /^command$/i, /^p1$/i, /^pic\s*us$/i, /^pic.under.supervision/i,
+    /^kapitän/i, /^pico/i, /^기장/, /^机长/, /^机長/,
+  ] },
+  { field: "sic",           patterns: [
+    /^s\.?\s*i\.?\s*c\.?(\s*time)?$/i, /^sic$/i, /^second.in.command/i,
+    /^p2$/i, /^부기장/, /^副機長/,
+  ] },
+  { field: "fo",            patterns: [
+    /^f\.?\s*o\.?(\s*time)?$/i, /^fo$/i, /^first.officer/i, /^co.?pilot/i, /^copilot/i,
+    /^kopilot/i, /^primer.oficial/i, /^부조종사/,
+  ] },
+  { field: "dual",          patterns: [
+    /^dual$/i, /^dual\s*received/i, /^dual.given/i, /^dual.recv/i,
+    /^doppelsteuer/i, /^doble/i, /^교관비행/,
+  ] },
+  { field: "solo",          patterns: [/^solo/i, /^single.pilot/i, /^단독/] },
+  { field: "day",           patterns: [
+    /^day(\s*time)?$/i, /^day\s*flying/i,
+    /^tag$/i, /^día$/i, /^주간/, /^白天/, /^昼間$/,
+  ] },
+  { field: "night",         patterns: [
+    /^night(\s*time)?$/i, /^night\s*flying/i,
+    /^nacht$/i, /^noche$/i, /^야간/, /^夜间/, /^夜間$/,
+  ] },
+  { field: "sel",           patterns: [/^sel\.?$/i, /single.?engine.*land/i, /^se\s*land/i] },
+  { field: "mel",           patterns: [/^mel\.?$/i, /multi.?engine.*land/i, /^me\s*land/i] },
+  { field: "ses",           patterns: [/^ses\.?$/i, /single.?engine.*sea/i, /^se\s*sea/i] },
+  { field: "mes",           patterns: [/^mes\.?$/i, /multi.?engine.*sea/i, /^me\s*sea/i] },
+  { field: "heli",          patterns: [/^heli/i, /^helicopter/i, /^rotor/i, /^hubschrauber/i, /^helicóptero/i] },
+  { field: "instrument",    patterns: [
+    /^actual\s*inst/i, /^imc$/i, /^instrument$/i, /^inst$/i, /^ifr$/i,
+    /^instrumento/i, /^계기/, /^仪表/, /^計器/,
+  ] },
+  { field: "hood",          patterns: [
+    /^hood$/i, /^simulated\s*inst/i, /^sim\s*inst/i, /^sim.imc/i, /^under.hood/i,
+  ] },
+  { field: "sim",           patterns: [
+    /^sim$/i, /^simulator$/i, /^ftd$/i, /^aatd$/i, /^simulator\s*time/i,
+    /^simulador/i, /^시뮬레이터/, /^模拟机/, /^シミュレーター/,
+  ] },
+  { field: "cross_country", patterns: [
+    /cross.?country/i, /^xc$/i, /^x.?country/i, /^x\.c\.?$/i,
+    /^überlandflug/i, /^vuelo.*travesía/i, /^크로스컨트리/,
+  ] },
+  { field: "total",         patterns: [
+    /^total\s*time$/i, /^total$/i, /^total\s*flight/i, /^total\s*duration/i,
+    /^due\s*time/i, /^tt$/i, /^flight\s*time$/i, /^block.?time$/i, /^blk$/i, /^block$/i,
+    /^gesamt/i, /^tiempo.*total/i, /^총비행/, /^总飞行/, /^合計時間/,
+  ] },
+  { field: "approaches",    patterns: [
+    /^approaches?$/i, /^ifr\s*app/i, /#\s*ifr/i, /^app(?:r|ch)?$/i, /^anflüge/i, /^접근/, /^进近/,
+  ] },
+  { field: "remarks",       patterns: [
+    /^remarks?$/i, /^comments?$/i, /^notes?$/i, /^description$/i,
+    /^bemerkungen/i, /^observaciones/i, /^비고/, /^备注/, /^備考/,
+  ] },
 ];
 
 const TIME_FIELDS: ReadonlySet<SmartField> = new Set<SmartField>([
@@ -835,13 +997,14 @@ interface SmartHeaderInfo {
 }
 
 function detectSmartHeader(rows: string[][]): SmartHeaderInfo | null {
-  // Scan the first 10 rows. Try every (startRow, span) combination with span
+  // Scan the first 20 rows. Try every (startRow, span) combination with span
   // 1-3, because real-world logbooks often split headers across two or three
-  // rows (top-level group + sub-headers + sub-sub-headers). For each
-  // combination, build a column→field map by unioning matches across all
-  // rows in the zone, then score by unique fields. The best-scoring
-  // combination wins.
-  const maxScan = Math.min(rows.length, 10);
+  // rows (top-level group + sub-headers + sub-sub-headers). Some templates
+  // also have lots of preamble (instructions, summary statistics, pilot info)
+  // so we scan further than feels strictly necessary. For each combination,
+  // build a column→field map by unioning matches across all rows in the
+  // zone, then score by unique fields. The best-scoring combination wins.
+  const maxScan = Math.min(rows.length, 20);
   let bestScore = 0;
   let bestRow = -1;
   let bestSpan = 1;
@@ -978,7 +1141,9 @@ function parseSmartLogbook(text: string): ParsedFlight[] {
         if (/^\d{1,2}$/.test(a) && /^\d{1,2}$/.test(b)) return parseFloat(`${a}.${b}`);
         if (/^\d{1,2}$/.test(a) && b === "") return parseFloat(a);
       }
-      return num(row[c] ?? "");
+      // parseTimeValue handles decimal, European comma, HH:MM, and HHMM 4-digit
+      // compact military format — covers virtually every real-world layout.
+      return parseTimeValue(row[c] ?? "");
     };
 
     const date = parseSmartDate(getStr("date"), yearOverride);

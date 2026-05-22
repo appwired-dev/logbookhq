@@ -17,8 +17,11 @@ const MAX_PARSED_FLIGHTS = 50_000;
 /**
  * Normalise uploaded file → CSV text. We accept Excel (.xlsx/.xls), OpenDocument
  * (.ods), and plain CSV/TSV — SheetJS handles all the binary formats; CSV/TSV
- * are read straight as text. For multi-sheet workbooks we use the first sheet
- * (pilot logbooks are almost always a single sheet).
+ * are read straight as text.
+ *
+ * For multi-sheet workbooks we pick the sheet with the most non-empty cells.
+ * Some pilots put their actual data on Sheet2/Sheet3 and leave Sheet1 as a
+ * cover page or summary; "first sheet" was too brittle.
  */
 async function fileToCsvText(file: File): Promise<string> {
   const name = file.name.toLowerCase();
@@ -30,16 +33,29 @@ async function fileToCsvText(file: File): Promise<string> {
     return await file.text();
   }
 
-  // Binary spreadsheet — parse with SheetJS, take the first sheet, serialise
-  // to RFC 4180 CSV so the existing parsers see what they expect.
+  // Binary spreadsheet — parse with SheetJS. Try every sheet, pick the one
+  // with the most non-empty rows so we don't get stuck on an empty "Sheet1".
   const buf = await file.arrayBuffer();
   const wb = XLSX.read(buf, { type: "array" });
-  const firstSheetName = wb.SheetNames[0];
-  if (!firstSheetName) throw new Error("Workbook has no sheets.");
-  const sheet = wb.Sheets[firstSheetName];
-  // `blankrows: true` preserves empty rows — important for the multi-header
-  // Numbers format detector which expects category text in the first row.
-  return XLSX.utils.sheet_to_csv(sheet, { blankrows: true });
+  if (wb.SheetNames.length === 0) throw new Error("Workbook has no sheets.");
+
+  let bestCsv = "";
+  let bestScore = -1;
+  for (const sheetName of wb.SheetNames) {
+    const sheet = wb.Sheets[sheetName];
+    if (!sheet || !sheet["!ref"]) continue;
+    // `blankrows: true` preserves empty rows — important for the multi-header
+    // Numbers format detector which expects category text in the first row.
+    const csv = XLSX.utils.sheet_to_csv(sheet, { blankrows: true });
+    // Score: number of lines with at least one non-comma character (i.e. non-empty).
+    const nonEmptyLines = csv.split(/\r?\n/).filter((l) => /[^,\s]/.test(l)).length;
+    if (nonEmptyLines > bestScore) {
+      bestScore = nonEmptyLines;
+      bestCsv = csv;
+    }
+  }
+  if (bestScore <= 0) throw new Error("No sheet in the workbook has any data.");
+  return bestCsv;
 }
 
 export async function importCsvAction(formData: FormData) {
