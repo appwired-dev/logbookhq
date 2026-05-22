@@ -17,7 +17,7 @@
  */
 import { parseCSV, importCsvText, type ParsedFlight, type Category, type Role } from "./csv";
 
-export type SourceFormat = "numbers" | "numbers-multihead" | "numbers-multihead-v2" | "foreflight" | "logten" | "myflightbook" | "logbookhq" | "unknown";
+export type SourceFormat = "numbers" | "numbers-multihead" | "numbers-multihead-v2" | "foreflight" | "logten" | "myflightbook" | "logbookhq" | "smart" | "unknown";
 
 const r1 = (n: number) => Math.round(n * 10) / 10;
 /**
@@ -93,8 +93,18 @@ export function parseAnyLogbook(text: string): { format: SourceFormat; flights: 
     case "logten":            return { format, flights: parseLogTen(text) };
     case "myflightbook":      return { format, flights: parseMyFlightbook(text) };
     case "logbookhq":         return { format, flights: parseLogbookHQ(text) };
-    default:
-      throw new Error("Unrecognised CSV format. Supported: Pilot Logbook HQ, ForeFlight, LogTen Pro, MyFlightbook, Numbers-exported.");
+    default: {
+      // Last-resort heuristic parser — handles arbitrary spreadsheet layouts
+      // by detecting the header row, fuzzy-matching column names to canonical
+      // logbook fields, and combining split hour/tenth time columns. Catches
+      // homemade FAA-style logbooks (Suvender-format), translated templates,
+      // and most other variations we haven't enumerated.
+      const smartFlights = parseSmartLogbook(text);
+      if (smartFlights.length > 0) {
+        return { format: "smart", flights: smartFlights };
+      }
+      throw new Error("Unrecognised CSV format. Supported: Pilot Logbook HQ, ForeFlight, LogTen Pro, MyFlightbook, Numbers-exported. (Tried smart fallback too — couldn't find a parseable header row.)");
+    }
   }
 }
 
@@ -745,4 +755,324 @@ function parseLogbookHQ(text: string): ParsedFlight[] {
     });
   }
   return out;
+}
+
+// ============================================================
+// Smart fallback parser
+// ============================================================
+
+/**
+ * Canonical field names the smart parser knows how to extract. Multiple
+ * source-header variants map onto each of these (see FIELD_PATTERNS).
+ */
+type SmartField =
+  | "date" | "make_model" | "registration" | "from" | "to" | "route"
+  | "pic" | "sic" | "fo" | "dual" | "solo" | "day" | "night"
+  | "sel" | "mel" | "ses" | "mes" | "heli"
+  | "instrument" | "hood" | "sim" | "cross_country" | "total"
+  | "approaches" | "remarks";
+
+/**
+ * Header-name patterns the smart parser recognizes. First match wins, so order
+ * matters when patterns could overlap (more specific first). All match against
+ * the trimmed, lowercased cell content via `RegExp.test`.
+ */
+const FIELD_PATTERNS: ReadonlyArray<{ field: SmartField; patterns: RegExp[] }> = [
+  { field: "date",          patterns: [/^date$/i, /^flight\s*date/i, /^date\s*flown/i, /year.?month.?day/i, /^year$/i, /^month.?day/i] },
+  { field: "make_model",    patterns: [/^make.*model/i, /^aircraft\s*type/i, /^aircraft$/i, /^type$/i, /^model$/i, /^make$/i] },
+  { field: "registration",  patterns: [/^reg/i, /^tail/i, /^ident/i, /^aircraft\s*id/i, /^n.?number/i] },
+  { field: "from",          patterns: [/^from$/i, /^dep/i, /^origin/i] },
+  { field: "to",            patterns: [/^to$/i, /^dest/i, /^arr/i] },
+  { field: "route",         patterns: [/^route$/i, /^city.pair/i] },
+  { field: "pic",           patterns: [/^p\.?\s*i\.?\s*c\.?(\s*time)?$/i, /^pic\s*time/i, /^pic$/i, /^captain/i] },
+  { field: "sic",           patterns: [/^s\.?\s*i\.?\s*c\.?(\s*time)?$/i, /^sic$/i, /^second.in.command/i] },
+  { field: "fo",            patterns: [/^f\.?\s*o\.?(\s*time)?$/i, /^fo$/i, /^first.officer/i, /^co.?pilot/i] },
+  { field: "dual",          patterns: [/^dual$/i, /^dual\s*received/i, /^dual.given/i] },
+  { field: "solo",          patterns: [/^solo/i] },
+  { field: "day",           patterns: [/^day(\s*time)?$/i] },
+  { field: "night",         patterns: [/^night(\s*time)?$/i] },
+  { field: "sel",           patterns: [/^sel\.?$/i, /single.?engine.*land/i] },
+  { field: "mel",           patterns: [/^mel\.?$/i, /multi.?engine.*land/i] },
+  { field: "ses",           patterns: [/^ses\.?$/i, /single.?engine.*sea/i] },
+  { field: "mes",           patterns: [/^mes\.?$/i, /multi.?engine.*sea/i] },
+  { field: "heli",          patterns: [/^heli/i, /^helicopter/i, /^rotor/i] },
+  { field: "instrument",    patterns: [/^actual\s*inst/i, /^imc$/i, /^instrument$/i, /^inst$/i] },
+  { field: "hood",          patterns: [/^hood$/i, /^simulated\s*inst/i, /^sim\s*inst/i] },
+  { field: "sim",           patterns: [/^sim$/i, /^simulator$/i, /^ftd$/i, /^aatd$/i] },
+  { field: "cross_country", patterns: [/cross.?country/i, /^xc$/i, /^x.?country/i] },
+  { field: "total",         patterns: [/^total\s*time$/i, /^total$/i, /^due\s*time/i] },
+  { field: "approaches",    patterns: [/^approaches?/i, /^ifr\s*app/i, /#\s*ifr/i] },
+  { field: "remarks",       patterns: [/^remarks?$/i, /^comments?$/i, /^notes?$/i] },
+];
+
+const TIME_FIELDS: ReadonlySet<SmartField> = new Set<SmartField>([
+  "pic", "sic", "fo", "dual", "solo", "day", "night",
+  "sel", "mel", "ses", "mes", "heli",
+  "instrument", "hood", "sim", "total",
+]);
+
+function matchSmartField(header: string): SmartField | null {
+  const h = (header ?? "").trim();
+  if (!h) return null;
+  for (const { field, patterns } of FIELD_PATTERNS) {
+    if (patterns.some((p) => p.test(h))) return field;
+  }
+  return null;
+}
+
+interface SmartHeaderInfo {
+  /** Index of the first data row (one past the header row). */
+  dataStartIdx: number;
+  /** Map of column index → canonical field name. */
+  columnMap: Map<number, SmartField>;
+  /** Year extracted from a nearby cell (e.g. "2010" in the header itself).
+   *  Used when individual date cells lack a year (e.g. "MAY.7"). */
+  yearOverride: string | null;
+  /** Whether time columns appear to span 2 cells (hr, tenths).
+   *  Detected by looking at data rows for single-digit pairs in adjacent
+   *  cells following a time-mapped header. */
+  splitTime: boolean;
+}
+
+function detectSmartHeader(rows: string[][]): SmartHeaderInfo | null {
+  // Scan the first 10 rows. Try every (startRow, span) combination with span
+  // 1-3, because real-world logbooks often split headers across two or three
+  // rows (top-level group + sub-headers + sub-sub-headers). For each
+  // combination, build a column→field map by unioning matches across all
+  // rows in the zone, then score by unique fields. The best-scoring
+  // combination wins.
+  const maxScan = Math.min(rows.length, 10);
+  let bestScore = 0;
+  let bestRow = -1;
+  let bestSpan = 1;
+  let bestMap = new Map<number, SmartField>();
+
+  for (let i = 0; i < maxScan; i++) {
+    for (let span = 1; span <= 3 && i + span <= maxScan; span++) {
+      const map = new Map<number, SmartField>();
+      for (let r = i; r < i + span; r++) {
+        const row = rows[r] ?? [];
+        for (let c = 0; c < row.length; c++) {
+          const f = matchSmartField(row[c] ?? "");
+          // First match per column wins so deeper sub-headers don't clobber
+          // a perfectly good top-level label.
+          if (f && !map.has(c)) map.set(c, f);
+        }
+      }
+      const uniqueFields = new Set(map.values()).size;
+      const hasDate = [...map.values()].includes("date");
+      // Require date + at least 3 unique fields total to call this a header.
+      // The +1 weight on "has date" pushes us toward zones that found a date
+      // column even if a noisier zone had more total matches.
+      const score = uniqueFields + (hasDate ? 100 : 0);
+      if (score > bestScore) {
+        bestScore = score;
+        bestRow = i;
+        bestSpan = span;
+        bestMap = map;
+      }
+    }
+  }
+
+  const hasDate = [...bestMap.values()].includes("date");
+  if (!hasDate || new Set(bestMap.values()).size < 3 || bestRow < 0) return null;
+
+  const dataStart = bestRow + bestSpan;
+
+  // Look for a year in the header zone, the row above, or the row below — some
+  // formats (FAA Suvender-style) stash the year in its own cell next to the
+  // sub-headers since each date cell only has month/day.
+  let yearOverride: string | null = null;
+  const scanFrom = Math.max(0, bestRow - 1);
+  const scanTo = Math.min(rows.length, dataStart + 1);
+  outer: for (let i = scanFrom; i < scanTo; i++) {
+    for (const cell of rows[i] ?? []) {
+      const m = (cell ?? "").trim().match(/^(19|20)\d{2}$/);
+      if (m) { yearOverride = m[0]; break outer; }
+    }
+  }
+
+  // Detect split-time pattern. If, in any of the next few data rows, a column
+  // mapped to a TIME field contains a 1-2 digit number AND the immediately
+  // following column (which is NOT itself mapped) also contains a 1-2 digit
+  // number, we treat them as an hour/tenth pair. Catches FAA-style "1,0" =
+  // (1 hour, 0 tenths) = 1.0.
+  let splitTime = false;
+  const lookAhead = Math.min(rows.length, dataStart + 6);
+  for (let i = dataStart; i < lookAhead && !splitTime; i++) {
+    const row = rows[i] ?? [];
+    for (const [col, field] of bestMap.entries()) {
+      if (!TIME_FIELDS.has(field)) continue;
+      const a = (row[col] ?? "").trim();
+      const b = (row[col + 1] ?? "").trim();
+      if (/^\d{1,2}$/.test(a) && /^\d{1,2}$/.test(b) && !bestMap.has(col + 1)) {
+        splitTime = true;
+        break;
+      }
+    }
+  }
+
+  return {
+    dataStartIdx: dataStart,
+    columnMap: bestMap,
+    yearOverride,
+    splitTime,
+  };
+}
+
+function findColForField(map: Map<number, SmartField>, target: SmartField): number | null {
+  for (const [col, field] of map.entries()) if (field === target) return col;
+  return null;
+}
+
+/**
+ * Parse a date cell, falling back to month-abbreviation + day formats when an
+ * external year is provided (handles "MAY.7", "MAY 7", "May 7" given a year
+ * sourced from a header cell).
+ */
+function parseSmartDate(s: string, yearOverride: string | null): string | null {
+  const full = parseAnyDate(s);
+  if (full) return full;
+  const m = (s ?? "").trim().match(/^([A-Za-z]+)\.?\s*(\d{1,2})$/);
+  if (m && yearOverride) {
+    const MONTHS: Record<string, string> = {
+      jan: "01", feb: "02", mar: "03", apr: "04", may: "05", jun: "06",
+      jul: "07", aug: "08", sep: "09", oct: "10", nov: "11", dec: "12",
+    };
+    const mm = MONTHS[m[1].slice(0, 3).toLowerCase()];
+    if (mm) return `${yearOverride}-${mm}-${m[2].padStart(2, "0")}`;
+  }
+  return null;
+}
+
+function parseSmartLogbook(text: string): ParsedFlight[] {
+  const rows = parseCSV(text);
+  const info = detectSmartHeader(rows);
+  if (!info) return [];
+
+  const { dataStartIdx, columnMap, yearOverride, splitTime } = info;
+
+  // First-occurrence-wins lookup: when multiple columns map to the same field
+  // (e.g. "Day" appears in both top + sub-header rows), prefer the leftmost.
+  const colByField = new Map<SmartField, number>();
+  for (const [col, field] of columnMap.entries()) {
+    if (!colByField.has(field)) colByField.set(field, col);
+  }
+
+  const flights: ParsedFlight[] = [];
+
+  for (let i = dataStartIdx; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row || row.every((c) => !(c ?? "").trim())) continue;
+
+    const getStr = (f: SmartField): string => {
+      const c = colByField.get(f);
+      return c == null ? "" : (row[c] ?? "").toString().trim();
+    };
+    const getTime = (f: SmartField): number => {
+      const c = colByField.get(f);
+      if (c == null) return 0;
+      if (splitTime) {
+        const a = (row[c] ?? "").toString().trim();
+        const b = (row[c + 1] ?? "").toString().trim();
+        if (/^\d{1,2}$/.test(a) && /^\d{1,2}$/.test(b)) return parseFloat(`${a}.${b}`);
+        if (/^\d{1,2}$/.test(a) && b === "") return parseFloat(a);
+      }
+      return num(row[c] ?? "");
+    };
+
+    const date = parseSmartDate(getStr("date"), yearOverride);
+    if (!date) continue; // skip rows without a parseable date (subtotals, blanks, etc.)
+
+    const make = getStr("make_model") || "Unknown";
+    const reg = getStr("registration") || null;
+
+    // Route: prefer explicit "route" col; otherwise build from from/to.
+    let route: string | null = getStr("route") || null;
+    if (!route) {
+      const fromAp = getStr("from");
+      const toAp = getStr("to");
+      if (fromAp && toAp) route = `${fromAp}-${toAp}`;
+      else if (fromAp || toAp) route = fromAp || toAp;
+    }
+
+    // Category from whichever category-column has hours.
+    const selT = getTime("sel");
+    const melT = getTime("mel");
+    const sesT = getTime("ses");
+    const mesT = getTime("mes");
+    const heliT = getTime("heli");
+    const simT = getTime("sim");
+
+    let category: Category;
+    if (melT > 0) category = "ME";
+    else if (sesT > 0) category = "SES";
+    else if (mesT > 0) category = "MES";
+    else if (heliT > 0) category = "HELI";
+    else if (selT > 0) category = "SE";
+    else if (simT > 0) category = "SIM";
+    else category = "SE";
+
+    // Role from whichever role-column has the most hours. Solo collapses to PIC
+    // since the schema doesn't carry a separate solo bucket.
+    const picT = getTime("pic") + getTime("solo");
+    const sicT = getTime("sic");
+    const foT = getTime("fo");
+    const dualT = getTime("dual");
+    const roleCandidates: Array<[Role, number]> = [
+      ["PIC", picT], ["SIC", sicT], ["FO", foT], ["DUAL", dualT],
+    ];
+    roleCandidates.sort((a, b) => b[1] - a[1]);
+    const role: Role = roleCandidates[0][1] > 0 ? roleCandidates[0][0] : "PIC";
+
+    // Day/night times — explicit if present, otherwise derive from category
+    // total. Templates that only track an aggregated "total" go into day.
+    let dayTime = getTime("day");
+    let nightTime = getTime("night");
+    if (dayTime === 0 && nightTime === 0) {
+      const catTime = Math.max(selT, melT, sesT, mesT, heliT);
+      const total = getTime("total");
+      const fallback = catTime > 0 ? catTime : total;
+      dayTime = fallback;
+    }
+
+    const isXc = getTime("cross_country") > 0;
+    const actualInst = getTime("instrument");
+    const hoodInst = getTime("hood");
+    const simInst = category === "SIM" ? simT : (simT > 0 ? simT : 0);
+    const approaches = Math.round(getTime("approaches"));
+    const remarks = getStr("remarks") || null;
+
+    const isNight = nightTime > 0 && dayTime === 0;
+    const isDay = dayTime > 0 && nightTime === 0;
+    const tolDefault = category === "SIM" ? 0 : 1;
+
+    flights.push({
+      date,
+      make_model: make,
+      registration: reg,
+      pic: null, copilot: null, third_pilot: null, check_pilot: null,
+      route,
+      remarks,
+      category,
+      role,
+      day_time: r1(dayTime),
+      night_time: r1(nightTime),
+      is_xcountry: isXc,
+      actual_inst: r1(actualInst),
+      hood_inst: r1(hoodInst),
+      sim_inst: r1(simInst),
+      ifr_approaches: approaches,
+      precision_approaches: 0,
+      non_precision_approaches: 0,
+      holds: 0,
+      cfi_time: 0,
+      takeoffs_day:    category === "SIM" ? 0 : (isNight ? 0 : tolDefault),
+      takeoffs_night:  category === "SIM" ? 0 : (isDay ? 0 : (nightTime > 0 ? tolDefault : 0)),
+      landings_day:    category === "SIM" ? 0 : (isNight ? 0 : tolDefault),
+      landings_night:  category === "SIM" ? 0 : (isDay ? 0 : (nightTime > 0 ? tolDefault : 0)),
+    });
+  }
+
+  return flights;
 }
