@@ -15,6 +15,7 @@
     "fix:route": "tsx scripts/fix-route.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.98.0",
     "@react-pdf/renderer": "^4.5.1",
     "@sentry/nextjs": "^10.53.1",
     "@supabase/ssr": "^0.5.2",

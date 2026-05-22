@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import * as XLSX from "xlsx";
 import { createClient } from "@/lib/supabase/server";
-import { parseAnyLogbook } from "@/lib/import-formats";
+import { parseAnyLogbook, parseSmartLogbook } from "@/lib/import-formats";
+import { aiInferColumnMapping } from "@/lib/import-ai";
 
 const BATCH = 500;
 // Hard caps to prevent OOM on a malicious or runaway upload. Files larger
@@ -81,16 +82,47 @@ export async function importCsvAction(formData: FormData) {
   }
   let format: string;
   let parsed;
+  // Two-stage parse: try every named format + the smart regex fallback first.
+  // If that yields nothing, escalate to Claude for column inference. The AI
+  // path is opt-in via env var (ANTHROPIC_API_KEY) so deploys without the
+  // key behave as if it didn't exist — they just don't get the safety net.
   try {
     const result = parseAnyLogbook(text);
     format = result.format;
     parsed = result.flights;
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e);
-    return { error: msg || "Failed to parse CSV." };
+  } catch {
+    // Stage-1 failed to even identify a format. Stage 2: AI inference.
+    const ai = await aiInferColumnMapping(text);
+    if (!ai.headerInfo) {
+      return {
+        error: `Unrecognised logbook format. ${ai.notes ? `AI mapping notes: ${ai.notes}` : "Send the file to support@pilotlogbookhq.com and we'll add a parser."}`,
+      };
+    }
+    const aiFlights = parseSmartLogbook(text, ai.headerInfo);
+    if (aiFlights.length === 0) {
+      return {
+        error: `AI suggested a column mapping (${ai.confidence} confidence) but no flights parsed cleanly. Notes: ${ai.notes}`,
+      };
+    }
+    format = `ai-${ai.confidence}`;
+    parsed = aiFlights;
   }
   if (parsed.length === 0) {
-    return { error: `Detected ${format} format but found no valid flights. Check the file isn't empty.` };
+    // Stage 1 returned a recognized format but zero flights — try AI as a
+    // last-ditch interpretation. Happens when the file matches a signature
+    // (e.g. someone exports a Numbers template but the data rows are mangled)
+    // but our strict parser drops every row.
+    const ai = await aiInferColumnMapping(text);
+    if (ai.headerInfo) {
+      const aiFlights = parseSmartLogbook(text, ai.headerInfo);
+      if (aiFlights.length > 0) {
+        format = `${format}-ai-${ai.confidence}`;
+        parsed = aiFlights;
+      }
+    }
+    if (parsed.length === 0) {
+      return { error: `Detected ${format} format but found no valid flights. Check the file isn't empty.` };
+    }
   }
   if (parsed.length > MAX_PARSED_FLIGHTS) {
     return { error: `File contains ${parsed.length.toLocaleString()} flights — over the ${MAX_PARSED_FLIGHTS.toLocaleString()} import limit. Split into smaller files.` };

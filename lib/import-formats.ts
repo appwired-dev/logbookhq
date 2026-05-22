@@ -209,6 +209,29 @@ function parseAnyDate(s: string): string | null {
 }
 
 /**
+ * Parse a clock-time-of-day value into minutes since midnight, or null if
+ * unparseable. Used for block_off / block_on columns where we compute
+ * duration as the delta between two clock times.
+ *   "08:30" → 510    "0830" → 510    "0:00" → 0    "23:59" → 1439
+ */
+function parseClockTime(s: string): number | null {
+  const t = (s ?? "").toString().trim();
+  if (!t) return null;
+  const hm = t.match(/^(\d{1,2}):(\d{2})$/);
+  if (hm) {
+    const h = parseInt(hm[1], 10);
+    const mm = parseInt(hm[2], 10);
+    if (h < 24 && mm < 60) return h * 60 + mm;
+  }
+  if (/^\d{4}$/.test(t)) {
+    const h = parseInt(t.slice(0, 2), 10);
+    const mm = parseInt(t.slice(2), 10);
+    if (h < 24 && mm < 60) return h * 60 + mm;
+  }
+  return null;
+}
+
+/**
  * Parse a time-of-duration value. Returns hours as a decimal, or 0 if unparseable.
  * Supports:
  *   - Decimal:        "1.5", "12.3"
@@ -845,12 +868,22 @@ function parseLogbookHQ(text: string): ParsedFlight[] {
  * Canonical field names the smart parser knows how to extract. Multiple
  * source-header variants map onto each of these (see FIELD_PATTERNS).
  */
-type SmartField =
+export type SmartField =
   | "date" | "make_model" | "registration" | "from" | "to" | "route"
   | "pic" | "sic" | "fo" | "dual" | "solo" | "day" | "night"
   | "sel" | "mel" | "ses" | "mes" | "heli"
   | "instrument" | "hood" | "sim" | "cross_country" | "total"
-  | "approaches" | "remarks";
+  | "approaches" | "remarks"
+  | "block_off" | "block_on";
+
+/** All canonical SmartField values — exported for the AI fallback module. */
+export const ALL_SMART_FIELDS: ReadonlyArray<SmartField> = [
+  "date", "make_model", "registration", "from", "to", "route",
+  "pic", "sic", "fo", "dual", "solo", "day", "night",
+  "sel", "mel", "ses", "mes", "heli",
+  "instrument", "hood", "sim", "cross_country", "total",
+  "approaches", "remarks", "block_off", "block_on",
+];
 
 /**
  * Header-name patterns the smart parser recognizes. First match wins, so order
@@ -892,13 +925,13 @@ const FIELD_PATTERNS: ReadonlyArray<{ field: SmartField; patterns: RegExp[] }> =
     /^登録記号$/,          // Japanese
   ] },
   { field: "from",          patterns: [
-    /^from$/i, /^dep/i, /^origin/i, /^orig/i, /^takeoff$/i, /^block.?off/i, /^out$/i,
+    /^from$/i, /^dep/i, /^origin/i, /^orig/i, /^takeoff$/i, /^out$/i,
     /^von$/i,    // German
     /^desde$/i,  // Spanish
     /^출발/, /^起飞/, /^出発/, // Korean/Chinese/Japanese
   ] },
   { field: "to",            patterns: [
-    /^to$/i, /^dest/i, /^arr/i, /^landing/i, /^block.?on/i, /^in$/i,
+    /^to$/i, /^dest/i, /^arr/i, /^landing/i, /^in$/i,
     /^nach$/i,   // German
     /^hasta$/i, /^a$/i, // Spanish
     /^도착/, /^降落/, /^到着/, // Korean/Chinese/Japanese
@@ -965,6 +998,16 @@ const FIELD_PATTERNS: ReadonlyArray<{ field: SmartField; patterns: RegExp[] }> =
     /^remarks?$/i, /^comments?$/i, /^notes?$/i, /^description$/i,
     /^bemerkungen/i, /^observaciones/i, /^비고/, /^备注/, /^備考/,
   ] },
+  // Block times — airline-style clock-time columns recording gate-out / gate-in
+  // (or chocks-off / chocks-on). Always paired; we compute duration as the
+  // delta. We deliberately don't match bare "out"/"in" since those collide
+  // with from/to (airport codes) in many templates.
+  { field: "block_off",     patterns: [
+    /^block.?off/i, /^bl.?off/i, /^takeoff\s*time/i, /^t.o\.?\s*time/i, /^chock.?off/i, /^gate.?out/i,
+  ] },
+  { field: "block_on",      patterns: [
+    /^block.?on/i, /^bl.?on/i, /^landing\s*time/i, /^ldg\s*time/i, /^chock.?on/i, /^gate.?in/i,
+  ] },
 ];
 
 const TIME_FIELDS: ReadonlySet<SmartField> = new Set<SmartField>([
@@ -982,7 +1025,7 @@ function matchSmartField(header: string): SmartField | null {
   return null;
 }
 
-interface SmartHeaderInfo {
+export interface SmartHeaderInfo {
   /** Index of the first data row (one past the header row). */
   dataStartIdx: number;
   /** Map of column index → canonical field name. */
@@ -994,6 +1037,11 @@ interface SmartHeaderInfo {
    *  Detected by looking at data rows for single-digit pairs in adjacent
    *  cells following a time-mapped header. */
   splitTime: boolean;
+}
+
+/** Parse just the CSV grid — exposed so AI fallback can inspect rows. */
+export function parseCSVGrid(text: string): string[][] {
+  return parseCSV(text);
 }
 
 function detectSmartHeader(rows: string[][]): SmartHeaderInfo | null {
@@ -1108,9 +1156,15 @@ function parseSmartDate(s: string, yearOverride: string | null): string | null {
   return null;
 }
 
-function parseSmartLogbook(text: string): ParsedFlight[] {
+/**
+ * Parse arbitrary spreadsheet text using the smart fallback heuristic.
+ * If `overrideInfo` is provided, skip header auto-detection and use it
+ * directly — this is how the AI fallback feeds a Claude-inferred mapping
+ * back into the same parse pipeline as the regex-based detector.
+ */
+export function parseSmartLogbook(text: string, overrideInfo?: SmartHeaderInfo): ParsedFlight[] {
   const rows = parseCSV(text);
-  const info = detectSmartHeader(rows);
+  const info = overrideInfo ?? detectSmartHeader(rows);
   if (!info) return [];
 
   const { dataStartIdx, columnMap, yearOverride, splitTime } = info;
@@ -1199,6 +1253,27 @@ function parseSmartLogbook(text: string): ParsedFlight[] {
       const total = getTime("total");
       const fallback = catTime > 0 ? catTime : total;
       dayTime = fallback;
+    }
+    // Airline-style block-time fallback: when no duration is present anywhere
+    // but block_off and block_on are recorded as clock times, compute the
+    // delta. Handles crossing-midnight legs (e.g. block_off 23:45, block_on
+    // 01:30) by adding 24h to the negative result.
+    if (dayTime === 0 && nightTime === 0) {
+      const offCol = colByField.get("block_off");
+      const onCol = colByField.get("block_on");
+      if (offCol != null && onCol != null) {
+        const off = parseClockTime((row[offCol] ?? "").toString());
+        const on = parseClockTime((row[onCol] ?? "").toString());
+        if (off != null && on != null) {
+          let durMin = on - off;
+          if (durMin < 0) durMin += 24 * 60;
+          const dur = durMin / 60;
+          // Sanity-check: reject implausible durations (long-haul tops out
+          // around 18-20 hours; anything beyond that is probably a typo or
+          // a non-block clock-time column).
+          if (dur > 0 && dur < 22) dayTime = dur;
+        }
+      }
     }
 
     const isXc = getTime("cross_country") > 0;
