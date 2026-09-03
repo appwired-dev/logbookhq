@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { ResponsiveContainer, Sankey, Tooltip } from "recharts";
 import type { Role } from "@/lib/types";
 
@@ -24,7 +24,7 @@ type NodeShapeProps = {
   x?: number; y?: number; width?: number; height?: number;
   payload?: FlowNode & { depth?: number; value?: number };
   fmt: Fmt;
-  dense: boolean;
+  mode: "wide" | "dense" | "tight";
   lastDepth: number;
 };
 
@@ -36,7 +36,7 @@ type NodeShapeProps = {
 // container is too narrow for inward-facing labels on both sides of a middle
 // column, that column drops to name-only so it can't collide with its
 // neighbours (the value is still in the tooltip).
-function NodeShape({ x = 0, y = 0, width = 0, height = 0, payload, fmt, dense, lastDepth }: NodeShapeProps) {
+function NodeShape({ x = 0, y = 0, width = 0, height = 0, payload, fmt, mode, lastDepth }: NodeShapeProps) {
   const depth = payload?.depth ?? 0;
   const onRight = depth === 0;
   const middle = depth > 0 && depth < lastDepth;
@@ -44,7 +44,7 @@ function NodeShape({ x = 0, y = 0, width = 0, height = 0, payload, fmt, dense, l
   const anchor = onRight ? "start" : "end";
   const name = payload?.name ?? "";
   const value = fmt(payload?.value ?? 0);
-  const nameOnly = dense && middle;
+  const nameOnly = mode === "tight" || (mode === "dense" && middle);
   const compact = nameOnly || height < 24;
   return (
     <g>
@@ -122,33 +122,28 @@ export default function FlowSankey({
   margin?: { top: number; right: number; bottom: number; left: number };
 }) {
   const data = useMemo(() => ({ nodes, links }), [nodes, links]);
-  const ref = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const ro = new ResizeObserver((entries) => setWidth(entries[0]?.contentRect.width ?? 0));
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-  // ~360px per column is the minimum for two inward-facing labels to clear
-  // each other; below that, middle columns switch to name-only labels.
-  const dense = width > 0 && width < columns * 360;
+  // Label density from the measured width. ~360px per column lets two
+  // inward-facing "name + value" labels clear each other; below that, middle
+  // columns go name-only; below ~220px per column (phones) every column does.
+  const perCol = width > 0 ? width / columns : Infinity;
+  const mode: "wide" | "dense" | "tight" = perCol < 220 ? "tight" : perCol < 360 ? "dense" : "wide";
   if (nodes.length === 0 || links.length === 0) return null;
   return (
-    <div ref={ref} style={{ height }}>
-      <ResponsiveContainer width="100%" height="100%">
+    <div style={{ height }}>
+      <ResponsiveContainer width="100%" height="100%" onResize={(w) => setWidth(w)}>
         {/* sort={false} + iterations={0} keep nodes in the order given, so a
             chronological input stays chronological instead of being shuffled
             by the crossing-minimisation pass. */}
         <Sankey
+          key={mode}
           data={data}
           sort={false}
           iterations={0}
           nodeWidth={nodeWidth}
           nodePadding={nodePadding}
           linkCurvature={0.55}
-          node={<NodeShape fmt={fmt} dense={dense} lastDepth={columns - 1} />}
+          node={<NodeShape fmt={fmt} mode={mode} lastDepth={columns - 1} />}
           link={<LinkShape />}
           margin={margin}
         >
