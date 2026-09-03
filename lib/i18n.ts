@@ -224,6 +224,10 @@ const TRANSLATIONS = {
   "settings.email":        { en: "Email",                  ko: "이메일",     zh: "电子邮箱",    es: "Correo electrónico" },
   "settings.tier":         { en: "Tier",                   ko: "등급",       zh: "级别",        es: "Nivel" },
   "settings.saved":        { en: "Saved",                  ko: "저장됨",     zh: "已保存",      es: "Guardado" },
+  "settings.augCredit":     { en: "Credit augmenting (SO / cruise-relief) time at 50%", ko: "증원 조종사(SO / 순항 교대) 시간을 50%로 인정", zh: "增援机组（SO / 巡航接替）时间按 50% 计入", es: "Acreditar el tiempo de refuerzo (SO / relevo en crucero) al 50%" },
+  "settings.augCreditHint": { en: "Applies to total, multi-engine and per-type totals and the Sankey charts. Flights keep their full logged time; flight-time limits, cross-country and instrument totals are unchanged.", ko: "총 시간, 다발 및 기종별 합계, Sankey 차트에 적용됩니다. 비행 기록은 전체 시간을 유지하며 비행시간 제한·야외 비행·계기 합계는 변경되지 않습니다.", zh: "影响总时间、多发与各机型合计以及 Sankey 图。飞行记录保留完整时间；飞行时间限制、转场和仪表合计不变。", es: "Afecta al total, multimotor, totales por tipo y los diagramas Sankey. Los vuelos conservan su tiempo completo; los límites de tiempo de vuelo, travesía e instrumentos no cambian." },
+  "dash.augCreditNote":     { en: "augmenting time credited at 50%", ko: "증원 시간 50% 인정", zh: "增援时间按 50% 计入", es: "tiempo de refuerzo acreditado al 50%" },
+  "charts.augCreditNote":   { en: "augmenting time at 50%", ko: "증원 시간 50%", zh: "增援时间 50%", es: "refuerzo al 50%" },
 
   // Flights page
   "flights.title":         { en: "Flights",                ko: "비행 기록",  zh: "飞行记录",    es: "Vuelos" },

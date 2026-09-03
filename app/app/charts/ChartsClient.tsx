@@ -12,6 +12,7 @@ import type { FlightDerived, Role } from "@/lib/types";
 import type { Airport } from "@/lib/airports";
 import FlightGlobe from "./Globe";
 import FlowSankey, { ROLE_COLORS, type FlowLink, type FlowNode } from "@/components/FlowSankey";
+import { creditedHours } from "@/lib/derive";
 import { makeT, type Locale } from "@/lib/i18n";
 
 const r1 = (n: number) => Math.round(n * 10) / 10;
@@ -34,9 +35,10 @@ const MIN_TYPE_SHARE = 0.01;
 const ROLE_ORDER: Role[] = ["PIC", "FO", "DUAL", "SIC", "CHECK"];
 
 export default function ChartsClient({
-  flights, globeAirports, globeArcs, globeYear, locale,
+  flights, globeAirports, globeArcs, globeYear, locale, augHalfCredit = false,
 }: {
   flights: FlightDerived[];
+  augHalfCredit?: boolean;
   globeAirports: Record<string, Airport>;
   globeArcs: Array<{ from: string; to: string; count: number }>;
   globeYear: string;
@@ -66,7 +68,7 @@ export default function ChartsClient({
     let grand = 0;
 
     for (const f of flights) {
-      const hrs = f.total_time;
+      const hrs = creditedHours(f, augHalfCredit);
       if (!f.role || !f.make_model || !f.date || hrs <= 0) continue;
       const year = f.date.slice(0, 4);
       const ac = f.make_model;
@@ -129,7 +131,7 @@ export default function ChartsClient({
 
     const tallest = Math.max(yearsAsc.length, aircraft.length, roles.length);
     return { nodes, links, years: yearsAsc, aircraft, roles, merged, tallest };
-  }, [flights]);
+  }, [flights, augHalfCredit]);
 
   const rolling = useMemo(() => {
     if (flights.length === 0) return [] as { date: string; hours: number }[];
@@ -188,7 +190,7 @@ export default function ChartsClient({
             <h2 className="text-sm font-bold text-slate-800">Career flow</h2>
             <div className="text-xs text-slate-500">
               Year → Aircraft → Role · {sankey.years.length} years · {sankey.aircraft.length} aircraft
-              {sankey.merged > 0 ? ` (${sankey.merged} minor types grouped as "${OTHER_TYPES}")` : ""} · {sankey.roles.length} roles
+              {sankey.merged > 0 ? ` (${sankey.merged} minor types grouped as "${OTHER_TYPES}")` : ""} · {sankey.roles.length} roles{augHalfCredit ? ` · ${t("charts.augCreditNote")}` : ""}
             </div>
           </div>
           <div className="flex items-center gap-3 text-[11px] text-slate-500">

@@ -8,6 +8,7 @@ export async function updateProfile(formData: FormData) {
   const full_name = String(formData.get("full_name") ?? "").trim() || null;
   const license_number = String(formData.get("license_number") ?? "").trim() || null;
   const primary_regime = String(formData.get("primary_regime") ?? "CA");
+  const aug_half_credit = formData.get("aug_half_credit") === "on";
 
   // Validate against the single source of truth so adding a regime to
   // REGIME_RULES is all that's needed for it to be selectable.
@@ -21,7 +22,7 @@ export async function updateProfile(formData: FormData) {
 
   const { error } = await supabase
     .from("profiles")
-    .update({ full_name, license_number, primary_regime })
+    .update({ full_name, license_number, primary_regime, aug_half_credit })
     .eq("id", user.id);
   if (error) return { error: error.message };
 

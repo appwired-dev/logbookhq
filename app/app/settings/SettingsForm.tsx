@@ -15,6 +15,7 @@ interface Profile {
   is_admin: boolean;
   avatar_url: string | null;
   share_token: string | null;
+  aug_half_credit: boolean;
 }
 
 export default function SettingsForm({ profile, locale }: { profile: Profile; locale: Locale }) {
@@ -139,6 +140,13 @@ export default function SettingsForm({ profile, locale }: { profile: Profile; lo
               ))}
             </select>
           </div>
+          <label className="sm:col-span-2 flex items-start gap-2 text-sm text-slate-700 pt-1">
+            <input type="checkbox" name="aug_half_credit" defaultChecked={profile.aug_half_credit} className="mt-0.5" />
+            <span>
+              <span className="font-medium">{t("settings.augCredit")}</span>
+              <span className="block text-xs text-slate-500">{t("settings.augCreditHint")}</span>
+            </span>
+          </label>
         </div>
         <div className="px-4 py-3 border-t border-slate-200/60 flex items-center gap-3">
           <button className="btn btn-primary" type="submit" disabled={pending}>

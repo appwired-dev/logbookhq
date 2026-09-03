@@ -11,7 +11,7 @@ export default async function SettingsPage() {
   const { data: { user } } = await supabase.auth.getUser();
   const { data: profile } = await supabase
     .from("profiles")
-    .select("full_name, email, license_number, primary_regime, tier, is_admin, avatar_url, share_token, stripe_customer_id")
+    .select("full_name, email, license_number, primary_regime, tier, is_admin, avatar_url, share_token, stripe_customer_id, aug_half_credit")
     .eq("id", user!.id)
     .single();
   const locale = await getLocale();

@@ -8,6 +8,10 @@ import ChartsClient from "./ChartsClient";
 
 export default async function ChartsPage() {
   const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const { data: profile } = await supabase
+    .from("profiles").select("aug_half_credit").eq("id", user!.id).maybeSingle();
+  const augHalfCredit = Boolean(profile?.aug_half_credit);
   const flights = await fetchAllFlights(supabase, { orderAsc: true });
   const derived = flights.map(deriveFlight);
 
@@ -82,5 +86,5 @@ export default async function ChartsPage() {
   });
 
   const locale = await getLocale();
-  return <ChartsClient flights={derived} globeAirports={airports} globeArcs={arcs} globeYear="Career" locale={locale} />;
+  return <ChartsClient flights={derived} globeAirports={airports} globeArcs={arcs} globeYear="Career" locale={locale} augHalfCredit={augHalfCredit} />;
 }

@@ -18,7 +18,7 @@ export default async function PublicSharePage({ params }: { params: Promise<{ to
 
   const { data: profile } = await admin
     .from("profiles")
-    .select("id, full_name, license_number, primary_regime")
+    .select("id, full_name, license_number, primary_regime, aug_half_credit")
     .eq("share_token", token)
     .maybeSingle();
   if (!profile) notFound();
@@ -39,7 +39,7 @@ export default async function PublicSharePage({ params }: { params: Promise<{ to
     all.push(...(data as Flight[]));
     if (data.length < PAGE) break;
   }
-  const totals = computeTotals(all);
+  const totals = computeTotals(all, { augHalfCredit: Boolean(profile.aug_half_credit) });
 
   // Sort aircraft types by hours desc for the breakdown table.
   const byType = Object.entries(totals.by_type)

@@ -35,7 +35,7 @@ export default async function DashboardPage() {
   const { data: { user } } = await supabase.auth.getUser();
   const { data: profile } = await supabase
     .from("profiles")
-    .select("primary_regime, full_name")
+    .select("primary_regime, full_name, aug_half_credit")
     .eq("id", user!.id)
     .single();
   const regime = (profile?.primary_regime ?? "CA") as Regime;
@@ -52,7 +52,8 @@ export default async function DashboardPage() {
 
   if (all.length === 0) return <EmptyState />;
 
-  const totals = computeTotals(all);
+  const augHalf = Boolean(profile?.aug_half_credit);
+  const totals = computeTotals(all, { augHalfCredit: augHalf });
   const currency = computeCurrencyForRegime(all, regime);
   const regimeRules = REGIME_RULES[regime];
   const t = await getT();
@@ -70,6 +71,7 @@ export default async function DashboardPage() {
               <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
               {t("dash.flightsAndHours", { flights: all.length.toLocaleString(), hours: totals.total_time.toFixed(1) })}
             </span>
+            {augHalf && <span className="ml-2 text-xs text-slate-400">· {t("dash.augCreditNote")}</span>}
           </p>
         </div>
         <div className="flex gap-2">

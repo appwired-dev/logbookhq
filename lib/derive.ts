@@ -44,21 +44,36 @@ export function deriveFlight(f: Flight): FlightDerived {
   return out;
 }
 
-export function computeTotals(flights: Flight[]): Totals {
+export type TotalsOptions = {
+  /** Count augmenting / cruise-relief (SIC) time at 50% in flight and type
+   *  totals. XC, instrument and approach figures stay as logged — the same
+   *  convention as the common paper / Numbers logbook layout. Regulatory
+   *  flight-time limits never use this (see currency-rules). */
+  augHalfCredit?: boolean;
+};
+
+/** Hours a flight contributes to experience totals under the user's convention. */
+export function creditedHours(f: FlightDerived, augHalfCredit: boolean): number {
+  return augHalfCredit && f.role === "SIC" ? r1(f.total_time * 0.5) : f.total_time;
+}
+
+export function computeTotals(flights: Flight[], opts: TotalsOptions = {}): Totals {
   const t: Totals = blank();
   for (const f of flights) {
     const d = deriveFlight(f);
     const role = d.role; // already AUG→SIC normalized by deriveFlight
-    t.total_time += d.total_time;
+    const k = opts.augHalfCredit && role === "SIC" ? 0.5 : 1;
+    const tt = d.total_time * k;
+    t.total_time += tt;
     if (role === "PIC") t.total_pic += d.total_time;
     if (role === "FO") t.total_fo += d.total_time;
 
     t.se_dual_day += d.se_dual_day; t.se_pic_day += d.se_pic_day;
     t.se_dual_night += d.se_dual_night; t.se_pic_night += d.se_pic_night;
     t.me_dual_day += d.me_dual_day; t.me_pic_day += d.me_pic_day;
-    t.me_fo_day += d.me_fo_day; t.me_sic_day += d.me_sic_day; t.me_check_day += d.me_check_day;
+    t.me_fo_day += d.me_fo_day; t.me_sic_day += d.me_sic_day * k; t.me_check_day += d.me_check_day;
     t.me_dual_night += d.me_dual_night; t.me_pic_night += d.me_pic_night;
-    t.me_fo_night += d.me_fo_night; t.me_sic_night += d.me_sic_night; t.me_check_night += d.me_check_night;
+    t.me_fo_night += d.me_fo_night; t.me_sic_night += d.me_sic_night * k; t.me_check_night += d.me_check_night;
 
     if (f.is_xcountry) {
       t.xc_day += d.day_time; t.xc_night += d.night_time;
@@ -84,18 +99,18 @@ export function computeTotals(flights: Flight[]): Totals {
 
     // Category-class aggregates for sea/heli (single number each, no day/night
     // or role split — defer that detail until users actually ask for it).
-    if (f.category === "SES") t.ses_total += d.total_time;
-    else if (f.category === "MES") t.mes_total += d.total_time;
-    else if (f.category === "HELI") t.heli_total += d.total_time;
+    if (f.category === "SES") t.ses_total += tt;
+    else if (f.category === "MES") t.mes_total += tt;
+    else if (f.category === "HELI") t.heli_total += tt;
 
     const key = f.make_model || "Unknown";
-    t.by_type[key] = (t.by_type[key] ?? 0) + d.total_time;
+    t.by_type[key] = (t.by_type[key] ?? 0) + tt;
 
     if (!t.by_type_role[key]) {
       t.by_type_role[key] = { PIC: 0, DUAL: 0, FO: 0, SIC: 0, CHECK: 0, total: 0, dominant: "PIC" };
     }
-    t.by_type_role[key][role] += d.total_time;
-    t.by_type_role[key].total += d.total_time;
+    t.by_type_role[key][role] += tt;
+    t.by_type_role[key].total += tt;
   }
 
   t.se_day = t.se_dual_day + t.se_pic_day;
