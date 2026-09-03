@@ -4,6 +4,7 @@ import { computeTotals } from "@/lib/derive";
 import { computeCurrencyForRegime, REGIME_RULES, type Regime } from "@/lib/currency-rules";
 import { fetchAllFlights } from "@/lib/fetch-flights";
 import { CountUp } from "@/components/CountUp";
+import AircraftRoleSankey from "@/components/AircraftRoleSankey";
 import { getT } from "@/lib/i18n-server";
 import type { TranslationKey } from "@/lib/i18n";
 import type { PilotDocument } from "@/lib/types";
@@ -262,17 +263,9 @@ export default async function DashboardPage() {
             <LegendDot color="bg-fuchsia-500" label={t("role.check")} />
           </div>
         </div>
-        <div className="space-y-1.5">
-          {Object.entries(totals.by_type)
-            .filter(([, v]) => v > 0)
-            .sort((a, b) => a[0].localeCompare(b[0]))
-            .map(([k, v], i) => (
-              <TypeArrowBar key={k} label={k} value={v}
-                            max={Math.max(...Object.values(totals.by_type))}
-                            index={i}
-                            roles={totals.by_type_role[k]} />
-            ))}
-        </div>
+        <AircraftRoleSankey
+          byTypeRole={totals.by_type_role}
+          roleLabels={{ PIC: t("dash.pic"), FO: t("role.fo"), DUAL: t("role.dual"), SIC: t("role.so"), CHECK: t("role.check") }} />
       </section>
     </div>
   );
@@ -407,144 +400,6 @@ function Breakdown({ title, rows, gradient }: {
           })}
         </tbody>
       </table>
-    </div>
-  );
-}
-
-/**
- * Per-role colour gradients for the dashboard "Time by Aircraft Type" bar.
- * Each role gets a light/mid/dark triplet for the 3D gradient treatment.
- */
-const ROLE_GRADIENT = {
-  PIC:   { lite: "#93c5fd", mid: "#3b82f6", dark: "#1e40af" }, // blue
-  FO:    { lite: "#6ee7b7", mid: "#10b981", dark: "#065f46" }, // emerald
-  DUAL:  { lite: "#fcd34d", mid: "#f59e0b", dark: "#92400e" }, // amber
-  SIC:   { lite: "#c4b5fd", mid: "#8b5cf6", dark: "#5b21b6" }, // violet (SO/Aug)
-  CHECK: { lite: "#f0abfc", mid: "#d946ef", dark: "#86198f" }, // fuchsia
-} as const;
-const ROLE_ORDER = ["PIC", "FO", "DUAL", "SIC", "CHECK"] as const;
-
-/**
- * Dashboard "Time by Aircraft Type" row: inline SVG horizontal 3D arrow bar.
- *
- * When `roles` is provided the front face is sub-divided into stacked
- * coloured segments (one per role) clipped to the arrow shape, so the same
- * pentagonal outline shows the role split. Top depth face stays neutral so
- * the role colours read clearly without competing chrome.
- */
-function TypeArrowBar({ label, value, max, index, roles }: {
-  label: string; value: number; max: number; index: number;
-  roles?: { PIC: number; DUAL: number; FO: number; SIC: number; CHECK: number; total: number };
-}) {
-  const pct = max > 0 ? (value / max) * 100 : 0;
-
-  // SVG dims — match the size used in dashboard list rows.
-  const W = 420, H = 28;
-  const barW = Math.max(2, (pct / 100) * W);
-  const depth = Math.min(H * 0.42, 8);
-  const id = `tab-${index}`;
-
-  // Flat rectangular bar (no arrow tip) with isometric top + right depth faces.
-  const front = [
-    `M 0,0`, `L ${barW},0`, `L ${barW},${H}`, `L 0,${H}`, "Z",
-  ].join(" ");
-  // Build a per-segment top-face path so each role's colour extends onto
-  // the top of the bar (rather than a flat grey top across the whole bar).
-  // Each top piece is a parallelogram from (start,0)→(end,0) projected
-  // back-up at the isometric angle.
-  const topParallelogram = (start: number, w: number) => [
-    `M ${start},0`, `L ${start + w},0`,
-    `L ${start + w + depth},${-depth}`, `L ${start + depth},${-depth}`, "Z",
-  ].join(" ");
-  const side = [
-    `M ${barW},0`,
-    `L ${barW + depth},${-depth}`,
-    `L ${barW + depth},${H - depth}`,
-    `L ${barW},${H}`,
-    "Z",
-  ].join(" ");
-
-  // Compute cumulative role segments along the bar body. Each segment is a
-  // contiguous slice proportional to that role's share of total time on
-  // this aircraft type. Falls back to a single PIC-blue fill when no roles.
-  const totalForSegs = roles?.total || value;
-  type RoleKey = keyof typeof ROLE_GRADIENT;
-  const segs: { role: RoleKey; start: number; w: number }[] = [];
-  if (roles && totalForSegs > 0) {
-    let cursor = 0;
-    for (const role of ROLE_ORDER) {
-      const hours = roles[role];
-      if (hours <= 0) continue;
-      const w = (hours / totalForSegs) * barW;
-      segs.push({ role, start: cursor, w });
-      cursor += w;
-    }
-  }
-  // Right side face is tinted with the rightmost-segment role colour so it
-  // visually belongs to that role (rather than a neutral grey).
-  const sideFill = segs.length > 0
-    ? ROLE_GRADIENT[segs[segs.length - 1].role].dark
-    : ROLE_GRADIENT.PIC.dark;
-
-  return (
-    <div className="flex items-center gap-3 py-1 group">
-      <span className="text-slate-800 truncate w-28 text-xs font-mono group-hover:text-slate-950 transition-colors">{label}</span>
-      <div className="flex-1 min-w-0">
-        <svg viewBox={`0 -${depth + 4} ${W + depth + 8} ${H + depth + 8}`} preserveAspectRatio="xMinYMid meet" className="w-full h-7 overflow-visible">
-          <defs>
-            {ROLE_ORDER.map((role) => (
-              <linearGradient key={role} id={`${id}-${role}`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={ROLE_GRADIENT[role].lite} />
-                <stop offset="50%" stopColor={ROLE_GRADIENT[role].mid} />
-                <stop offset="100%" stopColor={ROLE_GRADIENT[role].dark} />
-              </linearGradient>
-            ))}
-            <clipPath id={`${id}-clip`}>
-              <path d={front} />
-            </clipPath>
-            <filter id={`${id}-sh`} x="-20%" y="-20%" width="200%" height="200%">
-              <feDropShadow dx="4" dy="6" stdDeviation="1" floodColor="#94a3b8" floodOpacity="0.45" />
-            </filter>
-          </defs>
-          {/* Drop shadow under the bar silhouette */}
-          <g filter={`url(#${id}-sh)`}><path d={front} fill="rgba(0,0,0,0.001)" /></g>
-          {/* Right side depth face — tinted with the rightmost role's dark shade */}
-          <path d={side} fill={sideFill} opacity="0.85" />
-          {/* Top 3D depth face — one parallelogram per role segment, using the
-              role's LITE shade for a "lit from above" effect. Falls back to a
-              single PIC-blue top when the bar isn't role-segmented. */}
-          {segs.length > 0 ? (
-            segs.map((s) => (
-              <path key={`top-${s.role}`}
-                    d={topParallelogram(s.start, s.w + 0.5)}
-                    fill={ROLE_GRADIENT[s.role].lite}
-                    opacity="0.95" />
-            ))
-          ) : (
-            <path d={topParallelogram(0, barW)}
-                  fill={ROLE_GRADIENT.PIC.lite}
-                  opacity="0.95" />
-          )}
-          {/* Front face: stacked role segments clipped to the arrow shape.
-              +0.5 overlap on rect width prevents 1px gaps between segments. */}
-          {segs.length > 0 ? (
-            <g clipPath={`url(#${id}-clip)`}>
-              {segs.map((s) => (
-                <rect key={s.role} x={s.start} y={0}
-                      width={s.w + 0.5} height={H}
-                      fill={`url(#${id}-${s.role})`}>
-                  <title>{`${s.role}: ${(roles![s.role] ?? 0).toFixed(1)} hrs`}</title>
-                </rect>
-              ))}
-            </g>
-          ) : (
-            <path d={front} fill={`url(#${id}-PIC)`} />
-          )}
-          {/* Specular highlight along top edge */}
-          <path d={`M 0.5,0.5 L ${barW - 1},0.5`} stroke="rgba(255,255,255,0.55)" strokeWidth="1" strokeLinecap="round" />
-        </svg>
-      </div>
-      <span className="font-bold text-slate-900 w-16 text-right text-xs tabular-nums">{value.toFixed(1)}</span>
     </div>
   );
 }
