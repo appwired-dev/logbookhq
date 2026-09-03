@@ -212,7 +212,7 @@ export default function ChartsClient({
         <h2 className="text-sm font-bold text-slate-800 mb-4">{t("charts.rolling")}
           <span className="text-xs text-slate-500 font-normal ml-2">{t("charts.rollingPeak", { peak: peakRolling.toFixed(0) })}</span>
         </h2>
-        <div className="h-64">
+        <div className="h-52">
           <ResponsiveContainer>
             <AreaChart data={rolling} margin={{ top: 10, right: 10, bottom: 10, left: 0 }}>
               <defs>

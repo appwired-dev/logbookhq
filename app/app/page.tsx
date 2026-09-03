@@ -136,15 +136,15 @@ export default async function DashboardPage() {
       )}
 
       {/* CARs / regime currency */}
-      <section className="card card-hover p-6">
-        <div className="flex items-end justify-between mb-5">
+      <section className="card card-hover p-5">
+        <div className="flex items-end justify-between mb-3">
           <div>
             <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-sky-600/90">{regimeRules.reference}</div>
-            <h2 className="text-lg font-bold text-slate-900 tracking-tight">{t("limits.title", { regime: t(REGIME_NAME_KEY[regime]) })}</h2>
+            <h2 className="text-base font-bold text-slate-900 tracking-tight">{t("limits.title", { regime: t(REGIME_NAME_KEY[regime]) })}</h2>
           </div>
           <div className="text-xs text-slate-500 tabular-nums font-mono">{currency.today}</div>
         </div>
-        <div className="space-y-5">
+        <div className="space-y-3.5">
           {currency.windows.map((w, i) => {
             const overshoot = w.pct >= 100;
             const warn = w.pct >= 90;
@@ -157,14 +157,14 @@ export default async function DashboardPage() {
                     <span className="text-slate-400 ml-2 text-xs">{t("limits.since", { date: w.start_date })}</span>
                   </div>
                   <div className="tabular-nums">
-                    <span className="font-bold text-slate-900 text-lg">{w.used.toFixed(1)}</span>
+                    <span className="font-bold text-slate-900 text-base">{w.used.toFixed(1)}</span>
                     <span className="text-slate-400 text-sm"> / {w.max} {t("limits.hrs")}</span>
                     <span className={`ml-2 text-xs font-semibold ${overshoot ? "text-rose-600" : warn ? "text-amber-600" : "text-emerald-600"}`}>
                       {w.pct.toFixed(1)}%
                     </span>
                   </div>
                 </div>
-                <div className="bar-track h-2.5 rounded-full overflow-hidden">
+                <div className="bar-track h-2 rounded-full overflow-hidden">
                   <div className={`h-full rounded-full ${fillCls} bar-shimmer transition-all duration-1000 ease-out`}
                        style={{ width: `${Math.min(100, w.pct)}%` }} />
                 </div>
@@ -175,11 +175,11 @@ export default async function DashboardPage() {
       </section>
 
       {/* Recency (IFR + Day-PAX + Night-PAX) */}
-      <section className="card card-hover p-6">
-        <div className="flex items-end justify-between mb-5">
+      <section className="card card-hover p-5">
+        <div className="flex items-end justify-between mb-3">
           <div>
             <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-sky-600/90">{regimeRules.authority}</div>
-            <h2 className="text-lg font-bold text-slate-900 tracking-tight">{t("recency.title")}</h2>
+            <h2 className="text-base font-bold text-slate-900 tracking-tight">{t("recency.title")}</h2>
           </div>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -195,7 +195,7 @@ export default async function DashboardPage() {
             const pct = Math.min(100, (r.achieved / r.required) * 100);
             const fillCls = r.current ? "bg-gradient-to-r from-emerald-400 to-emerald-600" : "bg-gradient-to-r from-rose-400 to-rose-600";
             return (
-              <div key={r.key} className={`rounded-xl border p-4 ${ringCls}`}>
+              <div key={r.key} className={`rounded-xl border p-3 ${ringCls}`}>
                 <div className="flex items-baseline justify-between mb-1">
                   <h3 className="text-sm font-bold text-slate-800">{t(RECENCY_LABEL_KEY[r.key] ?? "recency.title")}</h3>
                   <span className={`text-[10px] font-bold uppercase tracking-wider ${labelCls}`}>
@@ -222,7 +222,7 @@ export default async function DashboardPage() {
       </section>
 
       {/* Breakdowns */}
-      <section className="grid md:grid-cols-2 gap-4">
+      <section className="grid md:grid-cols-2 xl:grid-cols-4 gap-3">
         <Breakdown title={t("dash.singleEngine")} gradient="from-slate-50 to-slate-100" rows={[
           [t("bd.dualDay"), totals.se_dual_day], [t("bd.picDay"), totals.se_pic_day], [t("bd.dayTotal"), totals.se_day, true],
           [t("bd.dualNight"), totals.se_dual_night], [t("bd.picNight"), totals.se_pic_night], [t("bd.nightTotal"), totals.se_night, true],
@@ -386,17 +386,17 @@ function Breakdown({ title, rows, gradient }: {
 }) {
   return (
     <div className="card card-hover overflow-hidden">
-      <div className={`bg-gradient-to-br ${gradient} px-5 py-3 border-b border-slate-200/60`}>
-        <h3 className="text-sm font-bold text-slate-800 tracking-tight">{title}</h3>
+      <div className={`bg-gradient-to-br ${gradient} px-4 py-2 border-b border-slate-200/60`}>
+        <h3 className="text-[13px] font-bold text-slate-800 tracking-tight">{title}</h3>
       </div>
-      <table className="w-full text-sm">
+      <table className="w-full text-[13px]">
         <tbody>
           {rows.map((row) => {
             const [k, v, emph] = row as [string, number, boolean | undefined];
             return (
               <tr key={k} className={`border-b border-slate-100 last:border-0 ${emph ? "bg-slate-50/60" : ""}`}>
-                <td className={`px-5 py-2 ${emph ? "font-semibold text-slate-800" : "text-slate-600"}`}>{k}</td>
-                <td className={`px-5 py-2 text-right tabular-nums ${emph ? "font-bold text-slate-900" : "font-medium text-slate-700"}`}>{v.toFixed(1)}</td>
+                <td className={`px-4 py-1.5 ${emph ? "font-semibold text-slate-800" : "text-slate-600"}`}>{k}</td>
+                <td className={`px-4 py-1.5 text-right tabular-nums ${emph ? "font-bold text-slate-900" : "font-medium text-slate-700"}`}>{v.toFixed(1)}</td>
               </tr>
             );
           })}
