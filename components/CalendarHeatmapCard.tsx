@@ -20,8 +20,8 @@ export default function CalendarHeatmapCard({ days, locale }: { days: HeatDay[];
   if (!calYear) return null;
 
   return (
-    <section className="card card-hover p-5">
-      <div className="flex items-center justify-between mb-3">
+    <section className="card card-hover p-4">
+      <div className="flex items-center justify-between mb-2">
         <h2 className="text-sm font-bold text-slate-800">{t("charts.calendar")}
           <span className="text-xs text-slate-500 font-normal ml-2">{t("charts.calDays", { year: calYear, days: calData.length })}</span>
         </h2>
@@ -29,7 +29,9 @@ export default function CalendarHeatmapCard({ days, locale }: { days: HeatDay[];
           {years.map((y) => <option key={y} value={y}>{y}</option>)}
         </select>
       </div>
-      <div className="text-xs">
+      {/* The heatmap SVG scales with its container; cap the width so the day
+          squares stay ~14px on wide monitors instead of growing with the page. */}
+      <div className="text-xs max-w-4xl">
         <CalendarHeatmap
           startDate={new Date(`${Number(calYear) - 1}-12-31`)}
           endDate={new Date(`${calYear}-12-31`)}
