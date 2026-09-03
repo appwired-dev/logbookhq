@@ -1,13 +1,11 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo } from "react";
 import {
   ResponsiveContainer,
   ReferenceLine, Area, AreaChart,
   XAxis, YAxis, CartesianGrid, Tooltip,
 } from "recharts";
-import CalendarHeatmap from "react-calendar-heatmap";
-import "react-calendar-heatmap/dist/styles.css";
 import type { FlightDerived, Role } from "@/lib/types";
 import type { Airport } from "@/lib/airports";
 import FlightGlobe from "./Globe";
@@ -45,17 +43,6 @@ export default function ChartsClient({
   locale: Locale;
 }) {
   const t = makeT(locale);
-  const years = useMemo(() => {
-    const s = new Set<string>();
-    for (const f of flights) s.add(f.date.slice(0, 4));
-    return [...s].sort();
-  }, [flights]);
-
-  const [calYear, setCalYear] = useState("");
-  useEffect(() => {
-    if (calYear === "" && years.length > 0) setCalYear(years[years.length - 1]);
-  }, [years, calYear]);
-
   // Career flow: Year → Aircraft type → Role.
   // Years stay chronological, each aircraft is placed at the year it first
   // appears (so ribbons drift diagonally instead of crossing), and types under
@@ -158,16 +145,6 @@ export default function ChartsClient({
     return points;
   }, [flights]);
 
-  const calData = useMemo(() => {
-    if (!calYear) return [];
-    const m = new Map<string, number>();
-    for (const f of flights) {
-      if (!f.date.startsWith(calYear)) continue;
-      m.set(f.date, (m.get(f.date) ?? 0) + f.total_time);
-    }
-    return [...m.entries()].map(([date, hours]) => ({ date, count: r1(hours) }));
-  }, [flights, calYear]);
-
   if (flights.length === 0) return <p className="text-slate-500">{t("charts.emptyState")}</p>;
 
   const peakRolling = rolling.reduce((m, p) => Math.max(m, p.hours), 0);
@@ -230,34 +207,6 @@ export default function ChartsClient({
             </AreaChart>
           </ResponsiveContainer>
         </div>
-      </section>
-
-      <section className="chart-stage">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-bold text-slate-800">{t("charts.calendar")}
-            <span className="text-xs text-slate-500 font-normal ml-2">{t("charts.calDays", { year: calYear, days: calData.length })}</span>
-          </h2>
-          <select className="input w-auto" value={calYear} onChange={(e) => setCalYear(e.target.value)}>
-            {years.map((y) => <option key={y} value={y}>{y}</option>)}
-          </select>
-        </div>
-        {calYear && (
-          <div className="text-xs">
-            <CalendarHeatmap
-              startDate={new Date(`${Number(calYear) - 1}-12-31`)}
-              endDate={new Date(`${calYear}-12-31`)}
-              values={calData}
-              classForValue={(v) => {
-                if (!v || !v.count) return "color-empty";
-                if (v.count < 1) return "color-scale-1";
-                if (v.count < 3) return "color-scale-2";
-                if (v.count < 6) return "color-scale-3";
-                return "color-scale-4";
-              }}
-              titleForValue={(v: any) => v?.date ? `${v.date}: ${v.count} hrs` : "no flight"}
-            />
-          </div>
-        )}
       </section>
     </div>
   );

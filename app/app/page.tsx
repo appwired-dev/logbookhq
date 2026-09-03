@@ -5,7 +5,8 @@ import { computeCurrencyForRegime, REGIME_RULES, type Regime } from "@/lib/curre
 import { fetchAllFlights } from "@/lib/fetch-flights";
 import { CountUp } from "@/components/CountUp";
 import AircraftRoleSankey from "@/components/AircraftRoleSankey";
-import { getT } from "@/lib/i18n-server";
+import { getT, getLocale } from "@/lib/i18n-server";
+import CalendarHeatmapCard, { type HeatDay } from "@/components/CalendarHeatmapCard";
 import type { TranslationKey } from "@/lib/i18n";
 import type { PilotDocument } from "@/lib/types";
 
@@ -57,6 +58,15 @@ export default async function DashboardPage() {
   const currency = computeCurrencyForRegime(all, regime);
   const regimeRules = REGIME_RULES[regime];
   const t = await getT();
+  const locale = await getLocale();
+
+  // Per-day hours for the calendar heatmap — one entry per flying day, so the
+  // client gets ~1.5k tiny rows instead of every flight.
+  const heatDays: HeatDay[] = (() => {
+    const m = new Map<string, number>();
+    for (const f of all) m.set(f.date, (m.get(f.date) ?? 0) + Number(f.day_time) + Number(f.night_time));
+    return [...m.entries()].map(([date, h]) => ({ date, count: Math.round(h * 10) / 10 }));
+  })();
 
   return (
     <div className="cascade space-y-7">
@@ -82,7 +92,7 @@ export default async function DashboardPage() {
 
       {/* Hero stats — 5 tiles on wide screens (Total · PIC · FO · XC · IFR),
           2 cols on phones, 3 cols on small tablets. */}
-      <section className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+      <section className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
         <HeroStat label={t("dash.totalTime")} value={totals.total_time} hrsLabel={t("limits.hrs")}
                   gradient="bg-gradient-aviation"
                   shadow="shadow-[0_8px_32px_rgba(7,89,133,0.35)]"
@@ -109,7 +119,7 @@ export default async function DashboardPage() {
           Sea (SES/MES) and Helicopter tiles only render when the pilot
           actually has hours in them, so airline FAA pilots don't see a
           dashboard cluttered with 0.0-hrs categories they never fly. */}
-      <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <section className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         <Stat label={t("dash.singleEngine")} value={totals.se_total} hrsLabel={t("limits.hrs")} />
         <Stat label={t("dash.multiEngine")} value={totals.me_total} hrsLabel={t("limits.hrs")} />
         <Stat label={t("dash.ifrApproaches")} value={totals.ifr_approaches} integer />
@@ -269,6 +279,9 @@ export default async function DashboardPage() {
           byTypeRole={totals.by_type_role}
           roleLabels={{ PIC: t("dash.pic"), FO: t("role.fo"), DUAL: t("role.dual"), SIC: t("role.so"), CHECK: t("role.check") }} />
       </section>
+
+      {/* Calendar heatmap — moved here from the charts page */}
+      <CalendarHeatmapCard days={heatDays} locale={locale} />
     </div>
   );
 }
@@ -348,7 +361,7 @@ function HeroStat({ label, value, gradient, shadow, accent, orbColor, hrsLabel =
   label: string; value: number; gradient: string; shadow: string; accent: string; orbColor: string; hrsLabel?: string;
 }) {
   return (
-    <div className={`group relative overflow-hidden rounded-2xl ${gradient} ${shadow} p-5 text-white card-hover transition-all duration-300`}>
+    <div className={`group relative overflow-hidden rounded-2xl ${gradient} ${shadow} p-4 text-white card-hover transition-all duration-300`}>
       {/* Soft inner highlight */}
       <div className="absolute inset-0 bg-gradient-to-br from-white/15 to-transparent pointer-events-none" />
       {/* Floating orb that drifts slightly on hover */}
@@ -356,8 +369,8 @@ function HeroStat({ label, value, gradient, shadow, accent, orbColor, hrsLabel =
       {/* Top edge bevel */}
       <div className="absolute top-0 left-0 right-0 h-px bg-white/30 pointer-events-none" />
       <div className="relative">
-        <div className={`text-[10px] font-bold uppercase tracking-[0.12em] ${accent} mb-2`}>{label}</div>
-        <div className="text-4xl font-bold tracking-tight drop-shadow-sm">
+        <div className={`text-[10px] font-bold uppercase tracking-[0.12em] ${accent} mb-1.5`}>{label}</div>
+        <div className="text-3xl font-bold tracking-tight drop-shadow-sm">
           <CountUp value={value} decimals={1} />
           <span className="text-base font-normal opacity-70 ml-1.5">{hrsLabel}</span>
         </div>
@@ -368,9 +381,9 @@ function HeroStat({ label, value, gradient, shadow, accent, orbColor, hrsLabel =
 
 function Stat({ label, value, integer = false, hrsLabel = "hrs" }: { label: string; value: number; integer?: boolean; hrsLabel?: string }) {
   return (
-    <div className="card card-hover p-4">
+    <div className="card card-hover p-3.5">
       <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">{label}</div>
-      <div className="text-2xl font-bold tabular-nums mt-1 text-slate-900 tracking-tight">
+      <div className="text-xl font-bold tabular-nums mt-1 text-slate-900 tracking-tight">
         <CountUp value={value} decimals={integer ? 0 : 1} />
         {!integer && <span className="text-xs font-normal text-slate-400 ml-1">{hrsLabel}</span>}
       </div>
