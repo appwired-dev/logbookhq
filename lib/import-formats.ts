@@ -562,8 +562,14 @@ function parseNumbersMultihead(text: string): ParsedFlight[] {
     const date = parseAnyDate(r[0] ?? "");
     if (!date) continue; // skips the 3 header rows
 
-    const make = (r[1] ?? "").trim();
-    if (!make) continue;
+    let make = (r[1] ?? "").trim();
+    if (!make) {
+      // Sim / PPC sessions are sometimes logged with the aircraft cell blank.
+      // Keep them (as SIM) when the row carries sim time or approaches, so the
+      // sim total and approach count reconcile with the spreadsheet's Totals.
+      if (num(r[27]) > 0 || num(r[28]) > 0) make = "SIM";
+      else continue;
+    }
 
     const reg = (r[2] ?? "").trim() || null;
     const pic = (r[3] ?? "").trim() || null;
@@ -571,6 +577,14 @@ function parseNumbersMultihead(text: string): ParsedFlight[] {
     const route = (r[5] ?? "").trim() || null;
     const remarks = (r[6] ?? "").trim() || null;
 
+    // Column map (0-indexed), verified against the live Numbers export header:
+    //   7-8   SE Day   Dual, PIC          9-10  SE Night  Dual, PIC
+    //   11-14 ME Day   Dual, PIC, FO, AUG 15-18 ME Night  Dual, PIC, FO, AUG
+    //   19-21 XC Day   FO, PIC, AUG       22-24 XC Night  FO, PIC, AUG
+    //   25 Actual  26 Hood  27 Sim  28 #IFR Approaches  29 row Total
+    // The ME blocks have FOUR role columns. An earlier map assumed three and
+    // shifted everything from col 14 onward: ME-night FO/AUG time vanished and
+    // the XC columns were read as instrument time / approach counts.
     const seDualDay = num(r[7]);
     const sePicDay = num(r[8]);
     const seDualNight = num(r[9]);
@@ -579,24 +593,23 @@ function parseNumbersMultihead(text: string): ParsedFlight[] {
     const meDualDay = num(r[11]);
     const mePicDay = num(r[12]);
     const meFoDay = num(r[13]);
-    const meDualNight = num(r[14]);
-    const mePicNight = num(r[15]);
-    const meFoNight = num(r[16]);
+    const meAugDay = num(r[14]);
+    const meDualNight = num(r[15]);
+    const mePicNight = num(r[16]);
+    const meFoNight = num(r[17]);
+    const meAugNight = num(r[18]);
 
-    const xcDayDual = num(r[17]);
-    const xcDayPic = num(r[18]);
-    const xcNightDual = num(r[19]);
-    const xcNightPic = num(r[20]);
-    const isXc = xcDayDual + xcDayPic + xcNightDual + xcNightPic > 0;
+    const xcTotal = num(r[19]) + num(r[20]) + num(r[21]) + num(r[22]) + num(r[23]) + num(r[24]);
+    const isXc = xcTotal > 0;
 
-    const actualInst = num(r[21]);
-    const hoodInst = num(r[22]);
-    const simInst = num(r[23]);
-    const ifrApp = Math.round(num(r[24]));
+    const actualInst = num(r[25]);
+    const hoodInst = num(r[26]);
+    const simInst = num(r[27]);
+    const ifrApp = Math.round(num(r[28]));
 
     // Pick category + role from the heaviest time bucket on this row.
     const seTotal = seDualDay + sePicDay + seDualNight + sePicNight;
-    const meTotal = meDualDay + mePicDay + meFoDay + meDualNight + mePicNight + meFoNight;
+    const meTotal = meDualDay + mePicDay + meFoDay + meAugDay + meDualNight + mePicNight + meFoNight + meAugNight;
 
     let category: Category;
     let role: Role;
@@ -616,6 +629,7 @@ function parseNumbersMultihead(text: string): ParsedFlight[] {
         ["DUAL", meDualDay, meDualNight],
         ["PIC",  mePicDay,  mePicNight],
         ["FO",   meFoDay,   meFoNight],
+        ["SIC",  meAugDay,  meAugNight], // AUG (augmenting / cruise relief) crew
       ];
       const best = candidates.reduce((a, b) => (b[1] + b[2] > a[1] + a[2] ? b : a));
       role = best[0]; dayTime = best[1]; nightTime = best[2];
