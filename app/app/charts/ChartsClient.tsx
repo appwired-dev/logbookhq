@@ -203,7 +203,7 @@ export default function ChartsClient({
         <p className="text-[11px] text-slate-400 mb-3">
           Ribbon width is hours. Years run top to bottom in order; each aircraft sits beside the year it first appears. Hover a ribbon for the exact figure.
         </p>
-        <FlowSankey nodes={sankey.nodes} links={sankey.links} height={Math.max(640, sankey.tallest * 32)} />
+        <FlowSankey nodes={sankey.nodes} links={sankey.links} height={Math.max(640, sankey.tallest * 32)} columns={3} />
       </section>
 
       <section className="chart-stage">

@@ -48,5 +48,5 @@ export default function AircraftRoleSankey({
     return { nodes, links, rows: rowsOut.length };
   }, [byTypeRole, roleLabels, minShare, otherLabel]);
 
-  return <FlowSankey nodes={nodes} links={links} height={Math.max(440, rows * 42)} />;
+  return <FlowSankey nodes={nodes} links={links} height={Math.max(440, rows * 42)} columns={2} />;
 }

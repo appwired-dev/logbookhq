@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ResponsiveContainer, Sankey, Tooltip } from "recharts";
 import type { Role } from "@/lib/types";
 
@@ -24,35 +24,42 @@ type NodeShapeProps = {
   x?: number; y?: number; width?: number; height?: number;
   payload?: FlowNode & { depth?: number; value?: number };
   fmt: Fmt;
+  dense: boolean;
+  lastDepth: number;
 };
 
 // Source column labels sit to the right of the bar, every later column to the
 // left, so text always points inward toward the flow (same convention as the
-// finance-style diagrams this was modelled on).
-function NodeShape({ x = 0, y = 0, width = 0, height = 0, payload, fmt }: NodeShapeProps) {
-  const onRight = (payload?.depth ?? 0) === 0;
+// finance-style diagrams this was modelled on). Every node gets a label —
+// nodePadding keeps adjacent single-line labels apart, and the small rows are
+// exactly the ones a reader can't identify from the ribbon alone. When the
+// container is too narrow for inward-facing labels on both sides of a middle
+// column, that column drops to name-only so it can't collide with its
+// neighbours (the value is still in the tooltip).
+function NodeShape({ x = 0, y = 0, width = 0, height = 0, payload, fmt, dense, lastDepth }: NodeShapeProps) {
+  const depth = payload?.depth ?? 0;
+  const onRight = depth === 0;
+  const middle = depth > 0 && depth < lastDepth;
   const lx = onRight ? x + width + 8 : x - 8;
   const anchor = onRight ? "start" : "end";
   const name = payload?.name ?? "";
   const value = fmt(payload?.value ?? 0);
-  // Always label — nodePadding keeps adjacent single-line labels apart, and
-  // the small rows (a 1% type, a 5-hour year) are exactly the ones a reader
-  // can't identify from the ribbon alone.
-  const compact = height < 24;
+  const nameOnly = dense && middle;
+  const compact = nameOnly || height < 24;
   return (
     <g>
       <rect x={x} y={y} width={width} height={Math.max(height, 2)} rx={3} fill={payload?.color ?? "#94a3b8"} />
-      {height >= 1 && (compact ? (
+      {compact ? (
         <text x={lx} y={y + height / 2} textAnchor={anchor} dominantBaseline="middle" fontSize={11} fill="#334155">
           <tspan fontWeight={600}>{name}</tspan>
-          <tspan fill="#64748b" fontFamily={MONO} fontSize={10}>{`  ${value}`}</tspan>
+          {!nameOnly && <tspan fill="#64748b" fontFamily={MONO} fontSize={10}>{`  ${value}`}</tspan>}
         </text>
       ) : (
         <text x={lx} y={y + height / 2} textAnchor={anchor} fontSize={12} fill="#1e293b">
           <tspan x={lx} dy="-0.2em" fontWeight={600}>{name}</tspan>
           <tspan x={lx} dy="1.3em" fill="#64748b" fontFamily={MONO} fontSize={11}>{value}</tspan>
         </text>
-      ))}
+      )}
     </g>
   );
 }
@@ -99,7 +106,7 @@ function FlowTooltip({ active, payload, fmt }: { active?: boolean; payload?: Too
 }
 
 export default function FlowSankey({
-  nodes, links, height,
+  nodes, links, height, columns = 2,
   fmt = (n) => `${n.toFixed(1)} hrs`,
   nodeWidth = 14, nodePadding = 14,
   margin = { top: 12, right: 16, bottom: 12, left: 16 },
@@ -107,15 +114,29 @@ export default function FlowSankey({
   nodes: FlowNode[];
   links: FlowLink[];
   height: number;
+  /** Number of node columns (depth levels); drives the narrow-width label mode. */
+  columns?: number;
   fmt?: Fmt;
   nodeWidth?: number;
   nodePadding?: number;
   margin?: { top: number; right: number; bottom: number; left: number };
 }) {
   const data = useMemo(() => ({ nodes, links }), [nodes, links]);
+  const ref = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(0);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => setWidth(entries[0]?.contentRect.width ?? 0));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  // ~360px per column is the minimum for two inward-facing labels to clear
+  // each other; below that, middle columns switch to name-only labels.
+  const dense = width > 0 && width < columns * 360;
   if (nodes.length === 0 || links.length === 0) return null;
   return (
-    <div style={{ height }}>
+    <div ref={ref} style={{ height }}>
       <ResponsiveContainer width="100%" height="100%">
         {/* sort={false} + iterations={0} keep nodes in the order given, so a
             chronological input stays chronological instead of being shuffled
@@ -127,7 +148,7 @@ export default function FlowSankey({
           nodeWidth={nodeWidth}
           nodePadding={nodePadding}
           linkCurvature={0.55}
-          node={<NodeShape fmt={fmt} />}
+          node={<NodeShape fmt={fmt} dense={dense} lastDepth={columns - 1} />}
           link={<LinkShape />}
           margin={margin}
         >
