@@ -45,7 +45,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <Tab href="/app">{t("nav.dashboard")}</Tab>
             <Tab href="/app/flights">{t("nav.flights")}</Tab>
             <Tab href="/app/charts">{t("nav.charts")}</Tab>
-            <Tab href="/app/badges">{t("nav.badges")}</Tab>
             <Tab href="/app/documents">{t("nav.documents")}</Tab>
             <Tab href="/app/transfer">{t("nav.transfer")}</Tab>
             <Tab href="/app/settings">{t("nav.settings")}</Tab>
