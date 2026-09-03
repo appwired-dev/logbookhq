@@ -138,12 +138,27 @@ export async function importCsvAction(formData: FormData) {
   // for not losing irreplaceable data on a flaky network.
   let oldIds: number[] = [];
   if (replace) {
-    const { data: existing, error: snapErr } = await supabase
-      .from("flights")
-      .select("id")
-      .eq("user_id", user.id);
-    if (snapErr) return { error: `Snapshot failed: ${snapErr.message}` };
-    oldIds = (existing ?? []).map((r) => r.id as number);
+    // Snapshot in 1000-row pages. PostgREST silently caps a single .select()
+    // at 1000 rows (project's db.max_rows) — an unbounded query on a user
+    // with more than that returns only the first 1000 ids, so the cleanup
+    // step below leaves the rest as stale rows next to the new import.
+    // Real incident: a user with 2,644 flights had 644 old rows survive.
+    const PAGE = 1000;
+    let from = 0;
+    for (;;) {
+      const { data: page, error: snapErr } = await supabase
+        .from("flights")
+        .select("id")
+        .eq("user_id", user.id)
+        .order("id")
+        .range(from, from + PAGE - 1);
+      if (snapErr) return { error: `Snapshot failed: ${snapErr.message}` };
+      if (!page || page.length === 0) break;
+      for (const r of page) oldIds.push(r.id as number);
+      if (page.length < PAGE) break;
+      from += PAGE;
+      if (from >= 200_000) break; // runaway guard
+    }
   }
 
   // Stamp user_id and batch-insert. Default duty_time to 0 for imports.
