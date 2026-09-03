@@ -10,3 +10,6 @@ dist
 .vercel
 next-env.d.ts
 tsconfig.tsbuildinfo
+
+# local env backups made by tooling
+.env.local.backup*
