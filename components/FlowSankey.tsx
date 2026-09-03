@@ -35,11 +35,14 @@ function NodeShape({ x = 0, y = 0, width = 0, height = 0, payload, fmt }: NodeSh
   const anchor = onRight ? "start" : "end";
   const name = payload?.name ?? "";
   const value = fmt(payload?.value ?? 0);
+  // Always label — nodePadding keeps adjacent single-line labels apart, and
+  // the small rows (a 1% type, a 5-hour year) are exactly the ones a reader
+  // can't identify from the ribbon alone.
   const compact = height < 24;
   return (
     <g>
       <rect x={x} y={y} width={width} height={Math.max(height, 2)} rx={3} fill={payload?.color ?? "#94a3b8"} />
-      {height >= 3 && (compact ? (
+      {height >= 1 && (compact ? (
         <text x={lx} y={y + height / 2} textAnchor={anchor} dominantBaseline="middle" fontSize={11} fill="#334155">
           <tspan fontWeight={600}>{name}</tspan>
           <tspan fill="#64748b" fontFamily={MONO} fontSize={10}>{`  ${value}`}</tspan>
