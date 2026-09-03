@@ -145,36 +145,37 @@ export default async function DashboardPage() {
                      daysLabel={(d) => d < 0 ? t("dash.expiredAgo", { days: -d }) : t("dash.daysLeft", { days: d })} />
       )}
 
-      {/* CARs / regime currency */}
-      <section className="card card-hover p-5">
-        <div className="flex items-end justify-between mb-3">
+      {/* CARs / regime currency + calendar heatmap, side by side near the top */}
+      <section className="grid lg:grid-cols-2 gap-3 items-start">
+      <div className="card card-hover p-4">
+        <div className="flex items-end justify-between mb-2">
           <div>
             <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-sky-600/90">{regimeRules.reference}</div>
-            <h2 className="text-base font-bold text-slate-900 tracking-tight">{t("limits.title", { regime: t(REGIME_NAME_KEY[regime]) })}</h2>
+            <h2 className="text-sm font-bold text-slate-900 tracking-tight">{t("limits.title", { regime: t(REGIME_NAME_KEY[regime]) })}</h2>
           </div>
           <div className="text-xs text-slate-500 tabular-nums font-mono">{currency.today}</div>
         </div>
-        <div className="space-y-3.5">
+        <div className="space-y-2.5">
           {currency.windows.map((w, i) => {
             const overshoot = w.pct >= 100;
             const warn = w.pct >= 90;
             const fillCls = overshoot ? "bar-fill-bad" : warn ? "bar-fill-warn" : "bar-fill-good";
             return (
               <div key={w.label} style={{ animationDelay: `${0.05 * i}s` }} className="animate-[fadeUp_0.5s_ease-out_both]">
-                <div className="flex justify-between items-baseline text-sm mb-1.5">
+                <div className="flex justify-between items-baseline text-[13px] mb-1">
                   <div>
                     <span className="font-semibold text-slate-800">{t("limits.lastDays", { n: w.days })}</span>
                     <span className="text-slate-400 ml-2 text-xs">{t("limits.since", { date: w.start_date })}</span>
                   </div>
                   <div className="tabular-nums">
-                    <span className="font-bold text-slate-900 text-base">{w.used.toFixed(1)}</span>
+                    <span className="font-bold text-slate-900 text-sm">{w.used.toFixed(1)}</span>
                     <span className="text-slate-400 text-sm"> / {w.max} {t("limits.hrs")}</span>
                     <span className={`ml-2 text-xs font-semibold ${overshoot ? "text-rose-600" : warn ? "text-amber-600" : "text-emerald-600"}`}>
                       {w.pct.toFixed(1)}%
                     </span>
                   </div>
                 </div>
-                <div className="bar-track h-2 rounded-full overflow-hidden">
+                <div className="bar-track h-1.5 rounded-full overflow-hidden">
                   <div className={`h-full rounded-full ${fillCls} bar-shimmer transition-all duration-1000 ease-out`}
                        style={{ width: `${Math.min(100, w.pct)}%` }} />
                 </div>
@@ -182,6 +183,8 @@ export default async function DashboardPage() {
             );
           })}
         </div>
+      </div>
+      <CalendarHeatmapCard days={heatDays} locale={locale} />
       </section>
 
       {/* Recency (IFR + Day-PAX + Night-PAX) */}
@@ -280,8 +283,6 @@ export default async function DashboardPage() {
           roleLabels={{ PIC: t("dash.pic"), FO: t("role.fo"), DUAL: t("role.dual"), SIC: t("role.so"), CHECK: t("role.check") }} />
       </section>
 
-      {/* Calendar heatmap — moved here from the charts page */}
-      <CalendarHeatmapCard days={heatDays} locale={locale} />
     </div>
   );
 }
