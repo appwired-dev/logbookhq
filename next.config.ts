@@ -5,9 +5,9 @@ const config: NextConfig = {
   reactStrictMode: true,
   experimental: {
     serverActions: {
-      // Document vault accepts files up to 10 MB; the default 1 MB rejects
-      // most PDF medicals and passport scans.
-      bodySizeLimit: "10mb",
+      // Document vault + logbook imports; bumped past 10 MB because Numbers/
+      // Excel exports of long flight histories can approach 15 MB.
+      bodySizeLimit: "25mb",
     },
   },
 };
