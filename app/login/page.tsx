@@ -5,11 +5,12 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { login } from "./actions";
 import { AuthShell } from "@/components/AuthShell";
+import { LoginFormSkeleton } from "./loading";
 
 export default function LoginPage() {
   return (
     <AuthShell title="Sign in" subtitle="Welcome back to Pilot Logbook HQ.">
-      <Suspense fallback={<div className="text-sm text-slate-500">Loading…</div>}>
+      <Suspense fallback={<LoginFormSkeleton />}>
         <LoginForm />
       </Suspense>
     </AuthShell>
