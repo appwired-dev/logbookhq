@@ -1,13 +1,32 @@
 import Stripe from "stripe";
 
 /**
- * Singleton Stripe SDK client. Pinned API version so a Stripe-side upgrade
- * doesn't silently change webhook payload shapes.
+ * Lazily-constructed singleton Stripe SDK client. Pinned API version so a
+ * Stripe-side upgrade doesn't silently change webhook payload shapes.
+ *
+ * Lazy on purpose: `next build` imports every route module while collecting
+ * page data, and an eager `new Stripe(undefined)` throws — which broke every
+ * build in an environment without STRIPE_SECRET_KEY (local, Vercel previews).
+ * The client is created on first use, so a missing key only fails the request
+ * that actually needs Stripe. Call sites keep using `stripe.<api>` unchanged.
  *
  * Server-side only — never import from a Client Component.
  */
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2026-04-22.dahlia",
+let client: Stripe | null = null;
+function getStripe(): Stripe {
+  if (!client) {
+    const key = process.env.STRIPE_SECRET_KEY;
+    if (!key) throw new Error("STRIPE_SECRET_KEY is not configured for this environment");
+    client = new Stripe(key, { apiVersion: "2026-04-22.dahlia" });
+  }
+  return client;
+}
+export const stripe: Stripe = new Proxy({} as Stripe, {
+  get(_target, prop) {
+    const c = getStripe();
+    const value = Reflect.get(c, prop, c);
+    return typeof value === "function" ? (value as (...a: unknown[]) => unknown).bind(c) : value;
+  },
 });
 
 /** Map our internal plan codes to the Stripe Price IDs from env. */
