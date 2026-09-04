@@ -275,6 +275,10 @@ function BottomBar({
     if (!nodes.length) return;
     const idx = nodes.indexOf(document.activeElement as HTMLElement);
     let next = -1;
+    if (e.key === " ") {
+      const el = document.activeElement as HTMLElement | null;
+      if (el && el.tagName === "A") { e.preventDefault(); el.click(); return; }
+    }
     if (e.key === "ArrowDown") next = (idx + 1) % nodes.length;
     else if (e.key === "ArrowUp") next = (idx - 1 + nodes.length) % nodes.length;
     else if (e.key === "Home") next = 0;

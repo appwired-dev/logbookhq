@@ -34,7 +34,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // Admin tab — only rendered for admin profiles; amber accent distinguishes
   // it from regular nav. Non-admins never see it.
   if (profile?.is_admin) {
-    items.push({ href: "/app/admin", label: "Admin", icon: "ShieldCheck", tone: "accent" });
+    items.push({ href: "/app/admin", label: t("nav.admin"), icon: "ShieldCheck", tone: "accent" });
   }
 
   const regime = profile?.primary_regime ?? "CA";
@@ -69,7 +69,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </div>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-[1440px] px-4 sm:px-6 py-5 sm:py-6 pb-24 md:pb-6 flex-1">
+      <main className="mx-auto w-full max-w-[1440px] px-4 sm:px-6 py-5 sm:py-6 pb-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom)+2.5rem)] md:pb-6 flex-1">
         {children}
       </main>
     </div>

@@ -18,7 +18,7 @@ export default async function BillingSuccessPage() {
 
   return (
     <div className="max-w-xl mx-auto py-16">
-      <EmptyState
+      <EmptyState headingLevel={1}
         icon={Icon.PartyPopper}
         title={firstName ? `Welcome to Pro, ${firstName}!` : "Welcome to Pro!"}
         body={<>

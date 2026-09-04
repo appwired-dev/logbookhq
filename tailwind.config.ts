@@ -19,11 +19,17 @@ const config: Config = {
         brand: v("brand"),
         "brand-deep": v("brand-deep"),
         "brand-glow": v("brand-glow"),
-        good: v("good"),
-        warn: v("warn"),
-        bad: v("bad"),
-        role: { pic: v("role-pic"), dual: v("role-dual"), fo: v("role-fo"), sic: v("role-sic"), check: v("role-check") },
-        cat: { se: v("cat-se"), me: v("cat-me"), heli: v("cat-heli"), sim: v("cat-sim") },
+        good: v("good"), "good-ink": v("good-ink"),
+        warn: v("warn"), "warn-ink": v("warn-ink"),
+        bad: v("bad"), "bad-ink": v("bad-ink"),
+        role: {
+          pic: v("role-pic"), dual: v("role-dual"), fo: v("role-fo"), sic: v("role-sic"), check: v("role-check"),
+          "pic-ink": v("role-pic-ink"), "dual-ink": v("role-dual-ink"), "fo-ink": v("role-fo-ink"), "sic-ink": v("role-sic-ink"), "check-ink": v("role-check-ink"),
+        },
+        cat: {
+          se: v("cat-se"), me: v("cat-me"), heli: v("cat-heli"), sim: v("cat-sim"),
+          "se-ink": v("cat-se-ink"), "me-ink": v("cat-me-ink"), "heli-ink": v("cat-heli-ink"), "sim-ink": v("cat-sim-ink"),
+        },
         chart: {
           1: v("chart-1"), 2: v("chart-2"), 3: v("chart-3"), 4: v("chart-4"),
           5: v("chart-5"), 6: v("chart-6"), 7: v("chart-7"), 8: v("chart-8"),

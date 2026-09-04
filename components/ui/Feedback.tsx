@@ -3,16 +3,19 @@ import type { LucideIcon } from "lucide-react";
 import { CircleAlert, Check, Info, TriangleAlert } from "./icons";
 
 export function EmptyState({
-  icon: Icon, title, body, primary, secondary, className = "",
+  icon: Icon, title, body, primary, secondary, className = "", headingLevel = 2,
 }: {
   icon: LucideIcon; title: ReactNode; body?: ReactNode; primary?: ReactNode; secondary?: ReactNode; className?: string;
+  /** Use 1 when the empty state is the page's only heading (404, success pages). */
+  headingLevel?: 1 | 2 | 3;
 }) {
+  const Heading = (`h${headingLevel}`) as "h1" | "h2" | "h3";
   return (
     <div className={`card p-10 text-center ${className}`}>
       <div className="mx-auto w-12 h-12 rounded-xl bg-brand/10 text-brand grid place-items-center">
         <Icon size={22} strokeWidth={1.75} aria-hidden />
       </div>
-      <h2 className="mt-4 text-lg font-semibold text-ink-1">{title}</h2>
+      <Heading className="mt-4 text-lg font-semibold text-ink-1">{title}</Heading>
       {body && <div className="mt-1.5 text-sm text-ink-2 max-w-md mx-auto">{body}</div>}
       {(primary || secondary) && (
         <div className="mt-5 flex gap-2 justify-center flex-wrap">{primary}{secondary}</div>
@@ -22,10 +25,10 @@ export function EmptyState({
 }
 
 const ALERT = {
-  info: { icon: Info, cls: "bg-brand/8 border-brand/25 text-ink-1", iconCls: "text-brand" },
-  good: { icon: Check, cls: "bg-good/8 border-good/30 text-ink-1", iconCls: "text-good" },
-  warn: { icon: TriangleAlert, cls: "bg-warn/10 border-warn/30 text-ink-1", iconCls: "text-warn" },
-  bad: { icon: CircleAlert, cls: "bg-bad/8 border-bad/30 text-ink-1", iconCls: "text-bad" },
+  info: { icon: Info, cls: "bg-brand/10 border-brand/25 text-ink-1", iconCls: "text-brand-deep" },
+  good: { icon: Check, cls: "bg-good/10 border-good/30 text-ink-1", iconCls: "text-good-ink" },
+  warn: { icon: TriangleAlert, cls: "bg-warn/10 border-warn/30 text-ink-1", iconCls: "text-warn-ink" },
+  bad: { icon: CircleAlert, cls: "bg-bad/10 border-bad/30 text-ink-1", iconCls: "text-bad-ink" },
 } as const;
 
 export function Alert({

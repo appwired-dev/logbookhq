@@ -33,7 +33,7 @@ export function CardHeader({
   return (
     <div className={`flex items-start justify-between gap-3 flex-wrap ${flush ? "" : "mb-3"} ${className}`}>
       <div className="min-w-0">
-        {eyebrow && <div className="text-2xs font-semibold uppercase tracking-[0.12em] text-brand mb-0.5">{eyebrow}</div>}
+        {eyebrow && <div className="text-2xs font-semibold uppercase tracking-[0.12em] text-brand-deep mb-0.5">{eyebrow}</div>}
         <h2 className="text-sm font-semibold text-ink-1 tracking-tight">{title}</h2>
         {meta && <div className="text-xs text-ink-3 mt-0.5">{meta}</div>}
       </div>

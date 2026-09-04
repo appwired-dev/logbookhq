@@ -13,16 +13,20 @@ export default function Brand({
   subtitle?: React.ReactNode;
 }) {
   const box = size === "sm" ? "w-8 h-8 rounded-lg" : "w-9 h-9 rounded-xl";
-  const word = size === "sm" ? "text-sm" : "text-[15px]";
+  const word = size === "sm" ? "text-sm" : "text-md";
   const text = tone === "light" ? "text-white" : "text-ink-1";
+  const accent = tone === "light" ? "text-brand-glow" : "text-brand-deep";
+  const ring = tone === "light"
+    ? "focus-visible:ring-white/70 focus-visible:ring-offset-surface-inverse"
+    : "focus-visible:ring-brand/60 focus-visible:ring-offset-canvas";
   return (
-    <Link href={href} className="flex items-center gap-2.5 group shrink-0 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60">
+    <Link href={href} className={`flex items-center gap-2.5 group shrink-0 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${ring}`}>
       <span className={`relative ${box} grid place-items-center bg-gradient-cyan shadow-glow group-hover:brightness-110 transition-[filter] duration-med`}>
         <PlaneMark />
       </span>
       <span className="leading-tight">
         <span className={`block font-semibold tracking-tight ${word} ${text}`}>
-          Pilot Logbook <span className="text-brand-glow">HQ</span>
+          Pilot Logbook <span className={accent}>HQ</span>
         </span>
         {subtitle}
       </span>

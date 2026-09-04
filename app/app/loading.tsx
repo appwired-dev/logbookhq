@@ -1,4 +1,5 @@
 import { Card, Skeleton, SkeletonText } from "@/components/ui";
+import LoadingStatus from "@/components/ui/LoadingStatus";
 
 /**
  * Dashboard loading state. Mirrors app/app/page.tsx geometry (same grids,
@@ -7,8 +8,8 @@ import { Card, Skeleton, SkeletonText } from "@/components/ui";
  */
 export default function DashboardLoading() {
   return (
-    <div className="space-y-7" aria-busy="true">
-      <span role="status" className="sr-only">Loading…</span>
+    <div className="space-y-6" aria-busy="true">
+      <LoadingStatus />
 
       {/* Page header: title + subtitle, two buttons on the right */}
       <div className="flex items-end justify-between flex-wrap gap-3" aria-hidden>
@@ -25,7 +26,7 @@ export default function DashboardLoading() {
       {/* Hero tiles */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3" aria-hidden>
         {Array.from({ length: 5 }, (_, i) => (
-          <Card key={i} padding="md" className="h-[104px] flex flex-col justify-between">
+          <Card key={i} padding="md" className="h-[116px] flex flex-col justify-between">
             <Skeleton className="h-3 w-20" />
             <Skeleton className="h-8 w-28" />
           </Card>
@@ -43,7 +44,7 @@ export default function DashboardLoading() {
       </div>
 
       {/* Recent flights */}
-      <Card padding="lg" aria-hidden>
+      <Card padding="md" aria-hidden>
         <div className="flex items-center justify-between mb-3">
           <Skeleton className="h-4 w-36" />
           <Skeleton className="h-3 w-16" />

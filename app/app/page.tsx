@@ -139,7 +139,7 @@ export default async function DashboardPage() {
   const trendFo = trend(all, (f) => roleOf(f) === "FO", credited);
   const trendXc = trend(all, (f) => Boolean(f.is_xcountry), blockHours);
   const trendInst = trend(all, (f) => instrumentHours(f) > 0, instrumentHours);
-  const delta = (v: number) => ({ value: v, label: l("last30") });
+  const delta = (v: number) => ({ value: v, label: l("last30"), unit: hrs });
 
   // fetchAllFlights returns newest first; sort defensively anyway.
   const recent = [...all]
@@ -293,9 +293,11 @@ export default async function DashboardPage() {
         <CardHeader eyebrow={regimeRules.authority} title={t("recency.title")} />
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {currency.recency.map((r) => {
-            const status: ExpiryStatus = r.current
-              ? (r.daysUntilExpiry != null ? expiryStatus(r.daysUntilExpiry) : "ok")
-              : "bad";
+            // Recency semantics (unchanged from main): red only when NOT current;
+            // amber when current but expiring within 14 days; green otherwise.
+            const status: ExpiryStatus = !r.current
+              ? "bad"
+              : (r.daysUntilExpiry != null && r.daysUntilExpiry <= 14 ? "warn" : "ok");
             const tone = STATUS_TONE[status];
             const pct = Math.min(100, (r.achieved / r.required) * 100);
             return (
@@ -386,9 +388,9 @@ export default async function DashboardPage() {
 
 /** Full class strings per status so Tailwind's purge keeps every variant. */
 const STATUS_TONE: Record<ExpiryStatus, { box: string; text: string; fill: string; pill: "good" | "warn" | "bad" }> = {
-  ok:   { box: "bg-good/10 border-good/30", text: "text-good", fill: "bar-fill-good", pill: "good" },
-  warn: { box: "bg-warn/10 border-warn/30", text: "text-warn", fill: "bar-fill-warn", pill: "warn" },
-  bad:  { box: "bg-bad/10 border-bad/30",   text: "text-bad",  fill: "bar-fill-bad",  pill: "bad" },
+  ok:   { box: "bg-good/10 border-good/30", text: "text-good-ink", fill: "bar-fill-good", pill: "good" },
+  warn: { box: "bg-warn/10 border-warn/30", text: "text-warn-ink", fill: "bar-fill-warn", pill: "warn" },
+  bad:  { box: "bg-bad/10 border-bad/30",   text: "text-bad-ink",  fill: "bar-fill-bad",  pill: "bad" },
 };
 
 function LegendDot({ color, label }: { color: string; label: string }) {

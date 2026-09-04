@@ -23,10 +23,10 @@ export function daysUntil(iso: string): number {
 }
 
 export type ExpiryStatus = "bad" | "warn" | "ok";
-/** Shared expiry thresholds: expired/today → bad, ≤ 30 days → warn, else ok. */
+/** Shared expiry thresholds: already expired → bad, expiring within 30 days (incl. today) → warn, else ok. */
 export const EXPIRY_WARN_DAYS = 30;
 export function expiryStatus(days: number): ExpiryStatus {
-  if (days <= 0) return "bad";
+  if (days < 0) return "bad";
   if (days <= EXPIRY_WARN_DAYS) return "warn";
   return "ok";
 }

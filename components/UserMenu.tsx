@@ -85,6 +85,10 @@ export default function UserMenu({
     if (!nodes.length) return;
     const idx = nodes.indexOf(document.activeElement as HTMLElement);
     let next = -1;
+    if (e.key === " ") {
+      const el = document.activeElement as HTMLElement | null;
+      if (el && el.tagName === "A") { e.preventDefault(); el.click(); return; }
+    }
     if (e.key === "ArrowDown") next = (idx + 1) % nodes.length;
     else if (e.key === "ArrowUp") next = (idx - 1 + nodes.length) % nodes.length;
     else if (e.key === "Home") next = 0;
@@ -156,7 +160,7 @@ export default function UserMenu({
             <Icon.Settings size={16} strokeWidth={1.75} aria-hidden className="text-ink-2" />
             {t("nav.settings")}
           </Link>
-          <Link href="/app/billing" role="menuitem" tabIndex={-1} onClick={() => setOpen(false)} className={ITEM}>
+          <Link href="/app/settings#billing" role="menuitem" tabIndex={-1} onClick={() => setOpen(false)} className={ITEM}>
             <Icon.CreditCard size={16} strokeWidth={1.75} aria-hidden className="text-ink-2" />
             {s("billing")}
           </Link>

@@ -35,6 +35,7 @@ const TRANSLATIONS = {
   "nav.import":     { en: "Import",     ko: "가져오기", zh: "导入",       es: "Importar" },
   "nav.transfer":   { en: "Import & Export", ko: "가져오기 및 내보내기", zh: "导入与导出", es: "Importar y Exportar" },
   "nav.settings":   { en: "Settings",   ko: "설정",     zh: "设置",       es: "Ajustes" },
+  "nav.admin":      { en: "Admin",      ko: "관리자",   zh: "管理员",     es: "Admin" },
   "nav.signOut":    { en: "Sign out",   ko: "로그아웃", zh: "退出登录",   es: "Cerrar sesión" },
 
   // Dashboard

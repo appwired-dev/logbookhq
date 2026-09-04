@@ -1,4 +1,5 @@
 import { Card, Skeleton } from "@/components/ui";
+import LoadingStatus from "@/components/ui/LoadingStatus";
 
 /** Alternating row widths so the table skeleton reads as data, not bars. */
 const ROW_WIDTHS = ["82%", "64%", "74%", "58%", "88%", "66%", "70%"];
@@ -10,7 +11,7 @@ const ROW_WIDTHS = ["82%", "64%", "74%", "58%", "88%", "66%", "70%"];
 export default function FlightsLoading() {
   return (
     <div className="space-y-3" aria-busy="true">
-      <span role="status" className="sr-only">Loading…</span>
+      <LoadingStatus />
 
       {/* Toolbar: search + three selects, count + primary button on the right */}
       <Card padding="none" className="h-14 px-3 flex items-center gap-2" aria-hidden>

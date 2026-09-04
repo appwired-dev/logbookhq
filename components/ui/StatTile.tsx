@@ -55,12 +55,12 @@ export function StatTile({
   );
 }
 
-function DeltaChip({ value, label, unit = "h" }: { value: number; label: string; unit?: string }) {
+function DeltaChip({ value, label, unit }: { value: number; label: string; unit?: string }) {
   const up = value > 0, flat = value === 0;
-  const tone = flat ? "text-ink-3" : up ? "text-good" : "text-bad";
+  const tone = flat ? "text-ink-3" : up ? "text-good-ink" : "text-bad-ink";
   return (
     <span className={`text-2xs font-medium num ${tone}`}>
-      {flat ? "±0" : `${up ? "+" : "−"}${Math.abs(value).toFixed(1)}`}{unit} <span className="text-ink-3 font-normal">· {label}</span>
+      {flat ? "±0" : `${up ? "+" : "−"}${Math.abs(value).toFixed(1)}`}{unit ? ` ${unit}` : ""} <span className="text-ink-3 font-normal">· {label}</span>
     </span>
   );
 }

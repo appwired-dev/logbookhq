@@ -1,5 +1,6 @@
 import Brand from "@/components/Brand";
 import { Skeleton } from "@/components/ui";
+import LoadingStatus from "@/components/ui/LoadingStatus";
 
 /**
  * Skeleton of the sign-in form body: two labelled fields, a full-width
@@ -11,7 +12,7 @@ import { Skeleton } from "@/components/ui";
 export function LoginFormSkeleton() {
   return (
     <div className="space-y-4" aria-busy="true">
-      <span role="status" className="sr-only">Loading…</span>
+      <LoadingStatus />
       <div aria-hidden>
         <Skeleton className="h-3 w-16 mb-1.5" />
         <Skeleton className="h-10 w-full" />

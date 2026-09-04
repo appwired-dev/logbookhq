@@ -1,4 +1,5 @@
 import { Card, Skeleton } from "@/components/ui";
+import LoadingStatus from "@/components/ui/LoadingStatus";
 
 /**
  * Charts loading state. Mirrors ChartsClient's three `.chart-stage` sections
@@ -7,7 +8,7 @@ import { Card, Skeleton } from "@/components/ui";
 export default function ChartsLoading() {
   return (
     <div className="space-y-6" aria-busy="true">
-      <span role="status" className="sr-only">Loading…</span>
+      <LoadingStatus />
 
       {/* Globe */}
       <Card padding="none" className="p-6 h-[560px] flex flex-col" aria-hidden>

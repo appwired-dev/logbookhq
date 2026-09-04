@@ -16,7 +16,7 @@ export function Section({
       {(title || actions) && (
         <div className="flex items-end justify-between gap-3 flex-wrap mb-3">
           <div className="min-w-0">
-            {eyebrow && <div className="text-2xs font-semibold uppercase tracking-[0.12em] text-brand mb-0.5">{eyebrow}</div>}
+            {eyebrow && <div className="text-2xs font-semibold uppercase tracking-[0.12em] text-brand-deep mb-0.5">{eyebrow}</div>}
             {title && <h2 className="text-sm font-semibold text-ink-1 tracking-tight">{title}</h2>}
             {meta && <div className="text-xs text-ink-3 mt-0.5">{meta}</div>}
           </div>

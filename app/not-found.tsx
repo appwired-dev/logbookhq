@@ -46,7 +46,7 @@ export default async function NotFound() {
         <Brand tone="dark" href="/" />
       </header>
       <main className="flex-1 flex items-center justify-center px-6 pb-16">
-        <EmptyState
+        <EmptyState headingLevel={1}
           className="w-full max-w-md"
           icon={Icon.Map}
           title={s.title}

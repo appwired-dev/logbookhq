@@ -23,7 +23,7 @@ export default async function SettingsPage() {
       <SettingsForm profile={profile!} locale={locale} />
       <div className="max-w-2xl space-y-4">
         {/* Billing card — visible to everyone; CTA changes by tier */}
-        <div className="card p-4 space-y-3">
+        <div id="billing" className="card p-4 space-y-3 scroll-mt-20">
           <div>
             <h2 className="text-sm font-bold text-slate-800">Billing</h2>
             <p className="text-xs text-slate-500 mt-0.5">

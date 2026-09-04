@@ -20,7 +20,7 @@
   /* ink */
   --ink-1: 15 23 42;
   --ink-2: 71 85 105;             /* slate-600: secondary text */
-  --ink-3: 100 116 139;           /* slate-500: the floor for text colour */
+  --ink-3: 91 106 128;            /* ≥ 4.5:1 on canvas AND white — the floor for text colour */
   --ink-inverse: 255 255 255;
 
   /* brand */
@@ -28,21 +28,21 @@
   --brand-deep: 12 74 110;        /* navy of gradient-aviation */
   --brand-glow: 56 189 248;
 
-  /* status */
-  --good: 16 185 129;
-  --warn: 245 158 11;
-  --bad: 239 68 68;
+  /* status — 500 weights for fills/bars/borders, -ink weights for TEXT on light tints */
+  --good: 16 185 129;   --good-ink: 4 120 87;
+  --warn: 245 158 11;   --warn-ink: 180 83 9;
+  --bad: 239 68 68;     --bad-ink: 185 28 28;
 
   /* semantics shared by pills, charts, sankeys */
-  --role-pic: 59 130 246;
-  --role-dual: 245 158 11;
-  --role-fo: 16 185 129;
-  --role-sic: 139 92 246;
-  --role-check: 217 70 239;
-  --cat-se: 100 116 139;
-  --cat-me: 99 102 241;
-  --cat-heli: 20 184 166;
-  --cat-sim: 244 63 94;
+  --role-pic: 59 130 246;    --role-pic-ink: 29 78 216;
+  --role-dual: 245 158 11;   --role-dual-ink: 180 83 9;
+  --role-fo: 16 185 129;     --role-fo-ink: 4 120 87;
+  --role-sic: 139 92 246;    --role-sic-ink: 109 40 217;
+  --role-check: 217 70 239;  --role-check-ink: 162 28 175;
+  --cat-se: 100 116 139;     --cat-se-ink: 51 65 85;
+  --cat-me: 99 102 241;      --cat-me-ink: 67 56 202;
+  --cat-heli: 20 184 166;    --cat-heli-ink: 15 118 110;
+  --cat-sim: 244 63 94;      --cat-sim-ink: 190 18 60;
 
   --chart-1: 14 165 233;
   --chart-2: 16 185 129;
@@ -168,10 +168,13 @@
   .card { @apply rounded-card border border-border bg-surface shadow-card; }
   .card-interactive {
     @apply transition-[box-shadow,transform] duration-med ease-out
-           hover:shadow-card-hover hover:-translate-y-0.5 cursor-pointer;
+           hover:shadow-card-hover hover:-translate-y-0.5 cursor-pointer
+           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas;
   }
-  /* legacy alias — pages still using .card-hover get the interactive lift */
-  .card-hover { @apply card-interactive; }
+  /* legacy alias (not-yet-migrated pages): lift only — no pointer cursor on static cards */
+  .card-hover {
+    @apply transition-[box-shadow,transform] duration-med ease-out hover:shadow-card-hover hover:-translate-y-0.5;
+  }
   .toolbar {
     @apply sticky top-16 z-20 -mx-4 sm:-mx-6 px-4 sm:px-6 py-2
            bg-canvas/85 backdrop-blur border-b border-border;
@@ -187,22 +190,22 @@
 
   /* ---- pills (all variants listed here so purge keeps them) ---- */
   .pill { @apply inline-flex items-center px-2 py-0.5 rounded-pill text-2xs font-semibold uppercase tracking-[0.06em] border whitespace-nowrap; }
-  .pill-pic       { @apply pill bg-role-pic/10 text-role-pic border-role-pic/30; }
-  .pill-dual      { @apply pill bg-role-dual/10 text-role-dual border-role-dual/30; }
-  .pill-fo        { @apply pill bg-role-fo/10 text-role-fo border-role-fo/30; }
-  .pill-sic-role  { @apply pill bg-role-sic/10 text-role-sic border-role-sic/30; }
-  .pill-aug       { @apply pill bg-role-sic/15 text-role-sic border-role-sic/40; }
-  .pill-check     { @apply pill bg-role-check/10 text-role-check border-role-check/30; }
-  .pill-se        { @apply pill bg-cat-se/10 text-cat-se border-cat-se/30; }
-  .pill-me        { @apply pill bg-cat-me/10 text-cat-me border-cat-me/30; }
-  .pill-ses       { @apply pill bg-cat-heli/10 text-cat-heli border-cat-heli/30; }
-  .pill-mes       { @apply pill bg-cat-heli/15 text-cat-heli border-cat-heli/40; }
-  .pill-heli      { @apply pill bg-cat-heli/10 text-cat-heli border-cat-heli/30; }
-  .pill-sim       { @apply pill bg-cat-sim/10 text-cat-sim border-cat-sim/30; }
-  .pill-xc        { @apply pill bg-brand/10 text-brand border-brand/30; }
-  .pill-good      { @apply pill bg-good/10 text-good border-good/30; }
-  .pill-warn      { @apply pill bg-warn/10 text-warn border-warn/30; }
-  .pill-bad       { @apply pill bg-bad/10 text-bad border-bad/30; }
+  .pill-pic       { @apply pill bg-role-pic/10 text-role-pic-ink border-role-pic/30; }
+  .pill-dual      { @apply pill bg-role-dual/10 text-role-dual-ink border-role-dual/30; }
+  .pill-fo        { @apply pill bg-role-fo/10 text-role-fo-ink border-role-fo/30; }
+  .pill-sic-role  { @apply pill bg-role-sic/10 text-role-sic-ink border-role-sic/30; }
+  .pill-aug       { @apply pill bg-role-sic/15 text-role-sic-ink border-role-sic/40; }
+  .pill-check     { @apply pill bg-role-check/10 text-role-check-ink border-role-check/30; }
+  .pill-se        { @apply pill bg-cat-se/10 text-cat-se-ink border-cat-se/30; }
+  .pill-me        { @apply pill bg-cat-me/10 text-cat-me-ink border-cat-me/30; }
+  .pill-ses       { @apply pill bg-cat-heli/10 text-cat-heli-ink border-cat-heli/30; }
+  .pill-mes       { @apply pill bg-cat-heli/15 text-cat-heli-ink border-cat-heli/40; }
+  .pill-heli      { @apply pill bg-cat-heli/10 text-cat-heli-ink border-cat-heli/30; }
+  .pill-sim       { @apply pill bg-cat-sim/10 text-cat-sim-ink border-cat-sim/30; }
+  .pill-xc        { @apply pill bg-brand/10 text-brand-deep border-brand/30; }
+  .pill-good      { @apply pill bg-good/10 text-good-ink border-good/30; }
+  .pill-warn      { @apply pill bg-warn/10 text-warn-ink border-warn/30; }
+  .pill-bad       { @apply pill bg-bad/10 text-bad-ink border-bad/30; }
   .pill-neutral   { @apply pill bg-surface-2 text-ink-2 border-border; }
   .pill-inverse   { @apply pill bg-white/10 text-white/85 border-white/15; }
 }

@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import CalendarHeatmap from "react-calendar-heatmap";
 import "react-calendar-heatmap/dist/styles.css";
 import { makeT, type Locale } from "@/lib/i18n";
+import { parseLocalDate } from "@/lib/dates";
 import { Card, CardHeader } from "@/components/ui";
 
 export type HeatDay = { date: string; count: number };
@@ -60,7 +61,7 @@ export default function CalendarHeatmapCard({ days, locale }: { days: HeatDay[];
           <CalendarHeatmap
             startDate={startDate}
             endDate={endDate}
-            values={calData}
+            values={calData.map((d) => ({ date: parseLocalDate(d.date), iso: d.date, count: d.count }))}
             classForValue={(v) => {
               if (!v || !v.count) return "color-empty";
               if (v.count < 1) return "color-scale-1";
@@ -68,7 +69,7 @@ export default function CalendarHeatmapCard({ days, locale }: { days: HeatDay[];
               if (v.count < 6) return "color-scale-3";
               return "color-scale-4";
             }}
-            titleForValue={(v: any) => v?.date ? `${v.date}: ${v.count} hrs` : "no flight"}
+            titleForValue={(v: any) => (v?.iso ? `${v.iso}: ${v.count} ${t("limits.hrs")}` : "")}
           />
         </div>
       </div>
