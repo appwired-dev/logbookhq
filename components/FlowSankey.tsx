@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ResponsiveContainer, Sankey, Tooltip } from "recharts";
 import type { Role } from "@/lib/types";
 
@@ -123,12 +123,18 @@ export default function FlowSankey({
 }) {
   const data = useMemo(() => ({ nodes, links }), [nodes, links]);
   const [width, setWidth] = useState(0);
+  // ResponsiveContainer measures the DOM; on the server (and the first client
+  // paint) there is nothing to measure, so render a same-height skeleton
+  // instead — no SSR warning, no layout shift when the chart appears.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   // Label density from the measured width. ~360px per column lets two
   // inward-facing "name + value" labels clear each other; below that, middle
   // columns go name-only; below ~220px per column (phones) every column does.
   const perCol = width > 0 ? width / columns : Infinity;
   const mode: "wide" | "dense" | "tight" = perCol < 220 ? "tight" : perCol < 360 ? "dense" : "wide";
   if (nodes.length === 0 || links.length === 0) return null;
+  if (!mounted) return <div className="skeleton w-full" style={{ height }} aria-hidden />;
   return (
     <div style={{ height }}>
       <ResponsiveContainer width="100%" height="100%" onResize={(w) => setWidth(w)}>

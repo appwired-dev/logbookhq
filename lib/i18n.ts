@@ -66,7 +66,7 @@ const TRANSLATIONS = {
   "dash.timeByAircraft":   { en: "Time by Aircraft Type",  ko: "기종별 비행시간", zh: "按机型分类时间", es: "Tiempo por Tipo de Aeronave" },
   "dash.sortedByHours":    { en: "sorted by hours",        ko: "비행시간 순", zh: "按小时排序",  es: "ordenado por horas" },
   "dash.upcomingExpiries": { en: "Upcoming document expiries", ko: "문서 만료 예정", zh: "即将到期的文档", es: "Documentos por vencer" },
-  "dash.manage":           { en: "Manage →",               ko: "관리 →",     zh: "管理 →",      es: "Gestionar →" },
+  "dash.manage":           { en: "Manage",               ko: "관리",     zh: "管理",      es: "Gestionar" },
   "dash.expiredAgo":       { en: "EXP {days}d ago",        ko: "{days}일 전 만료", zh: "{days} 天前过期", es: "Vencido hace {days}d" },
   "dash.daysLeft":         { en: "{days}d",                ko: "{days}일",   zh: "{days}天",    es: "{days}d" },
   "dash.empty.title":      { en: "No flights yet",         ko: "비행 기록 없음", zh: "暂无飞行记录", es: "Aún no hay vuelos" },
@@ -231,7 +231,7 @@ const TRANSLATIONS = {
 
   // Flights page
   "flights.title":         { en: "Flights",                ko: "비행 기록",  zh: "飞行记录",    es: "Vuelos" },
-  "flights.new":           { en: "+ New Flight",           ko: "+ 새 비행",  zh: "+ 新飞行",    es: "+ Nuevo Vuelo" },
+  "flights.new":           { en: "New Flight",           ko: "새 비행",  zh: "新飞行",    es: "Nuevo Vuelo" },
   "flights.search":        { en: "Search…",                ko: "검색…",      zh: "搜索…",       es: "Buscar…" },
   "flights.date":          { en: "Date",                   ko: "날짜",       zh: "日期",        es: "Fecha" },
   "flights.aircraft":      { en: "Aircraft",               ko: "항공기",     zh: "航空器",      es: "Aeronave" },
