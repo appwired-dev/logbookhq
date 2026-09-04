@@ -38,7 +38,7 @@ export default async function TransferPage() {
       </section>
 
       {/* Divider */}
-      <div className="border-t border-slate-200 -mx-4 sm:-mx-6" />
+      <div className="border-t border-border" />
 
       {/* Import section */}
       <section>

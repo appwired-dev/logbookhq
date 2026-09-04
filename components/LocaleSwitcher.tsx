@@ -1,14 +1,18 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import {
+  useCallback, useEffect, useId, useRef, useState, useTransition,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from "react";
 import { useRouter } from "next/navigation";
 import { setLocaleAction } from "@/app/actions/set-locale";
-import { LOCALES, LOCALE_LABELS, type Locale } from "@/lib/i18n";
+import { Icon } from "@/components/ui";
+import { LOCALES, LOCALE_LABELS, makeT, type Locale } from "@/lib/i18n";
 
 /**
- * Dropdown locale picker. Trigger shows the current language as a flag +
- * short code; the menu lists all locales with full names so the user always
- * recognises their language.
+ * Dropdown locale picker. Trigger shows a Languages icon + two-letter code
+ * chip; the menu lists all locales as code chip + full name so the user
+ * always recognises their language.
  *
  * Click flow:
  *   1. Set the `logbookhq.locale` cookie via a Server Action.
@@ -18,18 +22,30 @@ import { LOCALES, LOCALE_LABELS, type Locale } from "@/lib/i18n";
  */
 export default function LocaleSwitcher({ current }: { current: Locale }) {
   const router = useRouter();
+  const t = makeT(current);
   const [, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const menuId = useId();
+
+  const close = useCallback((restoreFocus: boolean) => {
+    setOpen(false);
+    if (restoreFocus) btnRef.current?.focus();
+  }, []);
 
   // Click-outside + Escape to close, same UX as UserMenu.
   useEffect(() => {
     if (!open) return;
     function onDown(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
     }
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setOpen(false);
+      if (e.key === "Escape") {
+        e.preventDefault();
+        close(true);
+      }
     }
     document.addEventListener("mousedown", onDown);
     document.addEventListener("keydown", onKey);
@@ -37,10 +53,43 @@ export default function LocaleSwitcher({ current }: { current: Locale }) {
       document.removeEventListener("mousedown", onDown);
       document.removeEventListener("keydown", onKey);
     };
+  }, [open, close]);
+
+  // Focus the active locale when the menu opens (falls back to the first).
+  useEffect(() => {
+    if (!open) return;
+    const menu = menuRef.current;
+    const target =
+      menu?.querySelector<HTMLElement>('[role="menuitemradio"][aria-checked="true"]') ??
+      menu?.querySelector<HTMLElement>('[role="menuitemradio"]');
+    target?.focus();
   }, [open]);
 
+  function onMenuKeys(e: ReactKeyboardEvent<HTMLDivElement>) {
+    const nodes = Array.from(menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitemradio"]') ?? []);
+    if (!nodes.length) return;
+    const idx = nodes.indexOf(document.activeElement as HTMLElement);
+    let next = -1;
+    if (e.key === "ArrowDown") next = (idx + 1) % nodes.length;
+    else if (e.key === "ArrowUp") next = (idx - 1 + nodes.length) % nodes.length;
+    else if (e.key === "Home") next = 0;
+    else if (e.key === "End") next = nodes.length - 1;
+    else if (e.key === "Tab") { setOpen(false); return; }
+    if (next >= 0) {
+      e.preventDefault();
+      nodes[next].focus();
+    }
+  }
+
+  function onTriggerKeys(e: ReactKeyboardEvent<HTMLButtonElement>) {
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      setOpen(true);
+    }
+  }
+
   function pick(code: Locale) {
-    setOpen(false);
+    close(true);
     if (code === current) return;
     startTransition(async () => {
       await setLocaleAction(code);
@@ -49,26 +98,36 @@ export default function LocaleSwitcher({ current }: { current: Locale }) {
   }
 
   return (
-    <div ref={ref} className="relative">
+    <div ref={rootRef} className="relative">
       <button
+        ref={btnRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1.5 text-xs text-sky-100/80 hover:text-white px-2 py-1 rounded-md hover:bg-white/10 transition-all border border-white/10 hover:border-white/20"
+        onKeyDown={onTriggerKeys}
+        className="inline-flex h-9 items-center gap-1.5 rounded-control px-2.5 text-xs text-white/85 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 cursor-pointer transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-inverse"
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label="Language"
+        aria-controls={open ? menuId : undefined}
+        aria-label={`${t("common.language")}: ${LOCALE_LABELS[current]}`}
       >
-        <span className="text-sm leading-none">{FLAG[current]}</span>
-        <span className="font-medium">{SHORT_LABEL[current]}</span>
-        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={`transition-transform ${open ? "rotate-180" : ""}`}>
-          <polyline points="6 9 12 15 18 9" />
-        </svg>
+        <Icon.Languages size={16} strokeWidth={1.75} aria-hidden className="shrink-0" />
+        <span className="mono text-2xs font-semibold">{SHORT_LABEL[current]}</span>
+        <Icon.ChevronDown
+          size={14}
+          strokeWidth={2}
+          aria-hidden
+          className={`shrink-0 transition-transform duration-fast ${open ? "rotate-180" : ""}`}
+        />
       </button>
 
       {open && (
         <div
+          id={menuId}
+          ref={menuRef}
           role="menu"
-          className="absolute right-0 mt-2 w-44 bg-white rounded-lg shadow-xl ring-1 ring-slate-900/10 overflow-hidden py-1 z-50 animate-fade-up"
+          aria-label={t("common.language")}
+          onKeyDown={onMenuKeys}
+          className="absolute right-0 mt-2 w-48 bg-surface text-ink-1 rounded-card shadow-pop border border-border py-1 z-50 animate-fade-up overflow-hidden"
         >
           {LOCALES.map((code) => {
             const isActive = code === current;
@@ -78,20 +137,24 @@ export default function LocaleSwitcher({ current }: { current: Locale }) {
                 type="button"
                 role="menuitemradio"
                 aria-checked={isActive}
+                tabIndex={-1}
+                lang={code}
                 onClick={() => pick(code)}
-                className={`w-full text-left px-3 py-2 text-sm flex items-center gap-2 transition-colors ${
+                className={`w-full text-left px-3 py-2 text-sm flex items-center gap-2.5 cursor-pointer transition-colors duration-fast focus-visible:outline-none ${
                   isActive
-                    ? "bg-sky-50 text-sky-700 font-medium"
-                    : "text-slate-700 hover:bg-slate-50"
+                    ? "bg-brand/10 text-brand font-medium focus-visible:bg-brand/15"
+                    : "text-ink-1 hover:bg-surface-2 focus-visible:bg-surface-2"
                 }`}
               >
-                <span className="text-base leading-none">{FLAG[code]}</span>
+                <span
+                  className={`mono text-2xs font-semibold w-7 shrink-0 rounded-pill border px-1 py-0.5 text-center ${
+                    isActive ? "border-brand/30 bg-brand/10 text-brand" : "border-border bg-surface-2 text-ink-2"
+                  }`}
+                >
+                  {SHORT_LABEL[code]}
+                </span>
                 <span className="flex-1">{LOCALE_LABELS[code]}</span>
-                {isActive && (
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="20 6 9 17 4 12" />
-                  </svg>
-                )}
+                {isActive && <Icon.Check size={16} strokeWidth={2.25} aria-hidden className="shrink-0" />}
               </button>
             );
           })}
@@ -101,20 +164,10 @@ export default function LocaleSwitcher({ current }: { current: Locale }) {
   );
 }
 
-/** Compact label shown on the trigger after the flag. */
+/** Two-letter code chip shown on the trigger and in the menu. */
 const SHORT_LABEL: Record<Locale, string> = {
   en: "EN",
   ko: "KO",
   zh: "ZH",
   es: "ES",
-};
-
-/** Country-flag emoji for each locale. Picks the most-recognisable flag for
- *  the language's largest user base (US for English, mainland China for
- *  Simplified Chinese, Spain for Spanish, Korea for Korean). */
-const FLAG: Record<Locale, string> = {
-  en: "🇺🇸",
-  ko: "🇰🇷",
-  zh: "🇨🇳",
-  es: "🇪🇸",
 };
