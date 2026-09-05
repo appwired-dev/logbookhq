@@ -50,49 +50,78 @@ function validateFlight(input: FlightInput): { ok: true; value: FlightInput } | 
   return { ok: true, value: cleaned as FlightInput };
 }
 
-export async function createFlight(input: FlightInput) {
+/**
+ * Mutations resolve to `{ error }` on any failure (auth, validation, DB,
+ * transport) so the form can render it inline, and redirect on success.
+ */
+export type FlightActionResult = { error: string } | undefined;
+
+/** Transport-level failures (fetch to Supabase threw) — return, don't throw, so the form can show them. */
+const failureMessage = (e: unknown, fallback: string) =>
+  e instanceof Error && e.message ? e.message : fallback;
+
+export async function createFlight(input: FlightInput): Promise<FlightActionResult> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not signed in." };
   const v = validateFlight(input);
   if (!v.ok) return { error: v.error };
-  const { error } = await supabase.from("flights").insert({ ...v.value, user_id: user.id });
-  if (error) return { error: error.message };
+  let savedId: number | null = null;
+  try {
+    const { data, error } = await supabase
+      .from("flights")
+      .insert({ ...v.value, user_id: user.id })
+      .select("id")
+      .single();
+    if (error) return { error: error.message };
+    savedId = typeof data?.id === "number" ? data.id : null;
+  } catch (e) {
+    return { error: failureMessage(e, "Could not save the flight.") };
+  }
   revalidatePath("/app");
   revalidatePath("/app/flights");
-  redirect("/app/flights");
+  // `?saved=<id>` lets the list scroll to and pulse the row once.
+  redirect(savedId != null ? `/app/flights?saved=${savedId}` : "/app/flights");
 }
 
-export async function updateFlight(id: number, input: FlightInput) {
+export async function updateFlight(id: number, input: FlightInput): Promise<FlightActionResult> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not signed in." };
   const v = validateFlight(input);
   if (!v.ok) return { error: v.error };
-  // RLS already restricts UPDATE to rows where auth.uid() = user_id, but
-  // adding the explicit eq is defense in depth — if RLS is ever accidentally
-  // dropped, this still scopes the write to the caller's rows.
-  const { error } = await supabase
-    .from("flights")
-    .update(v.value)
-    .eq("id", id)
-    .eq("user_id", user.id);
-  if (error) return { error: error.message };
+  try {
+    // RLS already restricts UPDATE to rows where auth.uid() = user_id, but
+    // adding the explicit eq is defense in depth — if RLS is ever accidentally
+    // dropped, this still scopes the write to the caller's rows.
+    const { error } = await supabase
+      .from("flights")
+      .update(v.value)
+      .eq("id", id)
+      .eq("user_id", user.id);
+    if (error) return { error: error.message };
+  } catch (e) {
+    return { error: failureMessage(e, "Could not save the flight.") };
+  }
   revalidatePath("/app");
   revalidatePath("/app/flights");
-  redirect("/app/flights");
+  redirect(`/app/flights?saved=${id}`);
 }
 
-export async function deleteFlight(id: number) {
+export async function deleteFlight(id: number): Promise<FlightActionResult> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not signed in." };
-  const { error } = await supabase
-    .from("flights")
-    .delete()
-    .eq("id", id)
-    .eq("user_id", user.id);
-  if (error) return { error: error.message };
+  try {
+    const { error } = await supabase
+      .from("flights")
+      .delete()
+      .eq("id", id)
+      .eq("user_id", user.id);
+    if (error) return { error: error.message };
+  } catch (e) {
+    return { error: failureMessage(e, "Could not delete the flight.") };
+  }
   revalidatePath("/app");
   revalidatePath("/app/flights");
   redirect("/app/flights");

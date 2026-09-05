@@ -6,8 +6,13 @@ import FlightsClient from "./FlightsClient";
 
 export default async function FlightsPage() {
   const supabase = await createClient();
-  const flights = await fetchAllFlights(supabase);
+  const { data: { user } } = await supabase.auth.getUser();
+  const [flights, locale, { data: profile }] = await Promise.all([
+    fetchAllFlights(supabase),
+    getLocale(),
+    // Same convention switch the dashboard / charts honour (SIC at 50 %).
+    supabase.from("profiles").select("aug_half_credit").eq("id", user?.id ?? "").maybeSingle(),
+  ]);
   const derived = flights.map(deriveFlight);
-  const locale = await getLocale();
-  return <FlightsClient flights={derived} locale={locale} />;
+  return <FlightsClient flights={derived} locale={locale} augHalfCredit={Boolean(profile?.aug_half_credit)} />;
 }
