@@ -96,6 +96,8 @@ export const IMPORT_STRINGS = {
   tileFlights:    { en: "Flights to import", ko: "가져올 비행", zh: "待导入飞行", es: "Vuelos a importar" },
   tileSkipped:    { en: "Skipped rows", ko: "건너뛴 행", zh: "跳过的行", es: "Filas omitidas" },
   tileHours:      { en: "Total hours", ko: "총 시간", zh: "总小时", es: "Horas totales" },
+  tileHoursCredited: { en: "Credited hours", ko: "인정 시간", zh: "计入小时", es: "Horas acreditadas" },
+  tileHoursLogged:   { en: "{n} logged · AUG at 50 %", ko: "기록 {n} · AUG 50 %", zh: "记录 {n} · AUG 按 50 %", es: "{n} registradas · AUG al 50 %" },
   skipReasons:    { en: "Why rows were skipped", ko: "건너뛴 이유", zh: "跳过原因", es: "Por qué se omitieron" },
   "skip.no_date":   { en: "No date", ko: "날짜 없음", zh: "无日期", es: "Sin fecha" },
   "skip.bad_date":  { en: "Unreadable date", ko: "읽을 수 없는 날짜", zh: "无法解析的日期", es: "Fecha ilegible" },

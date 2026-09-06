@@ -320,9 +320,12 @@ export function applyMapping(workbook: Workbook, analysis: Analysis, mapping: Co
     for (let c = 0; c < row.length; c++) {
       const cell = row[c];
       if (cell.kind !== "number") continue;
-      columnSums[c] = r1((columnSums[c] ?? 0) + (dateCol === c ? 0 : hoursOf(cell, clockTimes) || cell.value));
+      // Accumulate unrounded; rounding at every step drifted +0.6 h on a
+      // 2,600-row Total column. Round once below.
+      columnSums[c] = (columnSums[c] ?? 0) + (dateCol === c ? 0 : hoursOf(cell, clockTimes) || cell.value);
     }
   }
+  for (const k of Object.keys(columnSums)) columnSums[Number(k)] = r1(columnSums[Number(k)]);
 
   return { flights, skipped, columnSums, rowTotals, sourceRows };
 }

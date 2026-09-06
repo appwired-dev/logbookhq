@@ -57,6 +57,9 @@ export default function StepReconcile({
   const noteId = `${ids}-note`;
   const { report } = preview;
   const n = preview.flights;
+  // With the 50 % AUG setting on, the headline is what the app will credit; the raw logged sum goes underneath.
+  const hoursCredited =
+    report.summary.creditedHours != null && Math.abs(report.summary.creditedHours - report.summary.totalHours) >= 0.05;
   const fromTemplate = Boolean(analysis.templateId);
   // A failed check never blocks, but the first click only arms the button.
   const [armed, setArmed] = useState(false);
@@ -152,7 +155,13 @@ export default function StepReconcile({
           <div className="grid grid-cols-3 gap-2">
             <Tile label={s("tileFlights")} value={n.toLocaleString()} accent="brand" />
             <Tile label={s("tileSkipped")} value={preview.skipped.toLocaleString()} accent={preview.skipped > 0 ? "warn" : "ink-3"} />
-            <Tile label={s("tileHours")} value={fmt1(report.summary.totalHours)} unit={s("hrs")} accent="good" />
+            <Tile
+              label={hoursCredited ? s("tileHoursCredited") : s("tileHours")}
+              value={fmt1(report.summary.creditedHours ?? report.summary.totalHours)}
+              unit={s("hrs")}
+              accent="good"
+              sub={hoursCredited ? s("tileHoursLogged", { n: fmt1(report.summary.totalHours) }) : undefined}
+            />
           </div>
           {preview.skipped > 0 && preview.skippedReasons.length > 0 && (
             <details className="group text-xs">
@@ -298,7 +307,7 @@ function CheckRow({ c, s, augHalfCredit }: { c: ReconcileCheck; s: ImportStrings
   );
 }
 
-function Tile({ label, value, unit, accent }: { label: string; value: string; unit?: string; accent: string }) {
+function Tile({ label, value, unit, accent, sub }: { label: string; value: string; unit?: string; accent: string; sub?: string }) {
   return (
     <div className="relative overflow-hidden rounded-control border border-border bg-surface p-2.5 pl-3">
       <span aria-hidden className="absolute left-0 top-2 bottom-2 w-[3px] rounded-r" style={{ background: `rgb(var(--${accent}))` }} />
@@ -306,6 +315,7 @@ function Tile({ label, value, unit, accent }: { label: string; value: string; un
       <div className="mt-0.5 flex items-baseline gap-1 text-xl font-semibold text-ink-1 num">
         {value}{unit && <span className="text-xs font-normal text-ink-3">{unit}</span>}
       </div>
+      {sub && <div className="mt-0.5 text-2xs text-ink-3 truncate num">{sub}</div>}
     </div>
   );
 }
