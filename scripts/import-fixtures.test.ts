@@ -10,15 +10,21 @@ import fs from "node:fs";
 import path from "node:path";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
+import * as XLSX from "xlsx";
 import {
-  analyzeWorkbook, applyMapping, arbitrateWithClaude, readWorkbook, reconcile, fingerprint,
+  analyzeWorkbook, applyMapping, arbitrateWithClaude, readWorkbook, reconcile, fingerprint, detectHeaderBand, mapColumns,
   CANONICAL_OPTIONS, targetKey, parseTargetKey,
-  type Analysis, type FieldTarget, type ReconcileReport,
+  type Analysis, type ApplyResult, type FieldTarget, type ReconcileReport,
 } from "../lib/import";
 import { FIELDS } from "../lib/import/targets";
 import { sha1Hex } from "../lib/import/util";
+import { classifyDeclaredLabel, classifyTotalLabel, isRecencyLabel, namesAllCategories } from "../lib/import/analyze";
 import { detectFormat, parseAnyLogbook } from "../lib/import-formats";
 import type { ParsedFlight } from "../lib/csv";
+
+/** Header fingerprint of the founder's real Numbers → Excel export (the system template must match it). */
+const REAL_NUMBERS_FINGERPRINT = "3bf044c69251d97414d2790abb41ccb1ea9da737";
+const NUMBERS_TEMPLATE_NAME = "Apple Numbers logbook (3-row header)";
 
 const FIXTURES = path.resolve(__dirname, "../tests/fixtures/import");
 
@@ -113,6 +119,42 @@ function sameRows(pipeline: ParsedFlight[], legacy: ParsedFlight[], fields: (key
 
 const sum = (xs: number[]) => Math.round(xs.reduce((s, x) => s + x, 0) * 10) / 10;
 
+type Raw = string | number | null;
+
+/** The numbers-multihead fixture as typed rows (numeric strings → numbers), the way an xlsx export would carry them. */
+function fixtureRows(): Raw[][] {
+  return loadText("numbers-multihead.csv").split(/\r?\n/).filter((l) => l.length > 0).map((line) =>
+    line.split(",").map((cell) => (cell === "" ? null : /^-?\d+(\.\d+)?$/.test(cell) ? Number(cell) : cell)),
+  );
+}
+
+/** Build a two-sheet workbook (flight rows + a "Totals" sheet of label/value pairs) in memory. */
+function buildXlsx(logbook: Raw[][], totals: Raw[][]): Uint8Array {
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(logbook), "Logbook");
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(totals), "Totals");
+  return new Uint8Array(XLSX.write(wb, { type: "array", bookType: "xlsx" }) as ArrayBuffer);
+}
+
+function rowByDate(rows: Raw[][], date: string): Raw[] {
+  const row = rows.find((r) => r[0] === date);
+  assert.ok(row, `no fixture row dated ${date}`);
+  return row;
+}
+
+/** A reconcile run over synthetic flights (all SE › PIC, day hours as given) against one declared grand total. */
+function grandTotalCheck(hours: number[], declared: number) {
+  const { analysis, applied } = run("numbers-multihead.csv");
+  const base = applied.flights[0];
+  const flights: ParsedFlight[] = hours.map((h) => ({ ...base, category: "SE", role: "PIC", day_time: h, night_time: 0 }));
+  const result: ApplyResult = { flights, skipped: [], columnSums: {} };
+  const a: Analysis = {
+    ...analysis, textNumberCells: undefined,
+    declaredTotals: [{ source: "totals-sheet", label: "Total Time", value: declared, meaning: { kind: "grand_total" } }],
+  };
+  return check(reconcile(result, a, analysis.mapping), "grand_total");
+}
+
 // ---------------------------------------------------------------------------
 // 1. numbers-multihead.csv — the founder's Apple Numbers layout
 // ---------------------------------------------------------------------------
@@ -135,17 +177,29 @@ async function numbersMultihead(): Promise<void> {
   const name = "numbers-multihead.csv";
   const { analysis: a, applied } = run(name);
 
-  await test("numbers-multihead: 3-row header band with qualified paths", () => {
+  await test("numbers-multihead: 3-row header band with qualified paths (as the real Numbers export writes them)", () => {
     assert.deepEqual(a.header.rows, [1, 2, 3], `header rows ${JSON.stringify(a.header.rows)}`);
     assert.equal(a.header.dataStart, 4);
+    assert.equal(labelOf(a, 0), "Date (d/m/y)");
+    assert.equal(labelOf(a, 1), "Aircraft › Make/Model", "the Aircraft group spans Make/Model …");
+    assert.equal(labelOf(a, 2), "Aircraft", "… and a sub-header-less registration column");
+    assert.equal(labelOf(a, 3), "Pilot in Command");
     assert.equal(labelOf(a, 7), `${SE} › Day › Dual`);
     assert.equal(labelOf(a, 10), `${SE} › Night › PIC`);
-    assert.equal(labelOf(a, 14), `${ME} › Day › AUG`);
+    assert.equal(labelOf(a, 14), `${ME} › Day › AUG.`);
     assert.equal(labelOf(a, 17), `${ME} › Night › FO`);
-    assert.equal(labelOf(a, 24), `${XC} › Night › AUG`);
+    assert.equal(labelOf(a, 24), `${XC} › Night › AUG.`);
     assert.equal(labelOf(a, 26), "Instrument › Hood");
     assert.equal(labelOf(a, 28), "Instrument › #IFR Appchs");
-    assert.equal(labelOf(a, 29), "Total");
+    assert.equal(labelOf(a, 29), "Total", "Total stands alone in the top header row");
+  });
+
+  await test("numbers-multihead: fingerprint matches the system Numbers template (and the founder's real export)", () => {
+    assert.equal(a.fingerprint, REAL_NUMBERS_FINGERPRINT);
+    assert.equal(a.templateName, NUMBERS_TEMPLATE_NAME);
+    assert.equal(a.templateId, "system:numbers-multihead");
+    const notTemplate = a.mapping.columns.filter((c) => c.source !== "template").map((c) => `col ${c.col} ${c.source}`);
+    assert.equal(notTemplate.length, 0, `columns not filled from the template: ${notTemplate.join(", ")}`);
   });
 
   await test("numbers-multihead: every column maps to the legacy parser's bucket", () => {
@@ -155,6 +209,21 @@ async function numbersMultihead(): Promise<void> {
     assert.equal(weak.length, 0, `low-confidence columns: ${weak.join(", ")}`);
     assert.deepEqual(a.lowConfidenceCols, []);
     assert.equal(a.mapping.conventions.blankAircraftIsSim, true, "blank aircraft + sim time rows are sims");
+  });
+
+  await test("numbers-multihead: the synonym mapper alone (no template) reaches the same buckets", () => {
+    const grid = readWorkbook(load(name), name).sheets[0];
+    const header = detectHeaderBand(grid);
+    const mapping = mapColumns(header, grid, header.dataStart, {});
+    const bad: string[] = [];
+    for (const [col, key] of Object.entries(NUMBERS_KEYS)) {
+      const c = mapping.columns.find((x) => x.col === Number(col));
+      const got = c ? targetKey(c.target) : "(unmapped)";
+      if (got !== key) bad.push(`col ${col} "${labelOf(a, Number(col))}": expected ${key}, got ${got}`);
+      if (c && c.confidence < 0.6) bad.push(`col ${col} confidence ${c.confidence}`);
+      if (c && c.source === "template") bad.push(`col ${col} came from a template`);
+    }
+    assert.equal(bad.length, 0, bad.join("\n"));
   });
 
   await test("numbers-multihead: applyMapping reproduces parseNumbersMultihead row for row", () => {
@@ -195,6 +264,24 @@ async function numbersMultihead(): Promise<void> {
     assert.equal(xc.status, "match", xc.explanation);
     const mismatches = report.checks.filter((c) => c.status === "mismatch").map((c) => c.id);
     assert.equal(report.ok, true, `hard mismatches: ${mismatches.join(", ")}`);
+  });
+
+  await test("numbers-multihead: summary carries raw and credited hours; invariants carry no fake declared values", () => {
+    const plain = reconcile(applied, a, a.mapping);
+    assert.equal(plain.summary.totalHours, 45.5);
+    assert.equal(plain.summary.creditedHours, 45.5, "no 50 % setting → credited equals raw");
+    const withAug = reconcile(applied, a, a.mapping, { augHalfCredit: true });
+    assert.equal(withAug.summary.totalHours, 45.5, "totalHours stays the raw day+night sum");
+    assert.equal(withAug.summary.creditedHours, 38, "SIC/AUG at 50 %");
+    assert.equal(withAug.summary.byRole.SIC, 7.5);
+    for (const id of ["hours_gt_24", "future_dates", "night_gt_total", "row_totals"]) {
+      const c = check(plain, id);
+      assert.equal(c.expected, undefined, `${id} should not carry an expected value`);
+      assert.equal(c.delta, undefined, `${id} should not carry a delta`);
+      assert.equal(c.status, "match", `${id}: ${c.explanation}`);
+    }
+    assert.match(check(plain, "night_gt_total").explanation ?? "", /^[\d,.]+ night h ≤ [\d,.]+ total h$/);
+    assert.equal(check(plain, "night_gt_total").actual, 19.7, "1.1 + 0.6 + 6 + 4 + 7 + 1 night hours");
   });
 
   await test("numbers-multihead: full-credit footer total → match", () => {
@@ -466,6 +553,191 @@ async function targets(): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// 8. Declared totals: classification + reconcile tiers
+// ---------------------------------------------------------------------------
+
+/** Totals sheet in the founder's style, with values that agree with the fixture's columns. */
+const FIXTURE_TOTALS: Raw[][] = [
+  ["Total Times", null],
+  ["Total Multi-Engine Augment (Night) =", 5],        // 10 h of night AUG at 50 %
+  ["Sum", 38],
+  ["Total X-Country Dual (Day) =", 3],                // the sheet's own mislabel of the Day › FO column
+  ["Total X-Country PIC (Day) =", 12.6],
+  ["Total X-Country Augment (Day) =", 5],
+  ["Total X-Country (Day) =", 20.6],
+  ["Total X-Country Co-Pilot (Night) =", 7.6],
+  ["Total X-Country (Night) =", 18.6],
+  ["Total X-Country Time =", 39.2],
+  ["Last 365 Days", 100],
+  ["Last 90 Days", 12.3],
+  ["Total Actual Instrument =", 4.9],
+  ["Total Instrument Time =", 8.9],                   // 4.9 actual + 0 hood + 4 sim
+  ["Total Time (Multi & Single) =", 38],
+  ["Total Time PIC (Multi & Single) =", 14.1],
+];
+
+async function declaredTotals(): Promise<void> {
+  await test("declared totals: recency windows are not totals", () => {
+    for (const l of ["Last 365 Days", "Past 90 days", "Previous 12 months", "Rolling 12 Months", "90-day", "Within 30 days", "12 months (last)",
+      "최근 90일", "지난 12개월", "最近90天", "últimos 90 días", "Últimas 24 horas", "letzte 90 Tage", "derniers 90 jours", "YTD hours", "This year"]) {
+      assert.ok(isRecencyLabel(l), `"${l}" should be a recency window`);
+    }
+    for (const l of ["Total Time", "Total Multi-Engine Time (Night)", "Total to date", "Night", "Total X-Country PIC (Day) =", "Day", "합계", "Total #IFR Approaches"]) {
+      assert.ok(!isRecencyLabel(l), `"${l}" is a total, not a recency window`);
+    }
+  });
+
+  await test("declared totals: labels naming both engine classes carry no category", () => {
+    for (const l of ["Total Time (Multi & Single) =", "Single & Multi", "Multi/Single", "SE + ME PIC", "single and multi engine", "All types", "all aircraft"]) {
+      assert.ok(namesAllCategories(l), `"${l}" spans every category`);
+    }
+    for (const l of ["Total Multi-Engine Time", "Single Engine Sea", "Total Time", "ME Night PIC"]) {
+      assert.ok(!namesAllCategories(l), `"${l}" names one category (or none)`);
+    }
+    assert.deepEqual(classifyTotalLabel("Total Time (Multi & Single) ="), { kind: "grand_total" });
+    assert.deepEqual(classifyTotalLabel("Total Time PIC (Multi & Single) ="), { kind: "time", category: "any", condition: "any", role: "pic" });
+    assert.deepEqual(classifyTotalLabel("Total Time PIC"), { kind: "time", category: "any", condition: "any", role: "pic" });
+    assert.deepEqual(classifyTotalLabel("Total Multi-Engine Time ="), { kind: "time", category: "me", condition: "any", role: "any" });
+    assert.deepEqual(classifyTotalLabel("Total Multi-Engine Augment (Night) ="), { kind: "time", category: "me", condition: "night", role: "sic" });
+    assert.deepEqual(classifyTotalLabel("Sum"), { kind: "grand_total" });
+  });
+
+  await test("declared totals: a bare \"Instrument\" total is actual + hood + sim", () => {
+    assert.deepEqual(classifyDeclaredLabel("Total Instrument Time ="), {
+      meaning: { kind: "field", field: "actual_inst" }, composite: ["actual_inst", "hood_inst", "sim_inst"],
+    });
+    assert.deepEqual(classifyDeclaredLabel("Total Actual Instrument ="), { meaning: { kind: "field", field: "actual_inst" } });
+    assert.deepEqual(classifyDeclaredLabel("Total Hood Instrument ="), { meaning: { kind: "field", field: "hood_inst" } });
+    assert.deepEqual(classifyDeclaredLabel("Total Sim ="), { meaning: { kind: "field", field: "sim_inst" } });
+  });
+
+  await test("reconcile: tiered tolerance — ≤ 0.15 h match, ≤ max(1 h, 0.1 %) explained, beyond that mismatch", () => {
+    const big = [...Array<number>(424).fill(10), 2.7]; // 4,242.7 h
+    const c07 = grandTotalCheck(big, 4242.04);
+    assert.equal(c07.delta, 0.7);
+    assert.equal(c07.status, "explained", c07.explanation);
+    assert.equal(c07.suggestion?.kind, "none");
+    assert.match(c07.explanation ?? "", /^Differs by 0\.7 h on 4,242 h\./);
+    assert.match(c07.explanation ?? "", /not a mapping problem/);
+    const c3 = grandTotalCheck(big, 4239.7); // 3 h on 4,240 h = 0.07 %
+    assert.equal(c3.status, "explained", c3.explanation);
+    const c5 = grandTotalCheck(big, 4237); // 5.7 h > 0.1 %
+    assert.equal(c5.status, "mismatch", c5.explanation);
+    assert.equal(c5.suggestion?.kind, "review_mapping");
+    const small = Array<number>(45).fill(1); // 45 h
+    assert.equal(grandTotalCheck(small, 45.1).status, "match");
+    assert.equal(grandTotalCheck(small, 44.5).status, "explained");
+    assert.equal(grandTotalCheck(small, 43.5).status, "mismatch");
+  });
+
+  // ---- end-to-end on an xlsx with a Totals sheet in the founder's style ----
+  const bytes = buildXlsx(fixtureRows(), FIXTURE_TOTALS);
+  const { analysis: a, applied } = run("numbers-multihead-totals.xlsx", bytes);
+  const plain = reconcile(applied, a, a.mapping);
+  const withAug = reconcile(applied, a, a.mapping, { augHalfCredit: true });
+
+  await test("xlsx totals sheet: recency lines dropped, grand total taken from the strongest label", () => {
+    assert.equal(a.sheetName, "Logbook");
+    assert.equal(a.templateName, NUMBERS_TEMPLATE_NAME, "same header paths → same template");
+    assert.equal(applied.flights.length, 14);
+    const labels = a.declaredTotals.map((d) => d.label);
+    assert.ok(!labels.some((l) => /last \d+ days/i.test(l)), `recency windows leaked into declared totals: ${labels.join(" | ")}`);
+    assert.ok(labels.includes("Total X-Country PIC (Day)"), "trailing \"=\" stripped from labels");
+    const grand = check(plain, "grand_total");
+    assert.equal(grand.label, 'Total time (declared: "Total Time (Multi & Single)")', "preferred over \"Sum\", the footer and the Total column");
+    assert.equal(grand.expected, 38);
+    assert.equal(grand.status, "explained", grand.explanation);
+    assert.equal(grand.suggestion?.kind, "aug_half_credit");
+    assert.equal(check(withAug, "grand_total").status, "match");
+    assert.equal(check(withAug, "grand_total").actual, 38);
+  });
+
+  await test("xlsx totals sheet: \"Total Time PIC (Multi & Single)\" is the PIC total, AUG line follows the 50 % convention", () => {
+    const pic = check(plain, "declared:time:any:any:pic|totals-sheet");
+    assert.equal(pic.actual, 14.1);
+    assert.equal(pic.status, "match", pic.explanation);
+    const augNight = check(plain, "declared:time:me:night:sic|totals-sheet");
+    assert.equal(augNight.actual, 10);
+    assert.equal(augNight.status, "explained", augNight.explanation);
+    assert.equal(augNight.suggestion?.kind, "aug_half_credit");
+    assert.equal(check(withAug, "declared:time:me:night:sic|totals-sheet").status, "match");
+    assert.equal(check(withAug, "declared:time:me:night:sic|totals-sheet").actual, 5);
+  });
+
+  await test("xlsx totals sheet: instrument composite compared against actual + hood + sim", () => {
+    const inst = check(plain, "declared:composite:actual_inst+hood_inst+sim_inst|totals-sheet");
+    assert.equal(inst.label, "Instrument time (actual + hood + sim)");
+    assert.equal(inst.expected, 8.9);
+    assert.equal(inst.actual, 8.9);
+    assert.equal(inst.status, "match", inst.explanation);
+    const actual = check(plain, "declared:field:actual_inst|totals-sheet");
+    assert.equal(actual.actual, 4.9, "the plain actual-instrument line is a separate check");
+    assert.equal(actual.status, "match");
+    assert.ok(!plain.checks.some((c) => c.id === "grand_total" && /Instrument/.test(c.label)), "the composite is never the grand total");
+  });
+
+  await test("xlsx totals sheet: X-Country lines compared per facet-matching column", () => {
+    const byId = (id: string) => check(plain, id);
+    const dayPic = byId("declared:field:xc_time|totals-sheet|any:day:pic");
+    assert.equal(dayPic.actual, 12.6, "Cross Country › Day › PIC column");
+    assert.equal(dayPic.status, "match", dayPic.explanation);
+    const dayAug = byId("declared:field:xc_time|totals-sheet|any:day:sic");
+    assert.equal(dayAug.actual, 5);
+    assert.equal(dayAug.status, "match", dayAug.explanation);
+    const day = byId("declared:field:xc_time|totals-sheet|any:day:any");
+    assert.equal(day.actual, 20.6, "Day › FO + PIC + AUG");
+    assert.equal(day.status, "match", day.explanation);
+    const nightFo = byId("declared:field:xc_time|totals-sheet|any:night:fo");
+    assert.equal(nightFo.actual, 7.6, "Co-Pilot → FO column");
+    assert.equal(nightFo.status, "match", nightFo.explanation);
+    const night = byId("declared:field:xc_time|totals-sheet|any:night:any");
+    assert.equal(night.actual, 18.6);
+    assert.equal(night.status, "match", night.explanation);
+    const all = byId("declared:field:xc_time|totals-sheet");
+    assert.equal(all.actual, 39.2, "all six columns");
+    assert.equal(all.status, "match", all.explanation);
+    const dual = byId("declared:field:xc_time|totals-sheet|any:day:dual");
+    assert.equal(dual.status, "info", "no Dual cross-country column exists → not compared");
+    assert.equal(dual.expected, undefined);
+    assert.match(dual.explanation ?? "", /No single column in the file corresponds to this line/);
+    assert.equal(plain.ok, true, plain.checks.filter((c) => c.status === "mismatch").map((c) => c.id).join(", "));
+    // Unaffected by the 50 % setting: cross-country is never credited at 50 %.
+    assert.equal(check(withAug, "declared:field:xc_time|totals-sheet|any:day:sic").status, "match");
+    assert.equal(check(withAug, "declared:field:xc_time|totals-sheet").actual, 39.2);
+  });
+
+  await test("xlsx: a number stored as text explains a short SUM; halved AUG row totals are recognised", () => {
+    const rows = fixtureRows();
+    const aug1 = rowByDate(rows, "14-Feb-16"), aug2 = rowByDate(rows, "20-Feb-16");
+    aug1[21] = "5";          // Cross Country › Day › AUG. stored as text → the sheet's SUM skips it
+    aug1[29] = 5.5; aug2[29] = 2; // row Total cells at 50 % for the AUG rows
+    const totals = FIXTURE_TOTALS.map((r) => [...r]);
+    const set = (label: string, v: number) => { const row = totals.find((r) => r[0] === label); assert.ok(row); row[1] = v; };
+    set("Total X-Country Augment (Day) =", 0);
+    set("Total X-Country (Day) =", 15.6);
+    set("Total X-Country Time =", 34.2);
+    const v = run("numbers-multihead-text.xlsx", buildXlsx(rows, totals));
+    assert.deepEqual(v.analysis.textNumberCells, { 21: { count: 1, sum: 5 } });
+    assert.equal(v.applied.flights.find((f) => f.date === "2016-02-14")?.is_xcountry, true, "the text cell still counts as cross-country time");
+    const report = reconcile(v.applied, v.analysis, v.analysis.mapping);
+    for (const id of ["declared:field:xc_time|totals-sheet|any:day:sic", "declared:field:xc_time|totals-sheet|any:day:any", "declared:field:xc_time|totals-sheet"]) {
+      const c = check(report, id);
+      assert.equal(c.delta, 5, `${id} delta`);
+      assert.equal(c.status, "explained", `${id}: ${c.explanation}`);
+      assert.equal(c.suggestion?.kind, "none");
+      assert.match(c.explanation ?? "", /1 cell stored as text \(5 h\) in "Cross Country › Day › AUG\."/);
+    }
+    const rt = check(report, "row_totals");
+    assert.equal(rt.status, "match", rt.explanation);
+    assert.equal(rt.actual, 0);
+    assert.match(rt.explanation ?? "", /^2 AUG rows carry a Total cell at 50 %/);
+    assert.equal(report.ok, true, report.checks.filter((c) => c.status === "mismatch").map((c) => c.id).join(", "));
+    // The CSV fixture is all text, so nothing is flagged there.
+    assert.equal(a.textNumberCells, undefined);
+  });
+}
+
+// ---------------------------------------------------------------------------
 
 async function main(): Promise<void> {
   await numbersMultihead();
@@ -475,6 +747,7 @@ async function main(): Promise<void> {
   await fingerprints();
   await arbiter();
   await targets();
+  await declaredTotals();
 
   const failed = results.filter((r) => !r.ok);
   console.log("\n" + "-".repeat(72));

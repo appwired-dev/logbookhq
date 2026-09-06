@@ -110,17 +110,23 @@ const LOGBOOKHQ: Spec[] = [
 ];
 
 const SE = "Single Engine Aircraft", ME = "Multi-Engine Aircraft", XC = "Cross Country", INST = "Instrument";
-/** The founder's Apple Numbers layout (3 header rows) — see lib/import-formats.ts parseNumbersMultihead. */
+/**
+ * The founder's Apple Numbers layout (3 header rows) — see
+ * lib/import-formats.ts parseNumbersMultihead. Header paths are the ones the
+ * real Numbers → Excel export produces (fingerprint 3bf044c6…): the "Aircraft"
+ * group spans Make/Model and a sub-header-less registration column, "AUG." is
+ * written with its period, and "Total" stands alone in the top header row.
+ */
 const NUMBERS_MULTIHEAD: Spec[] = [
-  ["Date", "field:date"], ["Make/Model", "field:make_model"], ["Reg", "field:registration"], ["PIC", "field:pic"], ["Co-pilot", "field:copilot"],
-  ["Route", "field:route"], ["Remarks", "field:remarks"],
+  ["Date (d/m/y)", "field:date"], [["Aircraft", "Make/Model"], "field:make_model"], ["Aircraft", "field:registration"],
+  ["Pilot in Command", "field:pic"], ["Co-Pilot", "field:copilot"], ["Route", "field:route"], ["Remarks", "field:remarks"],
   [[SE, "Day", "Dual"], "time:se:day:dual"], [[SE, "Day", "PIC"], "time:se:day:pic"], [[SE, "Night", "Dual"], "time:se:night:dual"], [[SE, "Night", "PIC"], "time:se:night:pic"],
-  [[ME, "Day", "Dual"], "time:me:day:dual"], [[ME, "Day", "PIC"], "time:me:day:pic"], [[ME, "Day", "FO"], "time:me:day:fo"], [[ME, "Day", "AUG"], "time:me:day:sic"],
-  [[ME, "Night", "Dual"], "time:me:night:dual"], [[ME, "Night", "PIC"], "time:me:night:pic"], [[ME, "Night", "FO"], "time:me:night:fo"], [[ME, "Night", "AUG"], "time:me:night:sic"],
-  [[XC, "Day", "FO"], "field:xc_time"], [[XC, "Day", "PIC"], "field:xc_time"], [[XC, "Day", "AUG"], "field:xc_time"],
-  [[XC, "Night", "FO"], "field:xc_time"], [[XC, "Night", "PIC"], "field:xc_time"], [[XC, "Night", "AUG"], "field:xc_time"],
+  [[ME, "Day", "Dual"], "time:me:day:dual"], [[ME, "Day", "PIC"], "time:me:day:pic"], [[ME, "Day", "FO"], "time:me:day:fo"], [[ME, "Day", "AUG."], "time:me:day:sic"],
+  [[ME, "Night", "Dual"], "time:me:night:dual"], [[ME, "Night", "PIC"], "time:me:night:pic"], [[ME, "Night", "FO"], "time:me:night:fo"], [[ME, "Night", "AUG."], "time:me:night:sic"],
+  [[XC, "Day", "FO"], "field:xc_time"], [[XC, "Day", "PIC"], "field:xc_time"], [[XC, "Day", "AUG."], "field:xc_time"],
+  [[XC, "Night", "FO"], "field:xc_time"], [[XC, "Night", "PIC"], "field:xc_time"], [[XC, "Night", "AUG."], "field:xc_time"],
   [[INST, "Actual"], "field:actual_inst"], [[INST, "Hood"], "field:hood_inst"], [[INST, "Sim"], "field:sim_inst"], [[INST, "#IFR Appchs"], "field:ifr_approaches"],
-  [[INST, "Total"], "field:total_time"],
+  ["Total", "field:total_time"],
 ];
 
 export const SYSTEM_TEMPLATES: ImportTemplate[] = [

@@ -130,7 +130,7 @@ const RECENCY_RES: RegExp[] = [
   /(?:올해|이번\s*달|금년|당해)/,
   /(?:最近|过去|過去)\s*\d+\s*(?:天|日|个月|個月|月|年|周|週)/, // 最近90天
   /(?:今年|本月|本年|近\d+天)/,
-  /\b[uú]ltim[oa]s\s+\d+\s*(?:d[ií]as?|meses?|a[ñn]os?|semanas?|horas?)\b/i, // últimos 90 días
+  /(?:^|[^a-záéíóúñ])[uú]ltim[oa]s\s+\d+\s*(?:d[ií]as?|meses?|a[ñn]os?|semanas?|horas?)(?![a-záéíóúñ])/i, // últimos 90 días (\b is ASCII-only)
   /\bletzten?\s+\d+\s*(?:tage?n?|monate?n?|jahre?n?|wochen?)\b/i, // letzte 90 Tage
   /\bderni[eè]r(?:e|es|s)?\s+\d+\s*(?:jours?|mois|ans?|semaines?)\b/i, // derniers 90 jours
 ];
