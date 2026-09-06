@@ -10,11 +10,12 @@
  *   fingerprint(headerPaths)                         → string
  */
 export * from "./types";
+export type { ApplyResultExt } from "./types-ext";
 export { readWorkbook } from "./grid";
 export { detectHeaderBand } from "./headers";
-export { mapColumns, CANONICAL_OPTIONS, describeTarget } from "./mapping";
+export { mapColumns, CANONICAL_OPTIONS, describeTarget, targetKey, parseTargetKey } from "./mapping";
 export { applyMapping } from "./apply";
 export { reconcile } from "./reconcile";
-export { fingerprint } from "./templates";
+export { fingerprint, SYSTEM_TEMPLATES } from "./templates";
 export { analyzeWorkbook } from "./analyze";
 export { arbitrateWithClaude } from "./arbiter";

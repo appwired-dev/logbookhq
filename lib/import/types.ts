@@ -118,6 +118,12 @@ export interface DeclaredTotal {
   value: number;
   /** Best-effort classification of what the label means, if recognised. */
   meaning?: TotalMeaning;
+  /**
+   * Set when the label names a composite figure — a bare "Total Instrument
+   * Time" is actual + hood + sim, not any single field. Reconcile sums these
+   * fields (and picks the closest sensible subset) instead of `meaning.field`.
+   */
+  composite?: FieldTarget[];
 }
 
 export type TotalMeaning =
@@ -146,6 +152,14 @@ export interface Analysis {
   lowConfidenceCols: number[];
   /** Detected legacy exact format (foreflight/logten/myflightbook/logbookhq) when the workbook is one of those. */
   legacyFormat?: string | null;
+  /**
+   * Per source column (numeric targets only): numeric-looking cells that the
+   * spreadsheet stores as text on an otherwise numeric column. A SUM formula
+   * skips those cells while the import reads them, so a declared total falls
+   * short by exactly `sum` — reconcile uses this to explain such gaps.
+   * Absent for CSV input (every cell is text there) and when nothing is mixed.
+   */
+  textNumberCells?: Record<number, { count: number; sum: number }>;
 }
 
 // ---------------------------------------------------------------------------
@@ -183,7 +197,20 @@ export interface ReconcileCheck {
 
 export interface ReconcileReport {
   checks: ReconcileCheck[];
-  summary: { flights: number; skipped: number; totalHours: number; byRole: Record<string, number>; byCategory: Record<string, number> };
+  summary: {
+    flights: number;
+    skipped: number;
+    /** Raw sum of day + night hours over the parsed flights (augmenting time in full). */
+    totalHours: number;
+    /**
+     * Hours credited under the account's convention passed to reconcile
+     * (`augHalfCredit`: SIC/AUG at 50 %). Equals `totalHours` when the option
+     * is off or the logbook has no SIC time.
+     */
+    creditedHours?: number;
+    byRole: Record<string, number>;
+    byCategory: Record<string, number>;
+  };
   /** True when no check is a hard mismatch. */
   ok: boolean;
 }

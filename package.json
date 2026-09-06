@@ -12,7 +12,9 @@
     "import:bulk": "tsx scripts/bulk-import.ts",
     "build:airports": "tsx scripts/build-airports.ts",
     "build:world": "tsx scripts/build-world.ts",
-    "fix:route": "tsx scripts/fix-route.ts"
+    "fix:route": "tsx scripts/fix-route.ts",
+    "test:import": "tsx scripts/import-fixtures.test.ts",
+    "check:client-graph": "tsx scripts/check-client-graph.ts app/app/import/ImportWizard.tsx app/app/import/StepMapping.tsx app/app/import/StepReconcile.tsx app/app/flights/FlightsClient.tsx app/app/flights/FlightForm.tsx"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.98.0",
