@@ -18,6 +18,16 @@
  * for a field spread over several columns are compared against the sum of
  * the source columns whose header facets match; a facet with no matching
  * column is reported as "info" rather than compared against the wrong thing.
+ *
+ * A cross-country column that matches its declared total can still differ
+ * from LogbookHQ's own figure, which credits whole flights (day + night of
+ * every flight flagged cross-country) while a sheet may log only the
+ * cross-country portion — reported as "explained", not a mapping problem.
+ *
+ * Rows that apply split into several flights (time in more than one
+ * (category, role) bucket — see apply.ts) are surfaced as an "info" check,
+ * and the row-totals invariant compares each SOURCE row's Total cell with the
+ * sum of the flights it emitted.
  */
 import type { Flight } from "../types";
 import type { ParsedFlight } from "../csv";
@@ -27,6 +37,7 @@ import type {
   TimeCategory, TimeCondition, TimeRole, TotalMeaning,
 } from "./types";
 import type { ApplyResultExt } from "./types-ext";
+import { sourceRowGroups } from "./apply";
 import { SUMMABLE_FIELDS } from "./targets";
 import { facetsOfPath, type Facets } from "./synonyms";
 import { r1, todayISO } from "./util";
@@ -141,16 +152,19 @@ export function reconcile(
 
   const rowTotals = ext.rowTotals;
   if (rowTotals && rowTotals.some((t) => t != null)) {
+    // One comparison per SOURCE row: a row split into several flights stands against their sum.
     let compared = 0, off = 0, halved = 0;
-    flights.forEach((f, i) => {
-      const t = rowTotals[i];
-      if (t == null || f.category === "SIM") return;
+    for (const g of sourceRowGroups(ext)) {
+      if (g.total == null) continue;
+      const fs = g.flights.map((i) => flights[i]).filter((f) => f.category !== "SIM");
+      if (fs.length === 0) continue;
       compared++;
-      const fullT = total(f);
-      if (Math.abs(t - fullT) <= 0.1) return;
-      if (f.role === "SIC" && Math.abs(t - fullT * 0.5) <= 0.1) { halved++; return; }
+      const fullT = r1(fs.reduce((s, f) => s + total(f), 0));
+      if (Math.abs(g.total - fullT) <= 0.1) continue;
+      const halfT = r1(fs.reduce((s, f) => s + credited(f, true), 0));
+      if (fs.some((f) => f.role === "SIC") && Math.abs(g.total - halfT) <= 0.1) { halved++; continue; }
       off++;
-    });
+    }
     const pct = compared ? off / compared : 0;
     const halvedNote = halved > 0
       ? `${plural(halved, "AUG row")} carry a Total cell at 50 % of their logged time — the sheet credits augmenting time at 50 % in its row totals.`
@@ -162,6 +176,14 @@ export function reconcile(
         ? `${off} of ${compared} rows have a Total cell that differs from the sum of their time buckets by more than 0.1 h.${halvedNote ? ` ${halvedNote}` : ""}`
         : halvedNote || `Every row's Total cell equals the sum of its time buckets (within 0.1 h).`,
       suggestion: off > 0 && pct > 0.02 ? { kind: "review_mapping" } : undefined,
+    });
+  }
+
+  const split = ext.splitRows ?? [];
+  if (split.length > 0) {
+    checks.push({
+      id: "split_rows", label: "Rows split across roles", actual: split.length, status: "info",
+      explanation: `${split.length === 1 ? "1 row carries" : `${split.length} rows carry`} time in more than one role; each was imported as one flight per role so no hours are lost.`,
     });
   }
 
@@ -477,7 +499,7 @@ function fieldCheck(id: string, d: DeclaredTotal, field: FieldTarget, flights: P
   const fullSum = r1(matched.reduce((s, c) => s + cols.sum(c), 0));
   const halfSum = r1(matched.reduce((s, c) => s + cols.sum(c) * (cols.isSicColumn(c) ? 0.5 : 1), 0));
   const via = matched.length < mapped.length || matched.length > 1 ? `Compared with the sum of ${listColumns(matched.map((c) => cols.labelOf(c)))}.` : undefined;
-  return compare({
+  const check = compare({
     id, label: d.label, declared: d.value, unit, primary: fullSum,
     alt: halfSum !== fullSum ? {
       value: halfSum,
@@ -487,6 +509,27 @@ function fieldCheck(id: string, d: DeclaredTotal, field: FieldTarget, flights: P
     textCells: cols.textCells(matched),
     note: via,
   });
+  return field === "xc_time" && check.status === "match" ? wholeFlightXc(check, flights, lf, fullSum, via) : check;
+}
+
+/**
+ * A matching cross-country column vs. LogbookHQ's own cross-country figure:
+ * the app credits whole flights (day + night of every flight flagged
+ * cross-country, narrowed to the label's facets) while a sheet may log only
+ * the cross-country portion of a flight. More than 0.15 h apart → "explained"
+ * with the gap, so the user knows why the app's total will read differently.
+ */
+function wholeFlightXc(check: ReconcileCheck, flights: ParsedFlight[], lf: LabelFacets, columnSum: number, note?: string): ReconcileCheck {
+  const flightBased = r1(flights.reduce((s, f) => {
+    if (!f.is_xcountry) return s;
+    if (lf.cat && lf.cat !== "any" && f.category !== CAT_ENUM[lf.cat]) return s;
+    if (lf.role && lf.role !== "any" && f.role !== ROLE_ENUM[lf.role]) return s;
+    return s + (lf.cond === "day" ? f.day_time : lf.cond === "night" ? f.night_time : total(f));
+  }, 0));
+  const gap = r1(flightBased - columnSum);
+  if (Math.abs(gap) <= TOL_HOURS) return check;
+  const text = `LogbookHQ credits whole flights as cross-country (${gap > 0 ? "+" : "−"}${fmt(Math.abs(gap))} h vs. your sheet's cross-country column).`;
+  return { ...check, status: "explained", explanation: note ? `${text} ${note}` : text, suggestion: { kind: "none" } };
 }
 
 /** "Total Instrument Time" = actual + hood + sim; when that misses but actual + hood hits, the sheet leaves sim out. */

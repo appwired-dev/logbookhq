@@ -14,10 +14,69 @@
  */
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { ColumnMapping, ImportTemplate } from "@/lib/import";
+import { parseTargetKey, targetKey, type ColumnAssignment, type ColumnMapping, type ImportTemplate, type MappingSource } from "@/lib/import";
 
 const TABLE = "import_templates";
 const COLUMNS = "id, user_id, fingerprint, name, mapping, header_paths, uses";
+
+// Upper bound on a source-column index; a real sheet is far narrower.
+const MAX_TEMPLATE_COLUMNS = 10_000;
+const MAPPING_SOURCES: readonly MappingSource[] = ["template", "synonym", "shape", "ai", "user"];
+const CONVENTION_KEYS = ["clockTimes", "decimalComma", "dayFirstDates", "blankAircraftIsSim"] as const;
+
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+function isNonNegativeInt(v: unknown): v is number {
+  return typeof v === "number" && Number.isInteger(v) && v >= 0;
+}
+
+/**
+ * What actually gets persisted as `mapping`. Every column target is pushed
+ * through parseTargetKey(targetKey(t)) — the round-trip the arbiter and the
+ * wizard use — so an unknown target is stored as "ignore" rather than as a
+ * shape the apply step has never seen; entries without a usable column index
+ * are dropped. Positions are not significant here (columns link to
+ * `header_paths` by their `col` value), so dropping is safe.
+ */
+function normaliseMappingForStorage(mapping: ColumnMapping): ColumnMapping {
+  const columns: ColumnAssignment[] = [];
+  for (const raw of mapping.columns as unknown[]) {
+    if (!isPlainObject(raw) || !isNonNegativeInt(raw.col) || raw.col >= MAX_TEMPLATE_COLUMNS) continue;
+    const target = isPlainObject(raw.target) && typeof raw.target.kind === "string"
+      ? parseTargetKey(targetKey(raw.target as ColumnAssignment["target"]))
+      : { kind: "ignore" as const };
+    const confidence = typeof raw.confidence === "number" && Number.isFinite(raw.confidence)
+      ? Math.max(0, Math.min(1, raw.confidence))
+      : 0;
+    const source = typeof raw.source === "string" && (MAPPING_SOURCES as readonly string[]).includes(raw.source)
+      ? (raw.source as MappingSource)
+      : "user";
+    const assignment: ColumnAssignment = { col: raw.col, target, confidence, source };
+    if (typeof raw.reason === "string" && raw.reason) assignment.reason = raw.reason.slice(0, 500);
+    columns.push(assignment);
+  }
+  const conventions: ColumnMapping["conventions"] = {};
+  const rawConventions: unknown = mapping.conventions;
+  if (isPlainObject(rawConventions)) {
+    for (const k of CONVENTION_KEYS) {
+      const v = rawConventions[k];
+      if (typeof v === "boolean") conventions[k] = v;
+    }
+  }
+  return { columns, conventions };
+}
+
+/**
+ * `header_paths` must be string[][] with one entry per source column — the
+ * index IS the column, so a malformed entry becomes an empty path (which the
+ * matcher skips) instead of being dropped and shifting everything after it.
+ */
+function normaliseHeaderPaths(paths: unknown): string[][] {
+  if (!Array.isArray(paths)) return [];
+  return paths.map((p) => (Array.isArray(p) ? p.filter((s): s is string => typeof s === "string") : []));
+}
 
 interface TemplateRow {
   id: string;
@@ -80,6 +139,8 @@ export async function upsertUserTemplate(
   input: { fingerprint: string; name: string; mapping: ColumnMapping; headerPaths: string[][] },
 ): Promise<void> {
   const name = input.name.trim().slice(0, 120) || "Untitled layout";
+  const mapping = normaliseMappingForStorage(input.mapping);
+  const headerPaths = normaliseHeaderPaths(input.headerPaths);
   const { data: existing, error: selErr } = await supabase
     .from(TABLE)
     .select("id, uses")
@@ -93,8 +154,8 @@ export async function upsertUserTemplate(
       .from(TABLE)
       .update({
         name,
-        mapping: input.mapping,
-        header_paths: input.headerPaths,
+        mapping,
+        header_paths: headerPaths,
         uses: ((existing.uses as number | null) ?? 0) + 1,
       })
       .eq("id", existing.id as string)
@@ -107,8 +168,8 @@ export async function upsertUserTemplate(
     user_id: userId,
     fingerprint: input.fingerprint,
     name,
-    mapping: input.mapping,
-    header_paths: input.headerPaths,
+    mapping,
+    header_paths: headerPaths,
     uses: 1,
   });
   if (error) throw new Error(error.message);

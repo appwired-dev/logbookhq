@@ -17,6 +17,7 @@ import {
   type Analysis, type ApplyResult, type FieldTarget, type ReconcileReport,
 } from "../lib/import";
 import { FIELDS } from "../lib/import/targets";
+import { sourceRowGroups } from "../lib/import/apply";
 import { sha1Hex } from "../lib/import/util";
 import { classifyDeclaredLabel, classifyTotalLabel, isRecencyLabel, namesAllCategories } from "../lib/import/analyze";
 import { detectFormat, parseAnyLogbook } from "../lib/import-formats";
@@ -133,6 +134,13 @@ function buildXlsx(logbook: Raw[][], totals: Raw[][]): Uint8Array {
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(logbook), "Logbook");
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(totals), "Totals");
+  return new Uint8Array(XLSX.write(wb, { type: "array", bookType: "xlsx" }) as ArrayBuffer);
+}
+
+/** Single-sheet workbook of flight rows (no Totals sheet). */
+function buildLogbook(logbook: Raw[][]): Uint8Array {
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(logbook), "Logbook");
   return new Uint8Array(XLSX.write(wb, { type: "array", bookType: "xlsx" }) as ArrayBuffer);
 }
 
@@ -738,6 +746,149 @@ async function declaredTotals(): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// 9. Rows split across (category, role) buckets, dataStart guard, partial cross-country
+// ---------------------------------------------------------------------------
+
+/** Numbers layout column indices used below (see NUMBERS_KEYS). */
+const COL = { seDayDual: 7, seDayPic: 8, meDayFo: 13, meDayAug: 14, xcDayFo: 19, xcDayPic: 20, xcDayAug: 21, actual: 25, ifr: 28, total: 29 } as const;
+
+async function splitRows(): Promise<void> {
+  const baseline = run("numbers-multihead-baseline.xlsx", buildLogbook(fixtureRows()));
+  const dataStart = baseline.analysis.header.dataStart;
+
+  await test("split rows: SE PIC 1.0 + SE Dual 1.0 on one row → two flights, 2.0 h, instrument and counts on the first only", () => {
+    const rows = fixtureRows();
+    const row = rowByDate(rows, "06-Jun-13"); // 1.2 h SE Day Dual in the fixture
+    row[COL.seDayDual] = 1; row[COL.seDayPic] = 1; row[COL.actual] = 0.5; row[COL.ifr] = 1; row[COL.total] = 2;
+    const v = run("numbers-multihead-split-se.xlsx", buildLogbook(rows));
+    assert.equal(v.applied.flights.length, 15, "one extra flight");
+    const [dual, pic] = v.applied.flights;
+    assert.equal(`${dual.category}/${dual.role}`, "SE/DUAL", "tie → legacy DUAL › PIC order picks DUAL first");
+    assert.equal(`${pic.category}/${pic.role}`, "SE/PIC");
+    assert.deepEqual([dual.day_time, dual.night_time, pic.day_time, pic.night_time], [1, 0, 1, 0]);
+    assert.equal(sum([dual.day_time, pic.day_time]), 2, "no hours lost");
+    for (const k of ["date", "make_model", "registration", "pic", "copilot", "route", "remarks", "is_xcountry"] as const) {
+      assert.deepEqual(pic[k], dual[k], `${k} shared by both halves`);
+    }
+    assert.equal(dual.is_xcountry, false);
+    assert.ok(dual.actual_inst === 0.5 && dual.ifr_approaches === 1, "instrument + approaches on the primary bucket");
+    assert.ok(pic.actual_inst === 0 && pic.ifr_approaches === 0, "…and never double-counted");
+    assert.deepEqual([dual.takeoffs_day, dual.landings_day, pic.takeoffs_day, pic.landings_day], [1, 1, 0, 0], "one takeoff/landing for the row, on the primary");
+    // Bookkeeping stays per SOURCE row.
+    assert.deepEqual(v.applied.splitRows, [{ row: dataStart, buckets: 2 }]);
+    assert.deepEqual(v.applied.skipped.map((s) => s.reason), ["header_or_total_row"]);
+    assert.equal(v.applied.rowTotals?.length, 14, "one Total entry per source row, not per flight");
+    assert.equal(v.applied.rowTotals?.[0], 2);
+    assert.equal(v.applied.sourceRows?.length, 14);
+    assert.equal(v.applied.sourceRows?.[0], dataStart);
+    const groups = sourceRowGroups(v.applied);
+    assert.deepEqual(groups[0], { row: dataStart, total: 2, flights: [0, 1] });
+    assert.deepEqual(groups[1], { row: dataStart + 1, total: 1, flights: [2] });
+    assert.equal(groups.length, 14);
+    assert.deepEqual(v.applied.flights.slice(2), baseline.applied.flights.slice(1), "every other row is untouched");
+    const report = reconcile(v.applied, v.analysis, v.analysis.mapping);
+    const rt = check(report, "row_totals");
+    assert.equal(rt.status, "match", rt.explanation);
+    assert.equal(rt.actual, 0, "the row's Total (2.0) is compared with the SUM of its two flights");
+    assert.equal(check(report, "split_rows").actual, 1);
+    assert.equal(report.summary.totalHours, 46.3, "45.5 − 1.2 + 2.0");
+  });
+
+  await test("split rows: founder-style ME Day FO 3.0 + AUG 2.0 with Total 5.0 → FO + SIC flights, split info check, row total vs. their sum", () => {
+    const rows = fixtureRows();
+    const row = rowByDate(rows, "06-Jan-15"); // 1.1 h ME Day FO, 0.4 actual, 1 approach in the fixture
+    row[COL.meDayFo] = 3; row[COL.meDayAug] = 2; row[COL.xcDayFo] = 3; row[COL.xcDayAug] = 2; row[COL.total] = 5;
+    const v = run("numbers-multihead-split-me.xlsx", buildLogbook(rows));
+    assert.equal(v.applied.flights.length, 15);
+    const fo = v.applied.flights[8], aug = v.applied.flights[9];
+    assert.ok(fo.date === "2015-01-06" && aug.date === "2015-01-06", `${fo.date} / ${aug.date}`);
+    assert.equal(`${fo.category}/${fo.role}/${fo.day_time}/${fo.night_time}`, "ME/FO/3/0");
+    assert.equal(`${aug.category}/${aug.role}/${aug.day_time}/${aug.night_time}`, "ME/SIC/2/0");
+    assert.ok(fo.is_xcountry && aug.is_xcountry, "cross-country row → both flights cross-country");
+    assert.ok(fo.actual_inst === 0.4 && fo.ifr_approaches === 1 && fo.takeoffs_day === 1 && fo.landings_day === 1, "row-level fields on the larger (FO) bucket");
+    assert.ok(aug.actual_inst === 0 && aug.ifr_approaches === 0 && aug.takeoffs_day === 0 && aug.landings_day === 0);
+    assert.deepEqual(v.applied.splitRows, [{ row: dataStart + 8, buckets: 2 }]);
+    assert.equal(v.applied.rowTotals?.[8], 5, "the Total cell applies to the row, once");
+    assert.equal(v.applied.rowTotals?.length, 14);
+    const report = reconcile(v.applied, v.analysis, v.analysis.mapping);
+    const split = check(report, "split_rows");
+    assert.equal(split.label, "Rows split across roles");
+    assert.equal(split.status, "info");
+    assert.equal(split.actual, 1);
+    assert.equal(split.expected, undefined);
+    assert.match(split.explanation ?? "", /^1 row carries time in more than one role; each was imported as one flight per role so no hours are lost\.$/);
+    const rt = check(report, "row_totals");
+    assert.equal(rt.status, "match", rt.explanation);
+    assert.equal(rt.actual, 0, "Total 5.0 = 3.0 FO + 2.0 SIC");
+    assert.equal(report.summary.totalHours, 49.4, "45.5 − 1.1 + 5.0: nothing dropped");
+    const withAug = reconcile(v.applied, v.analysis, v.analysis.mapping, { augHalfCredit: true });
+    assert.equal(withAug.summary.creditedHours, 40.9, "SIC half of the split row credited at 50 % like any other AUG time");
+    assert.equal(withAug.summary.byRole.SIC, 8.5, "7.5 existing + 2.0 × 50 %");
+    // A sheet that halves AUG in its row totals: Total 4.0 = 3.0 + 2.0 × 50 % is recognised as the 50 % convention.
+    row[COL.total] = 4;
+    const halved = run("numbers-multihead-split-me-half.xlsx", buildLogbook(rows));
+    const rtHalf = check(reconcile(halved.applied, halved.analysis, halved.analysis.mapping), "row_totals");
+    assert.equal(rtHalf.status, "match", rtHalf.explanation);
+    assert.equal(rtHalf.actual, 0);
+    assert.match(rtHalf.explanation ?? "", /^1 AUG row carry a Total cell at 50 %/);
+    // Unsplit files report no split check at all.
+    assert.equal(baseline.applied.splitRows?.length, 0);
+    assert.ok(!reconcile(baseline.applied, baseline.analysis, baseline.analysis.mapping).checks.some((c) => c.id === "split_rows"));
+  });
+
+  await test("applyMapping: a negative / fractional / NaN dataStart is clamped — no phantom skipped rows", () => {
+    const { analysis: a, workbook, applied } = run("numbers-multihead.csv");
+    const withStart = (dataStart: number) => applyMapping(workbook, { ...a, header: { ...a.header, dataStart } }, a.mapping);
+    // Clamped to 0: the title + header rows are visited and rejected by the date guards (rows 0–3), but no row index is ever negative.
+    for (const bogus of [-3, Number.NaN]) {
+      const r = withStart(bogus);
+      assert.deepEqual(r.flights, applied.flights, `dataStart ${bogus}: same flights`);
+      assert.deepEqual([r.rowTotals, r.sourceRows, r.splitRows, r.columnSums], [applied.rowTotals, applied.sourceRows, applied.splitRows, applied.columnSums], `dataStart ${bogus}: same bookkeeping`);
+      assert.ok(r.skipped.every((s) => s.row >= 0), `dataStart ${bogus}: phantom rows ${JSON.stringify(r.skipped.filter((s) => s.row < 0))}`);
+      assert.deepEqual(r.skipped.filter((s) => s.row >= a.header.dataStart), applied.skipped, `dataStart ${bogus}: data-area skips unchanged`);
+      assert.deepEqual(r.skipped.filter((s) => s.row < a.header.dataStart).map((s) => s.row), [0, 1, 2, 3], `dataStart ${bogus}: only the header rows are the extra skips`);
+    }
+    assert.deepEqual(withStart(a.header.dataStart + 0.9), applied, "fractional dataStart is floored");
+    const far = withStart(10_000);
+    assert.deepEqual(far.flights, []);
+    assert.deepEqual(far.skipped, []);
+    assert.deepEqual(far.rowTotals, []);
+  });
+
+  await test("reconcile: a cross-country column that matches its total but not the whole-flight figure → explained (+1 h)", () => {
+    const rows = fixtureRows();
+    rowByDate(rows, "15-Sep-13")[COL.xcDayPic] = 1.3;   // 2.3 h flight, only 1.3 h of it logged as cross-country
+    rowByDate(rows, "Totals")[COL.xcDayPic] = 11.6;     // footer follows the column
+    const totals = FIXTURE_TOTALS.map((r) => [...r]);
+    const set = (label: string, v: number) => { const row = totals.find((r) => r[0] === label); assert.ok(row); row[1] = v; };
+    set("Total X-Country PIC (Day) =", 11.6);
+    set("Total X-Country (Day) =", 19.6);
+    set("Total X-Country Time =", 38.2);
+    const v = run("numbers-multihead-partial-xc.xlsx", buildXlsx(rows, totals));
+    const f = v.applied.flights.find((x) => x.date === "2013-09-15");
+    assert.ok(f && f.is_xcountry && f.day_time === 2.3, "the flight is still cross-country, in full");
+    const report = reconcile(v.applied, v.analysis, v.analysis.mapping);
+    const WHOLE = /^LogbookHQ credits whole flights as cross-country \(\+1 h vs\. your sheet's cross-country column\)\./;
+    for (const id of ["declared:field:xc_time|footer-row", "declared:field:xc_time|totals-sheet", "declared:field:xc_time|totals-sheet|any:day:pic", "declared:field:xc_time|totals-sheet|any:day:any"]) {
+      const c = check(report, id);
+      assert.equal(c.delta, 0, `${id}: column sum equals the declared figure`);
+      assert.equal(c.status, "explained", `${id}: ${c.explanation}`);
+      assert.equal(c.suggestion?.kind, "none");
+      assert.match(c.explanation ?? "", WHOLE, id);
+    }
+    assert.equal(check(report, "declared:field:xc_time|footer-row").expected, 38.2);
+    assert.equal(check(report, "declared:field:xc_time|totals-sheet|any:day:pic").actual, 11.6);
+    assert.match(check(report, "declared:field:xc_time|footer-row").explanation ?? "", /Compared with the sum of/, "the column note is kept");
+    const night = check(report, "declared:field:xc_time|totals-sheet|any:night:any");
+    assert.equal(night.status, "match", "night cross-country is untouched → plain match");
+    assert.equal(night.explanation, undefined);
+    assert.equal(report.ok, true, report.checks.filter((c) => c.status === "mismatch").map((c) => c.id).join(", "));
+    // Within 0.15 h the column stays a plain match (the untouched fixture: 39.2 both ways).
+    assert.equal(check(reconcile(baseline.applied, baseline.analysis, baseline.analysis.mapping), "declared:field:xc_time|footer-row").status, "match");
+  });
+}
+
+// ---------------------------------------------------------------------------
 
 async function main(): Promise<void> {
   await numbersMultihead();
@@ -748,6 +899,7 @@ async function main(): Promise<void> {
   await arbiter();
   await targets();
   await declaredTotals();
+  await splitRows();
 
   const failed = results.filter((r) => !r.ok);
   console.log("\n" + "-".repeat(72));

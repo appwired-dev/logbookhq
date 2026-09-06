@@ -28,6 +28,13 @@ export interface Grid {
   rows: Cell[][];
   /** Max column count across rows. */
   width: number;
+  /**
+   * Per date column: the day-first decision the reader made and whether the
+   * data alone was ambiguous (every value valid both ways). analyze.ts applies
+   * priors to ambiguous columns; apply.ts re-parses `raw` when the convention
+   * differs from this decision.
+   */
+  dateCols?: Record<number, { dayFirst: boolean; ambiguous: boolean }>;
 }
 
 export interface Workbook {
@@ -53,6 +60,8 @@ export interface HeaderBand {
   /** First data row index. */
   dataStart: number;
   paths: HeaderPath[];
+  /** Date-bearing rows found ABOVE the chosen header band (should be 0; reconcile flags > 0). */
+  dateRowsAbove?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -104,6 +113,8 @@ export interface ColumnMapping {
     dayFirstDates?: boolean;
     /** Rows with an empty aircraft cell but sim time are sim sessions. */
     blankAircraftIsSim?: boolean;
+    /** How `dayFirstDates` was decided: data evidence, a locale/registration prior, the separator default, or the user's toggle. */
+    dayFirstSource?: "evidence" | "prior" | "default" | "user";
   };
 }
 
@@ -160,6 +171,10 @@ export interface Analysis {
    * Absent for CSV input (every cell is text there) and when nothing is mixed.
    */
   textNumberCells?: Record<number, { count: number; sum: number }>;
+  /** Other sheets with the same header fingerprint (per-year workbooks); apply imports them too. */
+  siblingSheets?: { index: number; name: string; dataStart: number; rowCount: number }[];
+  /** Sheets with dated rows in a different layout that were NOT imported (for an info check). */
+  otherDatedSheets?: { index: number; name: string; rowCount: number }[];
 }
 
 // ---------------------------------------------------------------------------
@@ -174,6 +189,28 @@ export interface ApplyResult {
   skipped: { row: number; reason: SkipReason }[];
   /** Per-column sums for numeric columns (used by reconcile). */
   columnSums: Record<number, number>;
+  /** Role-column texts the mapper did not recognise (imported as PIC). */
+  unknownRoles?: { text: string; count: number }[];
+  /** True when the mapped total column looks like a running total and was not used for row hours. */
+  cumulativeTotal?: boolean;
+  /** Rows whose actual+hood instrument time exceeded flight time and was clamped. */
+  instrumentClamped?: number;
+  /** Cells with negative hours treated as 0. */
+  negativeHours?: number;
+  /**
+   * Source rows that produced more than one flight because their time hits
+   * span several (category, role) buckets — e.g. "ME › Day › FO" 3.0 and
+   * "ME › Day › AUG" 2.0 on one line: 0-based row index and the number of
+   * flights emitted. Absent (or empty) when no row was split.
+   *
+   * Alignment: `flights` are emitted in source-row order and a split row
+   * contributes `buckets` consecutive flights, primary (largest) bucket
+   * first. `skipped`, `rowTotals` and `sourceRows` (ApplyResultExt) carry ONE
+   * entry per source row, never per emitted flight, so a split row's Total
+   * cell stands against the sum of its flights — `sourceRowGroups` in
+   * apply.ts rebuilds the flight ↔ source-row grouping.
+   */
+  splitRows?: { row: number; buckets: number }[];
 }
 
 // ---------------------------------------------------------------------------
@@ -193,6 +230,10 @@ export interface ReconcileCheck {
   explanation?: string;
   /** Optional suggested action the wizard can offer (e.g. enable the 50% AUG credit setting). */
   suggestion?: { kind: "aug_half_credit" | "review_mapping" | "none"; detail?: string };
+  /** Stable id for client-side localisation of fixed checks (declared-total checks keep the sheet's own label). */
+  messageKey?: string;
+  /** Values referenced by the localised template for `messageKey`. */
+  vars?: Record<string, string | number>;
 }
 
 export interface ReconcileReport {

@@ -16,6 +16,21 @@
  *   - simulator sessions (SIM-like aircraft, blank aircraft with sim time,
  *     or no aircraft hours at all but sim/approach data) are SIM › DUAL with
  *     day = night = 0 and the duration in sim_inst.
+ *
+ * Rows whose time hits span more than one (category, role) bucket — e.g.
+ * "ME › Day › FO" 3.0 and "ME › Day › AUG" 2.0 on one line — become one
+ * flight per bucket instead of keeping the winning bucket and dropping the
+ * rest: the same date / aircraft / crew / route / remarks on each, per-bucket
+ * day/night hours, cross-country on every flight when the row is
+ * cross-country, and the instrument hours, approaches, holds, instruction
+ * given and takeoffs/landings attached only to the bucket with the most
+ * hours (ties fall back to the orders above). Only fully-qualified hits (both
+ * category and role named) define buckets — PIC and Solo share one, as both
+ * log as PIC; generic columns ("Night", a bare "PIC") are handed out greedily,
+ * largest bucket first, never twice. A row's Total cell belongs to the row:
+ * `ApplyResult.splitRows` records the split, while `rowTotals` /
+ * `sourceRows` / `skipped` stay one entry per SOURCE row (see
+ * `sourceRowGroups`). Single-bucket rows take exactly the legacy path.
  */
 import type { Category, ParsedFlight, Role } from "../csv";
 import type {
@@ -42,9 +57,14 @@ const ROLE_ORDER: Rl[] = ["dual", "pic", "fo", "sic", "check", "solo"];
 /** Tie order — ME beats SE (legacy `meTotal >= seTotal`). */
 const CAT_ORDER: Cat[] = ["me", "se", "mes", "ses", "heli", "sim"];
 const HEADER_REPEAT_RE = /^(date|flight date|날짜|일자|日期|日付|fecha|datum)$/i;
+/** Float residue below which a drained shared column counts as empty. */
+const EPS = 1e-9;
+const ZERO_COUNTS = { takeoffs_day: 0, takeoffs_night: 0, landings_day: 0, landings_night: 0 } as const;
 
 interface TimeCol { col: number; cat: TimeCategory; cond: TimeCondition; role: TimeRole }
 interface TimeHit extends TimeCol { h: number }
+/** One (category, role) bucket of a row; `role` is the raw column role (PIC vs Solo), `hours` its fully-qualified hits. */
+interface Bucket { cat: Cat; role: Rl; hours: number }
 
 // ---------------------------------------------------------------------------
 // Cell readers
@@ -117,7 +137,8 @@ function parseRoleText(s: string | null): Role | null {
 
 export function applyMapping(workbook: Workbook, analysis: Analysis, mapping: ColumnMapping): ApplyResultExt {
   const grid: Grid = workbook.sheets[analysis.sheetIndex] ?? workbook.sheets[0] ?? { sheet: "csv", rows: [], width: 0 };
-  const dataStart = analysis.header.dataStart;
+  // A bogus analysis (negative, fractional or NaN dataStart) must not create phantom skipped rows.
+  const dataStart = Number.isFinite(analysis.header.dataStart) ? Math.max(0, Math.floor(analysis.header.dataStart)) : 0;
   const conv = mapping.conventions ?? {};
   const clockTimes = Boolean(conv.clockTimes);
 
@@ -138,12 +159,15 @@ export function applyMapping(workbook: Workbook, analysis: Analysis, mapping: Co
   const pathOf = (col: number): string[] => analysis.header.paths.find((p) => p.col === col)?.path ?? [];
   const landingsDayGeneric = cols("landings_day").some((c) => facetsOfPath(pathOf(c)).cond !== "day");
   const takeoffsDayGeneric = cols("takeoffs_day").some((c) => facetsOfPath(pathOf(c)).cond !== "day");
+  const anyLdg = has("landings_day") || has("landings_night");
+  const anyTo = has("takeoffs_day") || has("takeoffs_night");
   const aircraftByReg = analysis.legacyFormat === "foreflight" ? foreflightAircraftMap(grid, analysis.header.rows[0] ?? dataStart) : null;
 
   const flights: ParsedFlight[] = [];
   const skipped: { row: number; reason: SkipReason }[] = [];
   const rowTotals: (number | null)[] = [];
   const sourceRows: number[] = [];
+  const splitRows: { row: number; buckets: number }[] = [];
   const columnSums: Record<number, number> = {};
 
   let lastRow = grid.rows.length - 1;
@@ -204,6 +228,118 @@ export function applyMapping(workbook: Workbook, analysis: Analysis, mapping: Co
     }
     const simMake = SIM_MAKE_RE.test(make);
 
+    // --- row-level fields shared by every flight the row emits -----------------
+    const totalField = sumHours("total_time");
+    const xc = sumHours("xc_time") > 0 || cols("xc_flag").some((c) => {
+      const cell = row[c];
+      return cell?.kind === "number" ? cell.value > 0 : cell?.kind === "text" ? isTruthyFlag(cell.value) : false;
+    });
+    const from = firstText("from"), to = firstText("to");
+    const route = firstText("route") ?? (from && to ? `${from}-${to}` : from ?? to);
+    const base = {
+      date,
+      make_model: make,
+      registration,
+      pic: firstText("pic"),
+      copilot: firstText("copilot"),
+      third_pilot: firstText("third_pilot"),
+      check_pilot: firstText("check_pilot"),
+      route,
+      remarks: firstText("remarks"),
+    };
+    /** Takeoffs / landings from the mapped count columns, else the legacy one-per-flight default by day/night (none for sims). */
+    const counts = (category: Category, day: number, night: number) => {
+      let landingsDay = sumCount("landings_day"), landingsNight = sumCount("landings_night");
+      let takeoffsDay = sumCount("takeoffs_day"), takeoffsNight = sumCount("takeoffs_night");
+      if (landingsDayGeneric && has("landings_night") && landingsDay >= landingsNight) landingsDay -= landingsNight;
+      if (takeoffsDayGeneric && has("takeoffs_night") && takeoffsDay >= takeoffsNight) takeoffsDay -= takeoffsNight;
+      if (!anyTo && anyLdg) { takeoffsDay = landingsDay; takeoffsNight = landingsNight; }
+      if (!anyLdg && anyTo) { landingsDay = takeoffsDay; landingsNight = takeoffsNight; }
+      if (!anyLdg && !anyTo) {
+        // Legacy default: one takeoff + landing per flight, by day/night; none for sims.
+        const isNight = night > 0 && day === 0;
+        const isDay = day > 0 && night === 0;
+        const tol = category === "SIM" ? 0 : 1;
+        takeoffsDay = landingsDay = category === "SIM" ? 0 : isNight ? 0 : tol;
+        takeoffsNight = landingsNight = category === "SIM" ? 0 : isDay ? 0 : night > 0 ? tol : 0;
+      }
+      return { takeoffs_day: takeoffsDay, takeoffs_night: takeoffsNight, landings_day: landingsDay, landings_night: landingsNight };
+    };
+    /** Per-SOURCE-row bookkeeping — once per row, however many flights it emitted. */
+    const finishRow = (emitted: number) => {
+      rowTotals.push(has("total_time") ? r1(totalField) : null);
+      sourceRows.push(r);
+      if (emitted > 1) splitRows.push({ row: r, buckets: emitted });
+      for (let c = 0; c < row.length; c++) {
+        const cell = row[c];
+        if (cell.kind !== "number") continue;
+        // Accumulate unrounded; rounding at every step drifted +0.6 h on a
+        // 2,600-row Total column. Round once below.
+        columnSums[c] = (columnSums[c] ?? 0) + (dateCol === c ? 0 : hoursOf(cell, clockTimes) || cell.value);
+      }
+    };
+
+    // --- rows with time in more than one (category, role) bucket ---------------
+    const buckets = bucketsOf(hits);
+    if (buckets.length > 1) {
+      const shared = hits.filter((t) => t.cat === "any" || t.role === "any");
+      const left = shared.map((t) => t.h);
+      /** Hand up to `cap` hours of the shared `cond` columns compatible with `b` to it — each hour once. */
+      const drain = (b: Bucket, cond: TimeCondition, cap: number): number => {
+        let got = 0;
+        shared.forEach((t, i) => {
+          if (t.cond !== cond || left[i] <= EPS || got >= cap - EPS) return;
+          if ((t.cat !== "any" && t.cat !== b.cat) || (t.role !== "any" && t.role !== b.role)) return;
+          const x = Math.min(left[i], cap - got);
+          left[i] -= x;
+          got += x;
+        });
+        return got < EPS ? 0 : got;
+      };
+      buckets.forEach((b, i) => {
+        const primary = i === 0;
+        const T = b.hours;
+        const owned = hits.filter((t) => t.cat === b.cat && t.role === b.role);
+        const ownedNight = sum(owned.filter((t) => t.cond === "night"));
+        const ownedDay = sum(owned.filter((t) => t.cond === "day"));
+        // As on the single-bucket path: the bucket's own day/night columns win; generic ones fill in only when it has none.
+        let night: number;
+        if (ownedNight > 0) { drain(b, "night", ownedNight); night = ownedNight; } else night = drain(b, "night", T);
+        let dayExplicit: number;
+        if (ownedDay > 0) { drain(b, "day", ownedDay); dayExplicit = ownedDay; } else dayExplicit = drain(b, "day", T);
+        night = Math.min(night, T);
+        let day = dayExplicit > 0 ? Math.min(dayExplicit, T) : Math.max(0, T - night);
+        if (r1(day + night) < r1(T) && dayExplicit > 0) day = Math.max(0, T - night);
+
+        const sim = simMake || b.cat === "sim";
+        const category: Category = sim ? "SIM" : CATEGORY_ENUM[b.cat];
+        const role: Role = ROLE_ENUM[b.role];
+        if (sim) { day = 0; night = 0; }
+        day = r1(day);
+        night = r1(night);
+        flights.push({
+          ...base,
+          category,
+          role,
+          day_time: day,
+          night_time: night,
+          is_xcountry: xc,
+          // Instrument time, approaches, holds, instruction given and counts belong to the row — booked once, on the largest bucket.
+          actual_inst: primary ? r1(sumHours("actual_inst")) : 0,
+          hood_inst: primary ? r1(sumHours("hood_inst")) : 0,
+          sim_inst: sim ? r1(primary && simInstCol > 0 ? simInstCol : T) : primary ? r1(simInstCol) : 0,
+          ifr_approaches: primary ? approaches : 0,
+          precision_approaches: primary ? sumCount("precision_approaches") : 0,
+          non_precision_approaches: primary ? sumCount("non_precision_approaches") : 0,
+          holds: primary ? sumCount("holds") : 0,
+          cfi_time: primary ? r1(sumHours("cfi_time")) : 0,
+          ...(primary ? counts(category, day, night) : ZERO_COUNTS),
+        });
+      });
+      finishRow(buckets.length);
+      continue;
+    }
+
     // --- role --------------------------------------------------------------
     let roleFromField = parseRoleText(firstText("role"));
     let R: Rl | null = null;
@@ -230,7 +366,6 @@ export function applyMapping(workbook: Workbook, analysis: Analysis, mapping: Co
     const catTotal = C ? sum(hits.filter((t) => t.cat === C)) : 0;
     const roleTotal = sum(hits.filter((t) => t.cat === "any" && t.role === R));
     const genericTotal = sum(hits.filter((t) => t.cat === "any" && t.role === "any"));
-    const totalField = sumHours("total_time");
     const nightSpecific = sum(compatible.filter((t) => t.cond === "night" && (t.cat !== "any" || t.role !== "any")));
     const nightGeneric = sum(compatible.filter((t) => t.cond === "night" && t.cat === "any" && t.role === "any"));
     const daySpecific = sum(compatible.filter((t) => t.cond === "day" && (t.cat !== "any" || t.role !== "any")));
@@ -263,40 +398,8 @@ export function applyMapping(workbook: Workbook, analysis: Analysis, mapping: Co
     }
 
     // --- cross-country / instrument / counts ----------------------------------
-    const xc = sumHours("xc_time") > 0 || cols("xc_flag").some((c) => {
-      const cell = row[c];
-      return cell?.kind === "number" ? cell.value > 0 : cell?.kind === "text" ? isTruthyFlag(cell.value) : false;
-    });
-    let landingsDay = sumCount("landings_day"), landingsNight = sumCount("landings_night");
-    let takeoffsDay = sumCount("takeoffs_day"), takeoffsNight = sumCount("takeoffs_night");
-    if (landingsDayGeneric && has("landings_night") && landingsDay >= landingsNight) landingsDay -= landingsNight;
-    if (takeoffsDayGeneric && has("takeoffs_night") && takeoffsDay >= takeoffsNight) takeoffsDay -= takeoffsNight;
-    const anyLdg = has("landings_day") || has("landings_night");
-    const anyTo = has("takeoffs_day") || has("takeoffs_night");
-    if (!anyTo && anyLdg) { takeoffsDay = landingsDay; takeoffsNight = landingsNight; }
-    if (!anyLdg && anyTo) { landingsDay = takeoffsDay; landingsNight = takeoffsNight; }
-    if (!anyLdg && !anyTo) {
-      // Legacy default: one takeoff + landing per flight, by day/night; none for sims.
-      const isNight = night > 0 && day === 0;
-      const isDay = day > 0 && night === 0;
-      const tol = category === "SIM" ? 0 : 1;
-      takeoffsDay = landingsDay = category === "SIM" ? 0 : isNight ? 0 : tol;
-      takeoffsNight = landingsNight = category === "SIM" ? 0 : isDay ? 0 : night > 0 ? tol : 0;
-    }
-
-    const from = firstText("from"), to = firstText("to");
-    const route = firstText("route") ?? (from && to ? `${from}-${to}` : from ?? to);
-
     flights.push({
-      date,
-      make_model: make,
-      registration,
-      pic: firstText("pic"),
-      copilot: firstText("copilot"),
-      third_pilot: firstText("third_pilot"),
-      check_pilot: firstText("check_pilot"),
-      route,
-      remarks: firstText("remarks"),
+      ...base,
       category,
       role,
       day_time: r1(day),
@@ -310,24 +413,36 @@ export function applyMapping(workbook: Workbook, analysis: Analysis, mapping: Co
       non_precision_approaches: sumCount("non_precision_approaches"),
       holds: sumCount("holds"),
       cfi_time: r1(sumHours("cfi_time")),
-      takeoffs_day: takeoffsDay,
-      takeoffs_night: takeoffsNight,
-      landings_day: landingsDay,
-      landings_night: landingsNight,
+      ...counts(category, day, night),
     });
-    rowTotals.push(has("total_time") ? r1(totalField) : null);
-    sourceRows.push(r);
-    for (let c = 0; c < row.length; c++) {
-      const cell = row[c];
-      if (cell.kind !== "number") continue;
-      // Accumulate unrounded; rounding at every step drifted +0.6 h on a
-      // 2,600-row Total column. Round once below.
-      columnSums[c] = (columnSums[c] ?? 0) + (dateCol === c ? 0 : hoursOf(cell, clockTimes) || cell.value);
-    }
+    finishRow(1);
   }
   for (const k of Object.keys(columnSums)) columnSums[Number(k)] = r1(columnSums[Number(k)]);
 
-  return { flights, skipped, columnSums, rowTotals, sourceRows };
+  return { flights, skipped, columnSums, rowTotals, sourceRows, splitRows };
+}
+
+/**
+ * Flights regrouped by the source row that produced them, aligned with
+ * `rowTotals` / `sourceRows` (one entry per imported source row). Flights are
+ * emitted in row order and a split row contributes `buckets` consecutive
+ * flights, primary bucket first, so a cursor walk rebuilds the grouping.
+ * `row` is null for a result that carries no `sourceRows` (then it is 1:1).
+ */
+export function sourceRowGroups(result: ApplyResultExt): { row: number | null; total: number | null; flights: number[] }[] {
+  const rows = result.sourceRows;
+  if (!rows) return result.flights.map((_, i) => ({ row: null, total: result.rowTotals?.[i] ?? null, flights: [i] }));
+  const bucketsAt = new Map<number, number>();
+  for (const s of result.splitRows ?? []) bucketsAt.set(s.row, s.buckets);
+  const out: { row: number | null; total: number | null; flights: number[] }[] = [];
+  let cursor = 0;
+  rows.forEach((row, k) => {
+    const n = Math.max(1, bucketsAt.get(row) ?? 1);
+    const idx: number[] = [];
+    for (let j = 0; j < n && cursor < result.flights.length; j++) idx.push(cursor++);
+    out.push({ row, total: result.rowTotals?.[k] ?? null, flights: idx });
+  });
+  return out;
 }
 
 function sum(list: TimeHit[]): number {
@@ -341,6 +456,34 @@ function argmaxRole(h: Partial<Record<Rl, number>>): Rl | null {
     if (v > (best ? h[best] ?? 0 : 0)) best = r;
   }
   return best;
+}
+
+/**
+ * Distinct (category, role) buckets among a row's fully-qualified time hits
+ * (both category and role named — "ME › Day › FO", not a generic "Night" or a
+ * bare "PIC"). PIC and Solo share a bucket (both log as PIC); inside one the
+ * raw role is the argmax one, as on the single-bucket path. Sorted largest
+ * first, ties in CAT_ORDER then ROLE_ORDER — the first is the primary bucket.
+ */
+function bucketsOf(hits: TimeHit[]): Bucket[] {
+  const groups = new Map<string, { cat: Cat; byRole: Partial<Record<Rl, number>> }>();
+  for (const t of hits) {
+    if (t.cat === "any" || t.role === "any") continue;
+    const key = `${t.cat}:${ROLE_ENUM[t.role]}`;
+    const g = groups.get(key) ?? { cat: t.cat, byRole: {} };
+    g.byRole[t.role] = (g.byRole[t.role] ?? 0) + t.h;
+    groups.set(key, g);
+  }
+  const out: Bucket[] = [];
+  for (const g of groups.values()) {
+    const role = argmaxRole(g.byRole);
+    if (role) out.push({ cat: g.cat, role, hours: g.byRole[role] ?? 0 });
+  }
+  out.sort((a, b) =>
+    r1(b.hours) - r1(a.hours)
+    || CAT_ORDER.indexOf(a.cat) - CAT_ORDER.indexOf(b.cat)
+    || ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role));
+  return out;
 }
 
 function blockDuration(row: Cell[], offCol: number | undefined, onCol: number | undefined): number {

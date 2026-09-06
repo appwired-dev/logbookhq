@@ -118,8 +118,12 @@ export default function ImportWizard({ locale, augHalfCredit }: { locale: Locale
     setAiNotice(null);
 
     // Known export or a remembered layout with nothing unclear: skip review.
-    const legacyName = a.legacyFormat ? (LEGACY_FORMAT_NAMES[a.legacyFormat] ?? a.legacyFormat) : null;
-    const templateName = a.templateId && a.lowConfidenceCols.length === 0 ? (a.templateName ?? a.templateId) : null;
+    // Both shortcuts require every mapped column to clear the confidence
+    // threshold — a legacy signature match with extra or renamed columns
+    // still lands on Review mapping.
+    const nothingUnclear = a.lowConfidenceCols.length === 0;
+    const legacyName = a.legacyFormat && nothingUnclear ? (LEGACY_FORMAT_NAMES[a.legacyFormat] ?? a.legacyFormat) : null;
+    const templateName = a.templateId && nothingUnclear ? (a.templateName ?? a.templateId) : null;
     const auto = legacyName ?? templateName;
     setAutoApplied(auto);
     goTo(auto ? 3 : 2);

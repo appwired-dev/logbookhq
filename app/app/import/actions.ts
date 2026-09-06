@@ -4,13 +4,13 @@ import { revalidatePath } from "next/cache";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import {
-  analyzeWorkbook, applyMapping, arbitrateWithClaude, readWorkbook, reconcile, SYSTEM_TEMPLATES,
+  analyzeWorkbook, applyMapping, arbitrateWithClaude, detectHeaderBand, fingerprint, readWorkbook, reconcile, SYSTEM_TEMPLATES,
   type Analysis, type ApplyResult, type ColumnMapping, type ImportTemplate, type SkipReason,
 } from "@/lib/import";
 import type { ParsedFlight } from "@/lib/csv";
 import { bumpTemplateUse, listTemplatesForUser, upsertUserTemplate } from "@/lib/import-templates-db";
 import {
-  MAX_FILE_BYTES, isActionError as isError, isAllowedExtension,
+  MAX_FILE_BYTES, isActionError as isError, isAllowedExtension, normaliseAnalysis, normaliseMapping,
   type ActionError, type ActionResult, type AnalyzeData, type CommitData, type ImportMode, type PreviewData, type SkipCount,
 } from "./wizard-types";
 
@@ -33,6 +33,9 @@ const BATCH = 500;
 // Hard cap on parsed rows to prevent OOM on a runaway upload. A 50-year career
 // at 1000 hrs/year is ~50,000 flights; anything beyond that is not a logbook.
 const MAX_PARSED_FLIGHTS = 50_000;
+// Replace-mode snapshot guard: stop paging past this many existing ids (a
+// runaway or hostile row count) rather than buffering them all in memory.
+const SNAPSHOT_CAP = 200_000;
 const SAMPLE_FLIGHTS = 5;
 
 // ---------------------------------------------------------------------------
@@ -72,20 +75,21 @@ function readJson<T>(formData: FormData, name: string): T | null {
   }
 }
 
-/** The client echoes the analysis back as JSON — check the parts we dereference before the pipeline sees it. */
+/**
+ * The client echoes the analysis and mapping back as JSON. Both are validated
+ * and normalised (wizard-types.ts) before the pipeline dereferences anything:
+ * integer indices are range-checked and every column target must round-trip
+ * through parseTargetKey(targetKey(t)) or it becomes "ignore".
+ */
 function readAnalysis(formData: FormData): Analysis | null {
-  const a = readJson<Analysis>(formData, "analysis");
-  if (!a || typeof a !== "object") return null;
-  if (!a.header || !Array.isArray(a.header.paths) || !a.mapping || !Array.isArray(a.mapping.columns)) return null;
-  if (typeof a.fingerprint !== "string") return null;
-  return a;
+  return normaliseAnalysis(readJson<unknown>(formData, "analysis"));
 }
 
 function readMapping(formData: FormData): ColumnMapping | null {
-  const m = readJson<ColumnMapping>(formData, "mapping");
-  if (!m || typeof m !== "object" || !Array.isArray(m.columns)) return null;
-  return { ...m, conventions: m.conventions ?? {} };
+  return normaliseMapping(readJson<unknown>(formData, "mapping"));
 }
+
+const FILE_MISMATCH = "This file no longer matches the analysed layout. Please upload it again.";
 
 async function getAugHalfCredit(supabase: SupabaseClient, userId: string): Promise<boolean> {
   const { data } = await supabase.from("profiles").select("aug_half_credit").eq("id", userId).maybeSingle();
@@ -115,12 +119,24 @@ function tallySkips(skipped: ApplyResult["skipped"]): SkipCount[] {
     .sort((a, b) => b.count - a.count);
 }
 
-/** Apply + reconcile in one go — the shared tail of analyze/preview/commit. */
+/**
+ * Apply + reconcile in one go — the shared tail of analyze/preview/commit.
+ *
+ * The browser re-sends the File on every step, so the bytes we parse here may
+ * not be the ones that produced `analysis` (a re-picked file, a tampered
+ * echo). Before trusting `analysis.header`/`sheetIndex` against this
+ * workbook, the header band is re-detected on the analysed sheet and its
+ * fingerprint must equal the one the analysis carries.
+ */
 function runPipeline(
   bytes: Uint8Array, filename: string, analysis: Analysis, mapping: ColumnMapping, augHalfCredit: boolean,
 ): { applied: ApplyResult; preview: Omit<PreviewData, "existingCount"> } | ActionError {
   try {
     const workbook = readWorkbook(bytes, filename);
+    const sheet = workbook.sheets[analysis.sheetIndex];
+    if (!sheet) return { error: FILE_MISMATCH };
+    const actualFingerprint = fingerprint(detectHeaderBand(sheet).paths.map((p) => p.path));
+    if (actualFingerprint !== analysis.fingerprint) return { error: FILE_MISMATCH };
     const applied = applyMapping(workbook, analysis, mapping);
     const report = reconcile(applied, analysis, mapping, { augHalfCredit });
     return {
@@ -143,7 +159,7 @@ function runPipeline(
 // ---------------------------------------------------------------------------
 
 export async function analyzeImportAction(formData: FormData): Promise<ActionResult<AnalyzeData>> {
-  // Auth first so an anonymous caller never gets 25 MB buffered on their behalf.
+  // Auth first so an anonymous caller never gets MAX_FILE_BYTES buffered on their behalf.
   const auth = await requireUser();
   if (isError(auth)) return auth;
   const upload = await readUpload(formData);
@@ -240,7 +256,14 @@ export async function commitImportAction(formData: FormData): Promise<ActionResu
   }
 
   const result = await insertFlights(supabase, userId, flights, mode);
-  if (isError(result)) return result;
+  if (isError(result)) {
+    // The database may have changed even on failure (a rollback that could
+    // not remove every row, or a Replace whose old-row cleanup failed), so
+    // the flight list must not keep serving a stale cache.
+    revalidatePath("/app");
+    revalidatePath("/app/flights");
+    return result;
+  }
 
   let templateSaved = false;
   if (saveTemplate) {
@@ -290,9 +313,13 @@ async function insertFlights(
     // with more than that returns only the first 1000 ids, so the cleanup
     // step below leaves the rest as stale rows next to the new import.
     // Real incident: a user with 2,644 flights had 644 old rows survive.
+    //
+    // A page may legitimately come back shorter than PAGE (a proxy or a
+    // lower max_rows trimming it), so the only stop condition is an empty
+    // page; `from` advances by what was actually received.
     const PAGE = 1000;
     let from = 0;
-    for (;;) {
+    while (from < SNAPSHOT_CAP) {
       const { data: page, error: snapErr } = await supabase
         .from("flights")
         .select("id")
@@ -302,9 +329,7 @@ async function insertFlights(
       if (snapErr) return { error: `Snapshot failed: ${snapErr.message}` };
       if (!page || page.length === 0) break;
       for (const r of page) oldIds.push(r.id as number);
-      if (page.length < PAGE) break;
-      from += PAGE;
-      if (from >= 200_000) break; // runaway guard
+      from += page.length;
     }
   }
 
@@ -320,32 +345,73 @@ async function insertFlights(
       .select("id");
     if (error) {
       // Roll back the new rows we already inserted in this run so the user
-      // isn't left with a half-import on top of their original data.
+      // isn't left with a half-import on top of their original data. The
+      // rollback is chunked like every other IN-list delete and its result
+      // is checked: whatever it could not remove is reported by exact count.
+      let message = `Insert failed at row ${i}: ${error.message}`;
       if (newIds.length > 0) {
-        await supabase.from("flights").delete().in("id", newIds);
+        const rollback = await deleteFlightIds(supabase, userId, newIds);
+        const leftover = newIds.length - rollback.removed;
+        if (leftover > 0) {
+          message += ` ${leftover} partially imported ${leftover === 1 ? "row" : "rows"} could not be removed; re-run in Replace mode to clean up.`;
+        }
       }
-      return { error: `Insert failed at row ${i}: ${error.message}` };
+      return { error: message };
     }
     for (const r of insertedRows ?? []) newIds.push(r.id as number);
     inserted += slice.length;
   }
 
-  // All inserts succeeded — now safe to delete the original rows.
+  // All inserts succeeded — now safe to delete the original rows. `deleted`
+  // counts rows the database confirms it removed, not ids we asked about.
   let deleted = 0;
   if (mode === "replace" && oldIds.length > 0) {
-    // Chunk the IN clause so very long id arrays don't blow PostgREST's URL
-    // length limits.
-    for (let i = 0; i < oldIds.length; i += BATCH) {
-      const chunk = oldIds.slice(i, i + BATCH);
-      const { error } = await supabase.from("flights").delete().in("id", chunk);
-      if (error) {
-        // Old rows linger as duplicates. Better than losing the new import;
-        // surface the warning so the user can manually clean up.
-        return { error: `Imported ${inserted} flights, but cleanup of old rows failed: ${error.message}. Old + new flights both present — delete old manually.` };
-      }
-      deleted += chunk.length;
+    const cleanup = await deleteFlightIds(supabase, userId, oldIds);
+    deleted = cleanup.removed;
+    if (cleanup.error) {
+      // Old rows linger next to the new import. Better than losing the new
+      // rows; a second Replace run snapshots old + new and removes both.
+      const remaining = oldIds.length - deleted;
+      return {
+        error: `Imported ${inserted} flights, but ${remaining} of the ${oldIds.length} previous flights could not be removed: ${cleanup.error}. `
+          + "Your old and new flights are both present right now — re-run this import in Replace mode and it will clean up the duplicates.",
+      };
     }
   }
 
   return { inserted, deleted };
+}
+
+/**
+ * Delete the user's flights by id in BATCH-sized IN lists (so long id arrays
+ * don't blow PostgREST's URL length limit), returning how many rows the
+ * database actually removed. Best effort: a failing chunk is recorded and the
+ * rest are still attempted, so a transient error leaves as little behind as
+ * possible. RLS already limits deletes to the caller's own rows; the explicit
+ * user_id filter is defence in depth.
+ */
+async function deleteFlightIds(
+  supabase: SupabaseClient, userId: string, ids: number[],
+): Promise<{ removed: number; error: string | null }> {
+  let removed = 0;
+  let firstError: string | null = null;
+  for (let i = 0; i < ids.length; i += BATCH) {
+    const chunk = ids.slice(i, i + BATCH);
+    try {
+      const { data, error } = await supabase
+        .from("flights")
+        .delete()
+        .in("id", chunk)
+        .eq("user_id", userId)
+        .select("id");
+      if (error) {
+        firstError ??= error.message;
+        continue;
+      }
+      removed += data?.length ?? 0;
+    } catch (e: unknown) {
+      firstError ??= e instanceof Error ? e.message : String(e);
+    }
+  }
+  return { removed, error: firstError };
 }

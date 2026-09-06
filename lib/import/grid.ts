@@ -10,7 +10,9 @@
  * strings it does not understand:
  *   - numbers: "1.5", "1,5" (decimal comma), "1,234.5", "1:30" (→ 1.5 h) —
  *     the raw text is kept so conventions can be detected later and block
- *     times can still be read as clock times;
+ *     times can still be read as clock times; Excel duration cells (serial
+ *     0.0625 formatted "h:mm", which `cellDates` hands over as a Date on the
+ *     1899-12-30 epoch) become the same 1.5 h / "1:30" cell;
  *   - dates: Date objects, ISO / dd/mm/yyyy / mm/dd/yyyy / yyyy.mm.dd /
  *     dd-MMM-yy / 2024년 3월 5일 … Day-vs-month ambiguity is resolved per
  *     column by which reading keeps every value valid and the column
@@ -20,7 +22,8 @@
 import * as XLSX from "xlsx";
 import type { Cell, Grid, Workbook } from "./types";
 import {
-  collapse, dateObjectToISO, isValidYMD, isoDate, parseDateText, parseTimeValue, type DateReading,
+  collapse, dateObjectToISO, excelDurationHours, excelEpochFraction, isValidYMD, isoDate, parseDateText, parseTimeValue,
+  type DateReading,
 } from "./util";
 
 const EMPTY_TOKENS = new Set(["", "-", "—", "–", "--", "---", ".", "n/a", "na", "n.a.", "null", "nil", "none", "#n/a", "#value!", "#ref!"]);
@@ -123,10 +126,21 @@ export function parseDelimited(text: string, delimiter?: string): string[][] {
 // SheetJS
 // ---------------------------------------------------------------------------
 
-type RawValue = string | number | boolean | Date | null | undefined;
+/**
+ * A numeric cell with an elapsed-time format that SheetJS left as a raw
+ * serial (fraction of a day) instead of converting it to a Date.
+ */
+export interface ExcelDuration { excelDays: number }
+
+export type RawValue = string | number | boolean | Date | ExcelDuration | null | undefined;
 
 function readSpreadsheet(u8: Uint8Array, filename: string): Workbook {
-  const wb = XLSX.read(u8, { type: "array", cellDates: true, cellNF: false, cellText: false });
+  // cellNF keeps each cell's number format (`z`) so duration formats can be told apart from plain numbers.
+  return workbookFromSheetJS(XLSX.read(u8, { type: "array", cellDates: true, cellNF: true, cellText: false }), filename);
+}
+
+/** SheetJS workbook (read with `cellDates`) → typed Workbook. Exported for tests that build sheets in memory. */
+export function workbookFromSheetJS(wb: XLSX.WorkBook, filename: string): Workbook {
   const sheets: Grid[] = [];
   for (const name of wb.SheetNames) {
     const ws = wb.Sheets[name];
@@ -139,11 +153,45 @@ function readSpreadsheet(u8: Uint8Array, filename: string): Workbook {
       header: 1, raw: true, defval: null, blankrows: true,
       range: { s: { r: 0, c: 0 }, e: range.e },
     });
+    markDurationSerials(ws, rows);
     const grid = gridFromValues(name, rows);
     applyMerges(grid, ws["!merges"]);
     sheets.push(grid);
   }
   return { filename, sheets };
+}
+
+/**
+ * Numeric cells that carry an elapsed-time / clock number format but that
+ * `cellDates` left as raw serials (in-memory sheets, or a format its date
+ * detection misses): wrap the fraction so typeValue reads "0.0625 as h:mm"
+ * as 1.5 h rather than as the number 0.0625.
+ */
+function markDurationSerials(ws: XLSX.WorkSheet, rows: RawValue[][]): void {
+  for (const addr of Object.keys(ws)) {
+    if (addr.startsWith("!")) continue;
+    const cell: XLSX.CellObject | undefined = ws[addr];
+    if (!cell || cell.t !== "n" || typeof cell.v !== "number" || typeof cell.z !== "string") continue;
+    if (cell.v < 0 || cell.v >= 1 || !isTimeFormat(cell.z)) continue;
+    const { r, c } = XLSX.utils.decode_cell(addr);
+    const row = rows[r];
+    if (row) row[c] = { excelDays: cell.v };
+  }
+}
+
+/**
+ * Elapsed-time / clock number formats: "h:mm", "hh:mm:ss", "[h]:mm",
+ * "h:mm AM/PM", "[hh]:mm;@" — hours and minutes with no day/month/year
+ * token. Only the first format section counts; quoted literals, escapes and
+ * colour / locale tags ("[Red]", "[$-409]") are ignored.
+ */
+export function isTimeFormat(z: string): boolean {
+  const f = z.split(";")[0].toLowerCase()
+    .replace(/"[^"]*"/g, "")
+    .replace(/\\./g, "")
+    .replace(/\[(?![hms]+\])[^\]]*\]/g, "")
+    .replace(/am\/pm|a\/p/g, "");
+  return /h/.test(f) && /mm/.test(f) && !/[dy]/.test(f);
 }
 
 /** Copy text anchors across merged ranges (header groups). Numbers/dates are never duplicated. */
@@ -188,6 +236,9 @@ export function gridFromValues(sheet: string, raw: RawValue[][]): Grid {
 function typeValue(v: RawValue): Provisional {
   if (v == null) return { cell: EMPTY };
   if (v instanceof Date) {
+    // A duration cell ("1:30" = serial 0.0625) arrives as the Excel epoch plus the fraction.
+    const fraction = excelEpochFraction(v);
+    if (fraction != null) return durationCell(fraction);
     const iso = dateObjectToISO(v);
     return { cell: iso ? { kind: "date", value: iso } : EMPTY };
   }
@@ -195,7 +246,18 @@ function typeValue(v: RawValue): Provisional {
     return { cell: Number.isFinite(v) ? { kind: "number", value: v } : EMPTY };
   }
   if (typeof v === "boolean") return { cell: { kind: "text", value: v ? "TRUE" : "FALSE" } };
-  return typeText(String(v));
+  if (typeof v === "object") return durationCell(v.excelDays);
+  return typeText(v);
+}
+
+/**
+ * Excel day fraction → the same cell a "1:30" text yields: hours as the value,
+ * "h:mm" as raw, so display, clock-time evidence and block-time parsing all
+ * behave as they do for a CSV of the same logbook.
+ */
+function durationCell(days: number): Provisional {
+  const { hours, raw } = excelDurationHours(days);
+  return { cell: { kind: "number", value: hours, raw } };
 }
 
 const NUM_PLAIN = /^[-+]?\d+(\.\d+)?$/;

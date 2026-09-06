@@ -10,10 +10,33 @@ const CATEGORIES: Category[] = ["SE", "ME", "SES", "MES", "HELI", "SIM"];
 const ROLES: Role[] = ["PIC", "DUAL", "FO", "SIC", "CHECK"];
 
 /**
+ * The only columns a client may write. Typed as a complete record over
+ * FlightInput so the compiler fails the build if the type gains a column
+ * that is not listed here (or lists one that no longer exists) — and, being
+ * derived from FlightInput, it can never contain id / user_id / created_at /
+ * updated_at.
+ */
+const WRITABLE_COLUMNS: Record<keyof FlightInput, true> = {
+  date: true, make_model: true, registration: true,
+  pic: true, copilot: true, third_pilot: true, check_pilot: true,
+  route: true, remarks: true, category: true, role: true,
+  day_time: true, night_time: true, is_xcountry: true,
+  actual_inst: true, hood_inst: true, sim_inst: true,
+  ifr_approaches: true, precision_approaches: true, non_precision_approaches: true, holds: true,
+  cfi_time: true, takeoffs_day: true, takeoffs_night: true, landings_day: true, landings_night: true,
+  duty_time: true,
+};
+const WRITABLE_KEYS = Object.keys(WRITABLE_COLUMNS) as (keyof FlightInput)[];
+
+/**
  * Normalise + sanity-check a FlightInput coming from the client. We rely on
  * RLS for auth, but Postgres rejects invalid enum/number values with cryptic
  * 400s that surface as ugly toasts. Validating here gives the user a clear
  * "Invalid category" instead of "new row violates check constraint flights_role_check".
+ *
+ * The returned payload is rebuilt from the WRITABLE_COLUMNS allowlist, so an
+ * `id`, `user_id` or any other stray key in the request never reaches the
+ * insert/update (a spread of the raw input would forward them verbatim).
  *
  * Returns either a validated payload or a structured error.
  */
@@ -39,9 +62,15 @@ function validateFlight(input: FlightInput): { ok: true; value: FlightInput } | 
     "holds", "cfi_time", "takeoffs_day", "takeoffs_night",
     "landings_day", "landings_night", "duty_time",
   ];
-  const cleaned: Record<string, unknown> = { ...input };
+  // Copy only allowlisted keys the client actually sent (absent keys stay
+  // absent so an update leaves them untouched and an insert takes DB defaults).
+  const raw = input as Record<string, unknown>;
+  const cleaned: Record<string, unknown> = {};
+  for (const k of WRITABLE_KEYS) {
+    if (k in raw) cleaned[k] = raw[k];
+  }
   for (const f of numericFields) {
-    const r = nonNegNumber((input as Record<string, unknown>)[f], f as string);
+    const r = nonNegNumber(raw[f], f as string);
     if (typeof r === "string") return { ok: false, error: r };
     cleaned[f as string] = r;
   }

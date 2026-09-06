@@ -222,6 +222,34 @@ export function dateObjectToISO(d: Date): string | null {
   return isValidYMD(y, m, day) ? isoDate(y, m, day) : null;
 }
 
+/**
+ * SheetJS (`cellDates`) turns a duration-formatted cell — serial 0.0625 shown
+ * as "1:30" — into a Date at the Excel epoch plus the fraction: 1899-12-30
+ * 01:30 in *local* components (that is how its `numdate` builds the Date, so
+ * the local clock, not UTC, is the one that matches the sheet). Returns that
+ * fraction of a day (0 ≤ f < 1) when `d` sits on the epoch day, null for any
+ * other date. Serials of a day or more (1899-12-31 onwards) are left to the
+ * date path untouched. Nobody logs a flight on 1899-12-30, so there is no
+ * ambiguity with a genuine date.
+ */
+export function excelEpochFraction(d: Date): number | null {
+  if (Number.isNaN(d.getTime())) return null;
+  if (d.getFullYear() !== 1899 || d.getMonth() !== 11 || d.getDate() !== 30) return null;
+  return (d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds() + d.getMilliseconds() / 1000) / 86400;
+}
+
+/**
+ * Excel day fraction → decimal hours (to 0.01) plus the "h:mm" text the sheet
+ * displays. Seconds are folded in (h + m/60 + s/3600); the text is rounded to
+ * the minute like Excel's own "h:mm".
+ */
+export function excelDurationHours(days: number): { hours: number; raw: string } {
+  const secs = Math.round(days * 86400);
+  const mins = Math.round(secs / 60);
+  const raw = `${Math.floor(mins / 60)}:${String(mins % 60).padStart(2, "0")}`;
+  return { hours: Math.round((secs / 3600) * 100) / 100, raw };
+}
+
 /** Today's local calendar date as ISO (for future-date checks). */
 export function todayISO(): string {
   const t = new Date();
