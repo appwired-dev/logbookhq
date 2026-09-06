@@ -214,7 +214,7 @@ export default function ImportWizard({ locale, augHalfCredit }: { locale: Locale
     setBusy(null);
     if (!r) return;
     setResult(r);
-    setAnnounce(s("successTitle", { n: r.inserted }));
+    setAnnounce(s("successTitle", { n: r.inserted.toLocaleString() }));
   }
 
   function resetAll() {
