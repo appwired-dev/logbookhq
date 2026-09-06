@@ -1,18 +1,30 @@
 "use client";
 
 import { useId, useMemo, useState, type RefObject } from "react";
-// ArrowLeft / Sparkles are not in components/ui/icons yet (read-only for this change).
-import { ArrowLeft, Sparkles } from "@/components/ui/icons";
 import { Alert, Button, CardFooter, Icon, Pill, type PillVariant } from "@/components/ui";
 import type { Analysis, CanonicalTarget, ColumnAssignment, ColumnMapping, HeaderPath } from "@/lib/import/types";
 // Pure module — keeps SheetJS/Anthropic (reachable via the "@/lib/import" barrel) out of the client bundle.
 import { CANONICAL_OPTIONS, describeTarget, parseTargetKey, targetKey } from "@/lib/import/mapping";
-import type { ImportStrings } from "./import-strings";
+import { targetGroupLabel, targetLabel, type ImportStrings } from "./import-strings";
 import type { AiNotice } from "./ImportWizard";
 
 /** The slice of a CANONICAL_OPTIONS group this table reads. */
 type OptionGroup = { group: string; options: { label: string; target: CanonicalTarget }[] };
 type Option = OptionGroup["options"][number];
+
+/**
+ * Localised label for a target key, built client-side from the stable key
+ * ("field:date", "time:me:night:fo"). Keys this locale file does not know
+ * fall back to the library's English describeTarget().
+ */
+export function labelForTargetKey(key: string, s: ImportStrings): string {
+  return targetLabel(s, key) ?? describeTarget(parseTargetKey(key));
+}
+
+/** Same, from a target object — keeps the exact target for the describeTarget() fallback. */
+function labelForTarget(target: CanonicalTarget, s: ImportStrings): string {
+  return targetLabel(s, targetKey(target)) ?? describeTarget(target);
+}
 
 // ---------------------------------------------------------------------------
 // Row model
@@ -158,7 +170,7 @@ export default function StepMapping({
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <Button size="sm" onClick={onAskAi} loading={aiBusy} disabled={busy || review.length === 0}>
-            <Sparkles size={14} strokeWidth={2} aria-hidden />
+            <Icon.Sparkles size={14} strokeWidth={2} aria-hidden />
             {aiBusy ? s("askAiPending") : s("askAi")}
           </Button>
           <Button size="sm" variant="ghost" onClick={onReset} disabled={busy}>
@@ -198,7 +210,7 @@ export default function StepMapping({
               <tr>
                 <td colSpan={4} className="!py-1 bg-surface-2/40">
                   <Button variant="ghost" size="sm" aria-expanded={showIgnored} onClick={() => setShowIgnored((v) => !v)}>
-                    <Icon.ChevronDown size={14} strokeWidth={2} aria-hidden className={`transition-transform duration-fast ${showIgnored ? "rotate-180" : ""}`} />
+                    <Icon.ChevronDown size={14} strokeWidth={2} aria-hidden className={`transition-transform duration-fast motion-reduce:transition-none ${showIgnored ? "rotate-180" : ""}`} />
                     {showIgnored ? s("hideIgnored") : s("showIgnored", { n: ignored.length })}
                   </Button>
                 </td>
@@ -215,7 +227,7 @@ export default function StepMapping({
 
       <CardFooter className="justify-between">
         <Button variant="ghost" onClick={onBack} disabled={busy}>
-          <ArrowLeft size={16} strokeWidth={2} aria-hidden />{s("back")}
+          <Icon.ArrowLeft size={16} strokeWidth={2} aria-hidden />{s("back")}
         </Button>
         <Button variant="primary" onClick={onContinue} loading={continueBusy} disabled={busy}>
           {continueBusy ? s("checking") : <>{s("continue")}<Icon.ArrowRight size={16} strokeWidth={2} aria-hidden /></>}
@@ -270,20 +282,21 @@ function MappingRow({
         <label htmlFor={id} className="sr-only">{s("mapSelectLabel", { col: `${letter} · ${path.label}` })}</label>
         <select
           id={id}
-          className="input input-sm min-w-[12rem]"
+          className="input input-sm h-11 sm:h-8 min-w-[12rem]"
           value={currentKey}
           disabled={disabled}
           onChange={(e) => onChange(path.col, e.target.value)}
         >
+          {/* Safety net only — the library lists "ignore" in its own group, whose label is localised below. */}
           {!LISTED_KEYS.has(IGNORE_KEY) && <option value={IGNORE_KEY}>{s("ignoreOption")}</option>}
           {!LISTED_KEYS.has(currentKey) && currentKey !== IGNORE_KEY && (
-            <option value={currentKey}>{describeTarget(assignment.target)}</option>
+            <option value={currentKey}>{labelForTarget(assignment.target, s)}</option>
           )}
           {CANONICAL_OPTIONS.map((g: OptionGroup) => (
-            <optgroup key={g.group} label={g.group}>
+            <optgroup key={g.group} label={targetGroupLabel(s, g.group)}>
               {g.options.map((o: Option) => {
                 const k = targetKey(o.target);
-                return <option key={`${g.group}:${k}`} value={k}>{o.label}</option>;
+                return <option key={`${g.group}:${k}`} value={k}>{labelForTargetKey(k, s)}</option>;
               })}
             </optgroup>
           ))}

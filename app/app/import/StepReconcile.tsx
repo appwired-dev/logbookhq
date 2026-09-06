@@ -1,21 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { useId, useState, type RefObject } from "react";
-// ArrowLeft / CircleCheck / CircleX are not in components/ui/icons yet (read-only for this change).
-import { ArrowLeft, CircleCheck, CircleX } from "@/components/ui/icons";
+import { useEffect, useId, useState, type RefObject } from "react";
 import { Alert, Button, CardFooter, Field, Icon, Pill, categoryPill, rolePill, type PillVariant } from "@/components/ui";
-import type { LucideIcon } from "lucide-react";
+import type { LucideIcon } from "@/components/ui/icons";
 import { makeT, type Locale } from "@/lib/i18n";
 import type { Analysis, CheckStatus, ReconcileCheck } from "@/lib/import/types";
-import { skipReasonLabel, type ImportStringKey, type ImportStrings } from "./import-strings";
+import { checkLabel, skipReasonLabel, type ImportStringKey, type ImportStrings } from "./import-strings";
 import type { ImportMode, PreviewData } from "./wizard-types";
 
 const STATUS: Record<CheckStatus, { icon: LucideIcon; cls: string; key: ImportStringKey }> = {
-  match:     { icon: CircleCheck,       cls: "text-good-ink", key: "statusMatch" },
-  info:      { icon: Icon.Info,         cls: "text-ink-3",    key: "statusInfo" },
+  match:     { icon: Icon.CircleCheck,   cls: "text-good-ink", key: "statusMatch" },
+  info:      { icon: Icon.Info,          cls: "text-ink-3",    key: "statusInfo" },
   explained: { icon: Icon.TriangleAlert, cls: "text-warn-ink", key: "statusExplained" },
-  mismatch:  { icon: CircleX,           cls: "text-bad-ink",  key: "statusMismatch" },
+  mismatch:  { icon: Icon.CircleX,       cls: "text-bad-ink",  key: "statusMismatch" },
 };
 
 const ROLE_VAR: Record<string, string> = { PIC: "role-pic", DUAL: "role-dual", FO: "role-fo", SIC: "role-sic", AUG: "role-sic", CHECK: "role-check" };
@@ -61,14 +59,45 @@ export default function StepReconcile({
   const hoursCredited =
     report.summary.creditedHours != null && Math.abs(report.summary.creditedHours - report.summary.totalHours) >= 0.05;
   const fromTemplate = Boolean(analysis.templateId);
-  // A failed check never blocks, but the first click only arms the button.
-  const [armed, setArmed] = useState(false);
-  const needsArm = !report.ok && !armed;
+  // Two things make the import a two-step: a failed check (never blocks, but
+  // the first click only arms the button) and Replace mode when it would
+  // delete existing flights. One arm covers both; Escape or switching the
+  // mode disarms.
+  const mismatch = !report.ok;
+  const replaceDanger = mode === "replace" && preview.existingCount > 0;
+  const requiresArm = mismatch || replaceDanger;
+  const [armedState, setArmed] = useState(false);
+  const armed = armedState && requiresArm;
 
   function clickImport() {
-    if (needsArm) { setArmed(true); return; }
+    if (requiresArm && !armedState) { setArmed(true); return; }
     onImport();
   }
+
+  function changeMode(m: ImportMode) {
+    if (m !== mode) setArmed(false);
+    onMode(m);
+  }
+
+  useEffect(() => {
+    if (!armed || importBusy) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      setArmed(false);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [armed, importBusy]);
+
+  const existing = preview.existingCount.toLocaleString();
+  const importLabel = importBusy
+    ? s("importing")
+    : armed && replaceDanger
+      ? s("replaceArmed", { existing, n: n.toLocaleString() })
+      : armed
+        ? s("importAnyway")
+        : s("importN", { n: n.toLocaleString() });
 
   return (
     <div className="space-y-5">
@@ -110,6 +139,7 @@ export default function StepReconcile({
               <Icon.Info size={16} strokeWidth={2} aria-hidden className="text-ink-3" />{s("checksNone")}
             </p>
           ) : (
+            /* Labels: fixed invariants are localised via checkLabel(); declared totals keep the sheet's own text. */
             <ul className="rounded-control border border-border px-3">
               {report.checks.map((c) => <CheckRow key={c.id} c={c} s={s} augHalfCredit={augHalfCredit} />)}
             </ul>
@@ -166,7 +196,7 @@ export default function StepReconcile({
           {preview.skipped > 0 && preview.skippedReasons.length > 0 && (
             <details className="group text-xs">
               <summary className="cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden flex items-center gap-1.5 font-medium text-ink-2 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60">
-                <Icon.ChevronDown size={14} strokeWidth={2} aria-hidden className="transition-transform duration-fast group-open:rotate-180" />
+                <Icon.ChevronDown size={14} strokeWidth={2} aria-hidden className="transition-transform duration-fast motion-reduce:transition-none group-open:rotate-180" />
                 {s("skipReasons")}
                 <span className="text-ink-3 font-normal">· {s("ofRows", { total: analysis.rowCount.toLocaleString() })}</span>
               </summary>
@@ -189,9 +219,9 @@ export default function StepReconcile({
       <fieldset className="space-y-2">
         <legend className="label">{s("modeTitle")}</legend>
         <div className="grid sm:grid-cols-2 gap-2">
-          <ModeCard name="mode" value="append" checked={mode === "append"} onChange={() => onMode("append")} disabled={importBusy}
+          <ModeCard name="mode" value="append" checked={mode === "append"} onChange={() => changeMode("append")} disabled={importBusy}
                     title={s("modeAppend")} body={s("modeAppendBody")} />
-          <ModeCard name="mode" value="replace" checked={mode === "replace"} onChange={() => onMode("replace")} disabled={importBusy}
+          <ModeCard name="mode" value="replace" checked={mode === "replace"} onChange={() => changeMode("replace")} disabled={importBusy}
                     title={s("modeReplace")} body={s("modeReplaceBody")} />
         </div>
         {mode === "replace" && (
@@ -238,20 +268,23 @@ export default function StepReconcile({
 
       <CardFooter className="justify-between">
         <Button variant="ghost" onClick={onBack} disabled={importBusy}>
-          <ArrowLeft size={16} strokeWidth={2} aria-hidden />{s("back")}
+          <Icon.ArrowLeft size={16} strokeWidth={2} aria-hidden />{s("back")}
         </Button>
         <div className="flex items-center gap-3 flex-wrap justify-end">
-          {armed && !report.ok && (
-            <span id={noteId} role="status" className="text-sm font-medium text-warn-ink">{s("mismatchNote")}</span>
+          {armed && (
+            <span id={noteId} role="status" className="text-sm font-medium text-right max-w-prose">
+              {mismatch && <span className="block text-warn-ink">{s("mismatchNote")}</span>}
+              {replaceDanger && <span className="block text-bad-ink">{s("replaceArmNote", { n: existing })}</span>}
+            </span>
           )}
           <Button
-            variant={armed && !report.ok ? "danger" : "primary"}
+            variant={armed ? "danger" : "primary"}
             onClick={clickImport}
             loading={importBusy}
             disabled={n === 0}
-            aria-describedby={armed && !report.ok ? noteId : undefined}
+            aria-describedby={armed ? noteId : undefined}
           >
-            {importBusy ? s("importing") : armed && !report.ok ? s("importAnyway") : s("importN", { n: n.toLocaleString() })}
+            {importLabel}
           </Button>
         </div>
       </CardFooter>
@@ -272,7 +305,7 @@ function CheckRow({ c, s, augHalfCredit }: { c: ReconcileCheck; s: ImportStrings
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline justify-between gap-3 flex-wrap">
           <span className="text-sm font-medium text-ink-1">
-            {c.label}<span className="sr-only">: {s(st.key)}</span>
+            {checkLabel(s, c)}<span className="sr-only">: {s(st.key)}</span>
           </span>
           <span className="num text-sm text-ink-1 whitespace-nowrap">
             {c.expected != null && (

@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, useTransition,
-  type ChangeEvent, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type ReactNode,
+  type ChangeEvent, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent,
+  type ReactNode,
 } from "react";
 import { createFlight, updateFlight, deleteFlight, lookupRegistration } from "./actions";
 import { makeT, type Locale } from "@/lib/i18n";
@@ -93,13 +95,24 @@ type RegLookup =
   | { status: "none"; tail: string }
   | { status: "found"; tail: string; model: string; category: Category; source: RegMatch["source"] };
 
+/** Which link opened the unsaved-changes prompt; `null` = closed. */
+type DiscardSource = "back" | "cancel" | null;
+
 /* ------------------------------------------------------------------------ */
 /* Form                                                                      */
 /* ------------------------------------------------------------------------ */
 
-export default function FlightForm({ flight, locale }: { flight?: Flight; locale: Locale }) {
+export default function FlightForm({
+  flight, locale, header,
+}: {
+  flight?: Flight;
+  locale: Locale;
+  /** The page's title block. Rendered beside the back link so both sit inside the form's unsaved-changes guard. */
+  header: ReactNode;
+}) {
   const t = makeT(locale);
   const s = formStrings(locale);
+  const router = useRouter();
   const editing = !!flight;
   const today = useLocalToday();
 
@@ -114,6 +127,8 @@ export default function FlightForm({ flight, locale }: { flight?: Flight; locale
   const [saving, startSaving] = useTransition();
   const [deleting, startDeleting] = useTransition();
   const [reg, setReg] = useState<RegLookup>({ status: "idle" });
+  const [discardSource, setDiscardSource] = useState<DiscardSource>(null);
+  const [leaving, startLeaving] = useTransition();
 
   const formRef = useRef<HTMLFormElement>(null);
   const errorRef = useRef<HTMLDivElement>(null);
@@ -121,6 +136,11 @@ export default function FlightForm({ flight, locale }: { flight?: Flight; locale
   const lookupSeq = useRef(0);
   /** Once the pilot picks a category (or we're editing) the lookup must not change it. */
   const categoryTouched = useRef(editing);
+  const backRef = useRef<HTMLAnchorElement>(null);
+  const cancelCardRef = useRef<HTMLAnchorElement>(null);
+  const cancelBarRef = useRef<HTMLAnchorElement>(null);
+  /** Set by Keep editing / Escape so the close effect knows which trigger gets focus back (auto-dismiss leaves it null). */
+  const returnFocusTo = useRef<DiscardSource>(null);
 
   // A new flight defaults to the client's local date until the pilot touches the field.
   const effective: FlightFormValues = dateEdited || values.date ? values : { ...values, date: today };
@@ -128,7 +148,9 @@ export default function FlightForm({ flight, locale }: { flight?: Flight; locale
   const errorCount = Object.keys(errors).length;
   const summary = summariseFlight(effective);
   const dirty = JSON.stringify(values) !== JSON.stringify(initial);
-  const busy = saving || deleting;
+  const busy = saving || deleting || leaving;
+  /** Something to lose: edits exist and the action hasn't redirected yet. */
+  const guarded = dirty && !saved;
 
   const set = useCallback(<K extends keyof FlightFormValues>(k: K, v: FlightFormValues[K]) => {
     setValues((prev) => ({ ...prev, [k]: v }));
@@ -142,16 +164,57 @@ export default function FlightForm({ flight, locale }: { flight?: Flight; locale
     return s(ERROR_STRING[key]);
   };
 
-  /* ---- unsaved-changes guard (hard navigations / tab close only) ---- */
+  /* ---- unsaved-changes guard ---- */
+  // Hard navigations / tab close: the browser's own prompt.
   useEffect(() => {
-    if (!dirty || saved) return;
+    if (!guarded) return;
     const warn = (e: BeforeUnloadEvent) => {
       e.preventDefault();
       e.returnValue = "";
     };
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
-  }, [dirty, saved]);
+  }, [guarded]);
+
+  // In-app links (header back, Cancel): a two-step inline prompt instead.
+  // Once there is nothing left to lose (edits reverted, or saved) it closes
+  // on its own without moving focus.
+  useEffect(() => {
+    if (!guarded) setDiscardSource(null);
+  }, [guarded]);
+
+  // Keep editing / Escape hand focus back to the trigger that opened the
+  // prompt. Cancel remounts on close (the prompt replaces it), so this waits
+  // for the commit; only the visible breakpoint's Cancel can take focus.
+  useEffect(() => {
+    if (discardSource) return;
+    const src = returnFocusTo.current;
+    returnFocusTo.current = null;
+    if (src === "back") backRef.current?.focus();
+    else if (src === "cancel") {
+      cancelCardRef.current?.focus();
+      cancelBarRef.current?.focus();
+    }
+  }, [discardSource]);
+
+  /** Click handler for the guarded links: a plain click opens the prompt while there is something to lose. */
+  function guardLink(source: Exclude<DiscardSource, null>) {
+    return (e: ReactMouseEvent<HTMLAnchorElement>) => {
+      if (!guarded) return; // nothing to lose — ordinary navigation
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return; // new tab/window: leave this one alone
+      e.preventDefault();
+      setDiscardSource((cur) => (cur === source ? null : source));
+    };
+  }
+  function keepEditing() {
+    returnFocusTo.current = discardSource;
+    setDiscardSource(null);
+  }
+  function confirmDiscard() {
+    startLeaving(() => {
+      router.push("/app/flights");
+    });
+  }
 
   /* ---- server errors: announce + focus ---- */
   useEffect(() => {
@@ -402,7 +465,31 @@ export default function FlightForm({ flight, locale }: { flight?: Flight; locale
     />
   ) : null;
 
+  const discardPrompt = (layout: "stack" | "row") => (
+    <DiscardPrompt layout={layout} leaving={leaving} onConfirm={confirmDiscard} onCancel={keepEditing} s={s} />
+  );
+
   return (
+    <>
+      {/* ---------------------------------------------------------------- */}
+      {/* Header: guarded back link + the page's title block                */}
+      {/* ---------------------------------------------------------------- */}
+      <div className="flex items-start gap-2">
+        <Link
+          ref={backRef}
+          href="/app/flights"
+          aria-label={s("backToFlights")}
+          title={s("backToFlights")}
+          aria-expanded={guarded ? discardSource === "back" : undefined}
+          onClick={guardLink("back")}
+          className={buttonClass("ghost", "md", "btn-icon h-11 w-11 sm:h-9 sm:w-9 shrink-0 -ml-2 text-ink-2 hover:text-ink-1")}
+        >
+          <Icon.ArrowLeft size={18} strokeWidth={1.75} aria-hidden />
+        </Link>
+        {header}
+      </div>
+      {discardSource === "back" && discardPrompt("stack")}
+
     <form
       ref={formRef}
       onSubmit={onSubmit}
@@ -485,9 +572,8 @@ export default function FlightForm({ flight, locale }: { flight?: Flight; locale
             <Field label={t("form.copilot")}><input {...textInput("copilot")} /></Field>
             <Field label={t("form.thirdPilot")}><input {...textInput("third_pilot")} /></Field>
             <Field label={t("form.checkPilot")}><input {...textInput("check_pilot")} /></Field>
-            <Field label={t("form.role")} required className="sm:col-span-2" error={visibleError("role")}>
+            <Field label={t("form.role")} required composite className="sm:col-span-2" error={visibleError("role")}>
               <Segmented
-                aria-label={t("form.role")}
                 options={roleOptions}
                 value={values.role}
                 onChange={(v) => set("role", v)}
@@ -500,9 +586,8 @@ export default function FlightForm({ flight, locale }: { flight?: Flight; locale
         <Card>
           <CardHeader title={t("form.section.time")} meta={s("timeMeta")} />
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            <Field label={t("form.category")} required className="col-span-2 sm:col-span-3" error={visibleError("category")}>
+            <Field label={t("form.category")} required composite className="col-span-2 sm:col-span-3" error={visibleError("category")}>
               <Segmented
-                aria-label={t("form.category")}
                 options={categoryOptions}
                 value={values.category}
                 onChange={(v) => {
@@ -623,17 +708,27 @@ export default function FlightForm({ flight, locale }: { flight?: Flight; locale
             instrument: s("statInstrument"),
             approaches: t("bd.approaches"),
             xc: t("form.xc"),
+            xcShort: s("xcShort"),
             yes: s("yes"),
             no: s("no"),
           }}
           actions={
             <>
-              <Button type="submit" variant="primary" loading={saving} disabled={deleting} className="w-full">
+              <Button type="submit" variant="primary" loading={saving} disabled={deleting || leaving} className="w-full">
                 {saveLabel}
               </Button>
-              <Link href="/app/flights" className={buttonClass("ghost", "md", "w-full")}>
-                {t("common.cancel")}
-              </Link>
+              {discardSource === "cancel" ? (
+                discardPrompt("stack")
+              ) : (
+                <Link
+                  ref={cancelCardRef}
+                  href="/app/flights"
+                  onClick={guardLink("cancel")}
+                  className={buttonClass("ghost", "md", "w-full")}
+                >
+                  {t("common.cancel")}
+                </Link>
+              )}
             </>
           }
           footer={deleteControl ?? undefined}
@@ -643,15 +738,23 @@ export default function FlightForm({ flight, locale }: { flight?: Flight; locale
       {/* ---------------------------------------------------------------- */}
       {/* Below lg: sticky bottom action bar                                */}
       {/* ---------------------------------------------------------------- */}
-      <FlightActionBar className="lg:hidden" total={summary.total} unit={hoursUnit} totalLabel={s("totalTime")} status={status}>
-        <Link href="/app/flights" className={buttonClass("ghost", "md", "h-11")}>
+      <FlightActionBar
+        className="lg:hidden"
+        total={summary.total}
+        unit={hoursUnit}
+        totalLabel={s("totalTime")}
+        status={status}
+        prompt={discardSource === "cancel" ? discardPrompt("row") : undefined}
+      >
+        <Link ref={cancelBarRef} href="/app/flights" onClick={guardLink("cancel")} className={buttonClass("ghost", "md", "h-11")}>
           {t("common.cancel")}
         </Link>
-        <Button type="submit" variant="primary" loading={saving} disabled={deleting} className="h-11">
+        <Button type="submit" variant="primary" loading={saving} disabled={deleting || leaving} className="h-11">
           {saveLabel}
         </Button>
       </FlightActionBar>
     </form>
+    </>
   );
 }
 
@@ -663,19 +766,20 @@ type SegOption<T extends string> = { value: T; label: string; tone: string };
 
 /**
  * Pill-styled radiogroup with roving tabindex: Tab lands on the checked
- * option, arrows move + select, Home/End jump. `Field` injects id,
- * aria-describedby, aria-invalid and required via cloneElement.
+ * option, arrows move + select, Home/End jump. `Field` (with `composite`)
+ * injects id, aria-labelledby, aria-describedby, aria-invalid and required
+ * via cloneElement — a radiogroup div isn't labelable, so htmlFor would be inert.
  */
 function Segmented<T extends string>({
   id, options, value, onChange, required,
-  "aria-label": ariaLabel, "aria-describedby": describedBy, "aria-invalid": invalid,
+  "aria-labelledby": labelledBy, "aria-describedby": describedBy, "aria-invalid": invalid,
 }: {
   id?: string;
   options: SegOption<T>[];
   value: T;
   onChange: (v: T) => void;
   required?: boolean;
-  "aria-label"?: string;
+  "aria-labelledby"?: string;
   "aria-describedby"?: string;
   "aria-invalid"?: boolean;
 }) {
@@ -698,7 +802,7 @@ function Segmented<T extends string>({
     <div
       id={id}
       role="radiogroup"
-      aria-label={ariaLabel}
+      aria-labelledby={labelledBy}
       aria-describedby={describedBy}
       aria-invalid={invalid}
       aria-required={required || undefined}
@@ -840,6 +944,79 @@ function DeleteControl({
           className={buttonClass("ghost", "sm", "h-11 sm:h-8")}
         >
           {s("keep")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------------ */
+/* Two-step discard (unsaved changes)                                        */
+/* ------------------------------------------------------------------------ */
+
+/**
+ * Inline "Discard unsaved changes?" note — the open state of DeleteControl,
+ * reused for Cancel and the header back link. The form owns open/closed and
+ * focus return; this focuses the safe option on mount and turns Escape into
+ * Keep editing. `row` is the compact one-line variant that takes over the
+ * phone action bar; `stack` is the boxed note used in the summary card and
+ * under the header. (Two `cancel` instances render — one per breakpoint —
+ * but only the visible one can take focus.)
+ */
+function DiscardPrompt({
+  layout, leaving, onConfirm, onCancel, s,
+}: {
+  layout: "stack" | "row";
+  leaving: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+  s: FormT;
+}) {
+  const keepRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    keepRef.current?.focus();
+  }, []);
+
+  const row = layout === "row";
+  const size = row ? "md" : "sm";
+  const height = row ? "h-11" : "h-11 sm:h-8";
+
+  return (
+    <div
+      role="group"
+      aria-label={s("discardQuestion")}
+      onKeyDown={(e) => {
+        if (e.key === "Escape" && !leaving) {
+          e.preventDefault();
+          e.stopPropagation();
+          onCancel();
+        }
+      }}
+      className={
+        row
+          ? "flex flex-wrap items-center justify-between gap-x-3 gap-y-2"
+          : "w-full rounded-control border border-warn/30 bg-warn/5 p-3"
+      }
+    >
+      <div className="min-w-0">
+        <p className="flex items-center gap-1.5 text-sm font-semibold text-ink-1">
+          <Icon.TriangleAlert size={14} strokeWidth={2} aria-hidden className="shrink-0 text-warn-ink" />
+          <span>{s("discardQuestion")}</span>
+        </p>
+        <p className="mt-0.5 text-xs text-ink-2">{s("discardHelp")}</p>
+      </div>
+      <div className={row ? "flex items-center gap-2 shrink-0" : "mt-3 flex flex-wrap items-center gap-2"}>
+        <Button variant="danger" size={size} className={height} loading={leaving} onClick={onConfirm}>
+          {leaving ? s("discarding") : s("discard")}
+        </Button>
+        <button
+          ref={keepRef}
+          type="button"
+          onClick={onCancel}
+          disabled={leaving}
+          className={buttonClass("ghost", size, height)}
+        >
+          {s("keepEditing")}
         </button>
       </div>
     </div>

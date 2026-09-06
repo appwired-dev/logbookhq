@@ -1,19 +1,30 @@
 import { Card, Skeleton } from "@/components/ui";
 import LoadingStatus from "@/components/ui/LoadingStatus";
+import { getServerIsDesktop } from "@/lib/device-hint";
 
-/** Alternating widths so the table skeleton reads as data, not bars. */
+/** Alternating widths so the skeletons read as data, not bars. */
 const ROW_WIDTHS = ["82%", "64%", "74%", "58%", "88%", "66%", "70%"];
 
 /**
- * Flights loading state. Mirrors FlightsClient: the sticky toolbar (title +
- * subtitle, search, year, two segmented controls, primary button) followed by
- * the table card — group row (h-7), column row (h-9) and 12 rows (h-10).
+ * Flights loading state. Branches on the same request device hint as
+ * page.tsx so the skeleton has the shape of what will replace it: phones get
+ * the two-row toolbar and the card list, everything else the sticky toolbar
+ * (title + subtitle, search, year, two segmented controls, primary button)
+ * followed by the table card — group row (h-7), column row (h-9), 12 rows (h-10).
  */
-export default function FlightsLoading() {
+export default async function FlightsLoading() {
+  const isDesktop = await getServerIsDesktop();
   return (
     <div className="space-y-3" aria-busy="true">
       <LoadingStatus />
+      {isDesktop ? <TableSkeleton /> : <CardsSkeleton />}
+    </div>
+  );
+}
 
+function TableSkeleton() {
+  return (
+    <>
       <div className="toolbar" aria-hidden>
         <div className="grid grid-cols-[minmax(0,1fr)_auto] xl:grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2">
           <div className="space-y-1.5">
@@ -57,6 +68,44 @@ export default function FlightsLoading() {
           </div>
         ))}
       </Card>
-    </div>
+    </>
+  );
+}
+
+/** Phone: two-row toolbar (search + New / summary + chips) and the card list (FlightsCards). */
+function CardsSkeleton() {
+  return (
+    <>
+      <div className="toolbar" aria-hidden>
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2">
+          <Skeleton className="h-11 w-full" />
+          <Skeleton className="h-11 w-28 justify-self-end" />
+          <div className="col-span-2 flex items-center gap-3 min-w-0 overflow-hidden py-1">
+            <Skeleton className="h-3 w-32 shrink-0" />
+            <Skeleton className="h-11 w-24 shrink-0" />
+            <Skeleton className="h-11 w-40 shrink-0" />
+            <Skeleton className="h-11 w-44 shrink-0" />
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-2" aria-hidden>
+        {Array.from({ length: 8 }, (_, i) => (
+          <Card key={i} padding="sm">
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-3 w-16 shrink-0" />
+              <Skeleton className="h-3" style={{ width: ROW_WIDTHS[i % ROW_WIDTHS.length], maxWidth: "30%" }} />
+              <Skeleton className="h-3 w-24 ml-auto shrink-0" />
+            </div>
+            <div className="mt-2 flex items-center gap-1.5">
+              <Skeleton className="h-4 w-10 rounded-pill" />
+              <Skeleton className="h-4 w-12 rounded-pill" />
+              <Skeleton className="h-5 w-14 ml-auto" />
+            </div>
+            <Skeleton className="mt-2 h-2.5" style={{ width: ROW_WIDTHS[(i + 3) % ROW_WIDTHS.length] }} />
+          </Card>
+        ))}
+      </div>
+    </>
   );
 }

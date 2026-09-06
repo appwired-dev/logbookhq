@@ -5,8 +5,16 @@
  */
 import type { Locale } from "@/lib/i18n";
 import type { SkipReason } from "@/lib/import";
+import type { FieldTarget, ReconcileCheck, TimeCategory, TimeCondition, TimeRole } from "@/lib/import/types";
 
 type Entry = Record<Locale, string>;
+
+const pick = (entry: Entry, locale: Locale): string => entry[locale] ?? entry.en;
+const fill = (str: string, vars: Record<string, string | number>): string => {
+  let out = str;
+  for (const [k, v] of Object.entries(vars)) out = out.split(`{${k}}`).join(String(v));
+  return out;
+};
 
 export const IMPORT_STRINGS = {
   // ---- shell ----
@@ -26,7 +34,7 @@ export const IMPORT_STRINGS = {
   // ---- step 1 · upload ----
   dropTitle:      { en: "Drop your logbook here", ko: "로그북 파일을 여기에 놓으세요", zh: "将日志本文件拖到这里", es: "Suelta tu bitácora aquí" },
   dropBody:       { en: "or click to choose a file", ko: "또는 클릭하여 파일 선택", zh: "或点击选择文件", es: "o haz clic para elegir un archivo" },
-  dropHint:       { en: "CSV, TSV, TXT, XLSX or XLS · up to 25 MB", ko: "CSV, TSV, TXT, XLSX 또는 XLS · 최대 25 MB", zh: "CSV、TSV、TXT、XLSX 或 XLS · 最大 25 MB", es: "CSV, TSV, TXT, XLSX o XLS · hasta 25 MB" },
+  dropHint:       { en: "CSV, TSV, TXT, XLSX or XLS · up to 23 MB", ko: "CSV, TSV, TXT, XLSX 또는 XLS · 최대 23 MB", zh: "CSV、TSV、TXT、XLSX 或 XLS · 最大 23 MB", es: "CSV, TSV, TXT, XLSX o XLS · hasta 23 MB" },
   fileInputLabel: { en: "Logbook file", ko: "로그북 파일", zh: "日志本文件", es: "Archivo de bitácora" },
   removeFile:     { en: "Remove file", ko: "파일 제거", zh: "移除文件", es: "Quitar archivo" },
   supported:      { en: "Supported out of the box", ko: "기본 지원 형식", zh: "开箱即用支持", es: "Compatibles de serie" },
@@ -34,7 +42,7 @@ export const IMPORT_STRINGS = {
   analyzing:      { en: "Analyzing…", ko: "분석 중…", zh: "正在分析…", es: "Analizando…" },
   readingColumns: { en: "Reading columns…", ko: "열을 읽는 중…", zh: "正在读取列…", es: "Leyendo columnas…" },
   errNoFile:      { en: "Pick a file first.", ko: "먼저 파일을 선택하세요.", zh: "请先选择文件。", es: "Elige un archivo primero." },
-  errTooLarge:    { en: "This file is {size} MB — the limit is 25 MB.", ko: "이 파일은 {size} MB입니다 — 최대 25 MB까지 가능합니다.", zh: "此文件为 {size} MB——上限为 25 MB。", es: "Este archivo pesa {size} MB — el límite es 25 MB." },
+  errTooLarge:    { en: "This file is {size} MB — the limit is 23 MB.", ko: "이 파일은 {size} MB입니다 — 최대 23 MB까지 가능합니다.", zh: "此文件为 {size} MB——上限为 23 MB。", es: "Este archivo pesa {size} MB — el límite es 23 MB." },
   errType:        { en: "That file type isn't supported. Use CSV, TSV, TXT, XLSX or XLS.", ko: "지원하지 않는 파일 형식입니다. CSV, TSV, TXT, XLSX 또는 XLS를 사용하세요.", zh: "不支持该文件类型。请使用 CSV、TSV、TXT、XLSX 或 XLS。", es: "Ese tipo de archivo no es compatible. Usa CSV, TSV, TXT, XLSX o XLS." },
   whereToExport:  { en: "Where to export from", ko: "각 앱에서 내보내는 방법", zh: "从各应用导出的方法", es: "Desde dónde exportar" },
   helpLogbookhq:  { en: "LogbookHQ — our own CSV export round-trips losslessly (duty time excepted).", ko: "LogbookHQ — 자체 CSV 내보내기는 무손실로 다시 가져올 수 있습니다 (근무시간 제외).", zh: "LogbookHQ——我们自己的 CSV 导出可无损往返（执勤时间除外）。", es: "LogbookHQ — nuestra propia exportación CSV se reimporta sin pérdidas (excepto el tiempo de servicio)." },
@@ -121,6 +129,8 @@ export const IMPORT_STRINGS = {
   importing:      { en: "Importing…", ko: "가져오는 중…", zh: "正在导入…", es: "Importando…" },
   mismatchNote:   { en: "Some checks failed — import anyway?", ko: "일부 검사가 실패했습니다 — 그래도 가져올까요?", zh: "部分核对未通过——仍要导入吗？", es: "Algunas comprobaciones fallaron — ¿importar de todos modos?" },
   importAnyway:   { en: "Yes, import anyway", ko: "예, 그래도 가져오기", zh: "是，仍要导入", es: "Sí, importar de todos modos" },
+  replaceArmed:   { en: "Delete {existing} flights and import {n}", ko: "비행 {existing}건 삭제 후 {n}건 가져오기", zh: "删除 {existing} 条飞行并导入 {n} 条", es: "Eliminar {existing} vuelos e importar {n}" },
+  replaceArmNote: { en: "Your {n} existing flights will be permanently deleted — this can't be undone. Press Escape to cancel.", ko: "기존 비행 {n}건이 영구 삭제되며 되돌릴 수 없습니다. 취소하려면 Esc 키를 누르세요.", zh: "您现有的 {n} 条飞行将被永久删除，且无法撤销。按 Esc 键可取消。", es: "Tus {n} vuelos existentes se eliminarán permanentemente — no se puede deshacer. Pulsa Escape para cancelar." },
   nothingToImport:{ en: "No flights to import — go back and check the mapping.", ko: "가져올 비행이 없습니다 — 돌아가서 매핑을 확인하세요.", zh: "没有可导入的飞行——请返回检查映射。", es: "No hay vuelos para importar — vuelve y revisa la asignación." },
   successTitle:   { en: "Imported {n} flights", ko: "비행 {n}건을 가져왔습니다", zh: "已导入 {n} 条飞行", es: "Se importaron {n} vuelos" },
   successReplaced:{ en: "Replaced {d} existing flights.", ko: "기존 비행 {d}건을 교체했습니다.", zh: "已替换 {d} 条现有飞行。", es: "Se reemplazaron {d} vuelos existentes." },
@@ -134,16 +144,22 @@ export const IMPORT_STRINGS = {
 
 export type ImportStringKey = keyof typeof IMPORT_STRINGS;
 
-/** Bind the copy to a locale: `const s = makeStrings(locale); s("importN", { n: 12 })`. */
+export function isImportStringKey(key: string): key is ImportStringKey {
+  return Object.prototype.hasOwnProperty.call(IMPORT_STRINGS, key);
+}
+
+/**
+ * Bind the copy to a locale: `const s = makeStrings(locale); s("importN", { n: 12 })`.
+ * The bound function also carries `.locale` so helpers that read the
+ * structured maps below (target labels, check labels) need only `s`.
+ */
 export function makeStrings(locale: Locale) {
-  return (key: ImportStringKey, vars?: Record<string, string | number>): string => {
+  const s = (key: ImportStringKey, vars?: Record<string, string | number>): string => {
     const entry: Entry = IMPORT_STRINGS[key];
-    let str = entry[locale] ?? entry.en;
-    if (vars) {
-      for (const [k, v] of Object.entries(vars)) str = str.split(`{${k}}`).join(String(v));
-    }
-    return str;
+    const str = pick(entry, locale);
+    return vars ? fill(str, vars) : str;
   };
+  return Object.assign(s, { locale });
 }
 
 export type ImportStrings = ReturnType<typeof makeStrings>;
@@ -151,6 +167,173 @@ export type ImportStrings = ReturnType<typeof makeStrings>;
 /** Human label for an apply-stage skip reason. */
 export function skipReasonLabel(s: ImportStrings, reason: SkipReason): string {
   return s(`skip.${reason}` as ImportStringKey);
+}
+
+// ---------------------------------------------------------------------------
+// Mapping targets (step 2) — localised client-side from the stable target key
+// ---------------------------------------------------------------------------
+
+/** CANONICAL_OPTIONS group labels, keyed by the library's (English) group string. */
+export const TARGET_GROUP = {
+  "Ignore":                            { en: "Ignore", ko: "무시", zh: "忽略", es: "Ignorar" },
+  "Flight basics":                     { en: "Flight basics", ko: "비행 기본 정보", zh: "飞行基本信息", es: "Datos básicos del vuelo" },
+  "Flight time — any aircraft":        { en: "Flight time — any aircraft", ko: "비행 시간 — 모든 항공기", zh: "飞行时间——任意机型", es: "Tiempo de vuelo — cualquier aeronave" },
+  "Single-engine time":                { en: "Single-engine time", ko: "단발 시간", zh: "单发时间", es: "Tiempo monomotor" },
+  "Multi-engine time":                 { en: "Multi-engine time", ko: "다발 시간", zh: "多发时间", es: "Tiempo multimotor" },
+  "Sea / helicopter / simulator time": { en: "Sea / helicopter / simulator time", ko: "수상기 / 헬리콥터 / 시뮬레이터 시간", zh: "水上 / 直升机 / 模拟机时间", es: "Tiempo hidroavión / helicóptero / simulador" },
+  "Cross-country & instrument":        { en: "Cross-country & instrument", ko: "크로스컨트리 및 계기", zh: "转场与仪表", es: "Travesía e instrumentos" },
+  "Approaches, holds, landings":       { en: "Approaches, holds, landings", ko: "접근, 홀딩, 착륙", zh: "进近、等待、着陆", es: "Aproximaciones, esperas, aterrizajes" },
+  "Crew & other":                      { en: "Crew & other", ko: "승무원 및 기타", zh: "机组与其他", es: "Tripulación y otros" },
+} satisfies Record<string, Entry>;
+
+/** Every FIELD target, keyed by targetKey ("field:date"). */
+export const TARGET_LABEL = {
+  "field:date":                     { en: "Date", ko: "날짜", zh: "日期", es: "Fecha" },
+  "field:make_model":               { en: "Aircraft make / model", ko: "항공기 제조사 / 기종", zh: "机型（制造商 / 型号）", es: "Marca / modelo de aeronave" },
+  "field:registration":             { en: "Registration", ko: "등록기호", zh: "注册号", es: "Matrícula" },
+  "field:pic":                      { en: "PIC name", ko: "기장 이름", zh: "机长姓名", es: "Nombre del PIC" },
+  "field:copilot":                  { en: "Co-pilot / student name", ko: "부기장 / 학생 이름", zh: "副驾驶 / 学员姓名", es: "Nombre del copiloto / alumno" },
+  "field:third_pilot":              { en: "Third pilot name", ko: "세 번째 조종사 이름", zh: "第三飞行员姓名", es: "Nombre del tercer piloto" },
+  "field:check_pilot":              { en: "Check pilot / examiner name", ko: "심사관 / 시험관 이름", zh: "检查员 / 考官姓名", es: "Nombre del piloto examinador" },
+  "field:route":                    { en: "Route", ko: "경로", zh: "航线", es: "Ruta" },
+  "field:from":                     { en: "From (departure)", ko: "출발지", zh: "出发地", es: "Origen (salida)" },
+  "field:to":                       { en: "To (arrival)", ko: "도착지", zh: "目的地", es: "Destino (llegada)" },
+  "field:remarks":                  { en: "Remarks", ko: "비고", zh: "备注", es: "Observaciones" },
+  "field:category":                 { en: "Category (SE/ME/SIM…)", ko: "구분 (SE/ME/SIM…)", zh: "类别（SE/ME/SIM…）", es: "Categoría (SE/ME/SIM…)" },
+  "field:role":                     { en: "Role (PIC/FO/DUAL…)", ko: "역할 (PIC/FO/DUAL…)", zh: "角色（PIC/FO/DUAL…）", es: "Rol (PIC/FO/DUAL…)" },
+  "field:xc_time":                  { en: "Cross-country time", ko: "크로스컨트리 시간", zh: "转场时间", es: "Tiempo de travesía" },
+  "field:xc_flag":                  { en: "Cross-country flag", ko: "크로스컨트리 표시", zh: "转场标记", es: "Marca de travesía" },
+  "field:actual_inst":              { en: "Actual instrument", ko: "실제 계기", zh: "实际仪表", es: "Instrumentos reales" },
+  "field:hood_inst":                { en: "Hood / simulated instrument", ko: "후드 / 모의 계기", zh: "遮蔽 / 模拟仪表", es: "Instrumentos simulados (capucha)" },
+  "field:sim_inst":                 { en: "Simulator time", ko: "시뮬레이터 시간", zh: "模拟机时间", es: "Tiempo de simulador" },
+  "field:ifr_approaches":           { en: "IFR approaches", ko: "IFR 접근", zh: "IFR 进近", es: "Aproximaciones IFR" },
+  "field:precision_approaches":     { en: "Precision approaches", ko: "정밀 접근", zh: "精密进近", es: "Aproximaciones de precisión" },
+  "field:non_precision_approaches": { en: "Non-precision approaches", ko: "비정밀 접근", zh: "非精密进近", es: "Aproximaciones de no precisión" },
+  "field:holds":                    { en: "Holds", ko: "홀딩", zh: "等待", es: "Esperas" },
+  "field:cfi_time":                 { en: "Instructor (dual given) time", ko: "교관 (교육 제공) 시간", zh: "教员（授课）时间", es: "Tiempo de instructor (instrucción dada)" },
+  "field:takeoffs_day":             { en: "Takeoffs (day)", ko: "이륙 (주간)", zh: "起飞（昼间）", es: "Despegues (día)" },
+  "field:takeoffs_night":           { en: "Takeoffs (night)", ko: "이륙 (야간)", zh: "起飞（夜间）", es: "Despegues (noche)" },
+  "field:landings_day":             { en: "Landings (day)", ko: "착륙 (주간)", zh: "着陆（昼间）", es: "Aterrizajes (día)" },
+  "field:landings_night":           { en: "Landings (night)", ko: "착륙 (야간)", zh: "着陆（夜间）", es: "Aterrizajes (noche)" },
+  "field:total_time":               { en: "Total time (row total)", ko: "총 시간 (행 합계)", zh: "总时间（行合计）", es: "Tiempo total (total de la fila)" },
+  "field:block_off":                { en: "Block off (clock time)", ko: "블록 오프 (시각)", zh: "撤轮挡（时刻）", es: "Calzos fuera (hora)" },
+  "field:block_on":                 { en: "Block on (clock time)", ko: "블록 온 (시각)", zh: "挡轮挡（时刻）", es: "Calzos puestos (hora)" },
+} satisfies Record<`field:${FieldTarget}`, Entry>;
+
+/** Building blocks for composed time-bucket labels ("Multi-engine · Night · FO time"). */
+export const TIME_CATEGORY = {
+  se:   { en: "Single-engine", ko: "단발", zh: "单发", es: "Monomotor" },
+  me:   { en: "Multi-engine", ko: "다발", zh: "多发", es: "Multimotor" },
+  ses:  { en: "Single-engine sea", ko: "단발 수상기", zh: "单发水上", es: "Monomotor hidro" },
+  mes:  { en: "Multi-engine sea", ko: "다발 수상기", zh: "多发水上", es: "Multimotor hidro" },
+  heli: { en: "Helicopter", ko: "헬리콥터", zh: "直升机", es: "Helicóptero" },
+  sim:  { en: "Simulator", ko: "시뮬레이터", zh: "模拟机", es: "Simulador" },
+} satisfies Record<Exclude<TimeCategory, "any">, Entry>;
+
+export const TIME_CONDITION = {
+  day:   { en: "Day", ko: "주간", zh: "昼间", es: "Día" },
+  night: { en: "Night", ko: "야간", zh: "夜间", es: "Noche" },
+} satisfies Record<Exclude<TimeCondition, "any">, Entry>;
+
+export const TIME_ROLE = {
+  dual:  { en: "Dual", ko: "교육 (Dual)", zh: "带飞 (Dual)", es: "Doble mando (Dual)" },
+  pic:   { en: "PIC", ko: "PIC", zh: "PIC", es: "PIC" },
+  fo:    { en: "FO", ko: "FO", zh: "FO", es: "FO" },
+  sic:   { en: "SIC / AUG", ko: "SIC / AUG", zh: "SIC / AUG", es: "SIC / AUG" },
+  check: { en: "Check", ko: "심사 (Check)", zh: "检查 (Check)", es: "Prueba (Check)" },
+  solo:  { en: "Solo", ko: "단독 (Solo)", zh: "单飞 (Solo)", es: "Solo" },
+} satisfies Record<Exclude<TimeRole, "any">, Entry>;
+
+/** How the facet parts and the word "time" combine, per locale (`{parts}` = "Multi-engine · Night · FO"). */
+const TIME_PATTERN: Entry = { en: "{parts} time", ko: "{parts} 시간", zh: "{parts}时间", es: "Tiempo {parts}" };
+/** time:any:any:any */
+const TIME_TOTAL: Entry = { en: "Flight time (total)", ko: "비행 시간 (합계)", zh: "飞行时间（合计）", es: "Tiempo de vuelo (total)" };
+
+const TIME_KEY_RE = /^time:([a-z]+):([a-z]+):([a-z]+)$/;
+const has = <T extends object>(obj: T, key: string): key is Extract<keyof T, string> =>
+  Object.prototype.hasOwnProperty.call(obj, key);
+
+/** Localised group label for a CANONICAL_OPTIONS group; the library's own string when unknown. */
+export function targetGroupLabel(s: ImportStrings, group: string): string {
+  return has(TARGET_GROUP, group) ? pick(TARGET_GROUP[group], s.locale) : group;
+}
+
+/**
+ * Localised label for a target key ("ignore", "field:date", "time:me:night:fo").
+ * Returns undefined for keys this file does not know so the caller can fall
+ * back to the library's describeTarget().
+ */
+export function targetLabel(s: ImportStrings, key: string): string | undefined {
+  if (key === "ignore") return s("ignoreOption");
+  if (has(TARGET_LABEL, key)) return pick(TARGET_LABEL[key], s.locale);
+  const m = TIME_KEY_RE.exec(key);
+  if (!m) return undefined;
+  const [, cat, cond, role] = m;
+  const known = (cat === "any" || has(TIME_CATEGORY, cat)) && (cond === "any" || has(TIME_CONDITION, cond)) && (role === "any" || has(TIME_ROLE, role));
+  if (!known) return undefined;
+  const parts: string[] = [];
+  if (has(TIME_CATEGORY, cat)) parts.push(pick(TIME_CATEGORY[cat], s.locale));
+  if (has(TIME_CONDITION, cond)) parts.push(pick(TIME_CONDITION[cond], s.locale));
+  if (has(TIME_ROLE, role)) parts.push(pick(TIME_ROLE[role], s.locale));
+  if (parts.length === 0) return pick(TIME_TOTAL, s.locale);
+  return fill(pick(TIME_PATTERN, s.locale), { parts: parts.join(" · ") });
+}
+
+// ---------------------------------------------------------------------------
+// Reconcile checks (step 3) — fixed invariants get a localised label;
+// declared-total checks keep the sheet's own label.
+// ---------------------------------------------------------------------------
+
+/** Keyed by the fixed check ids in lib/import/reconcile.ts (plus the two composed forms). */
+export const CHECK_LABEL = {
+  grand_total:          { en: "Total time", ko: "총 비행 시간", zh: "总时间", es: "Tiempo total" },
+  grand_total_declared: { en: "Total time (declared: {src})", ko: "총 비행 시간 (명시: {src})", zh: "总时间（声明：{src}）", es: "Tiempo total (declarado: {src})" },
+  hours_gt_24:          { en: "Flights longer than 24 h", ko: "24시간을 초과하는 비행", zh: "超过 24 小时的飞行", es: "Vuelos de más de 24 h" },
+  row_totals:           { en: "Row totals vs. time buckets", ko: "행 합계 vs. 시간 항목", zh: "行合计 vs. 时间分项", es: "Totales de fila vs. casillas de tiempo" },
+  date_order:           { en: "Dates in order", ko: "날짜 순서", zh: "日期顺序", es: "Fechas en orden" },
+  future_dates:         { en: "Future-dated flights", ko: "미래 날짜의 비행", zh: "日期在未来的飞行", es: "Vuelos con fecha futura" },
+  night_gt_total:       { en: "Night hours vs. total hours", ko: "야간 시간 vs. 총 시간", zh: "夜间小时 vs. 总小时", es: "Horas nocturnas vs. horas totales" },
+  split_rows:           { en: "Rows split across roles", ko: "역할별로 분할된 행", zh: "按角色拆分的行", es: "Filas divididas por rol" },
+  skipped:            { en: "Rows skipped — {reason}", ko: "건너뛴 행 — {reason}", zh: "跳过的行——{reason}", es: "Filas omitidas — {reason}" },
+  instrument_composite: { en: "Instrument time ({parts})", ko: "계기 시간 ({parts})", zh: "仪表时间（{parts}）", es: "Tiempo de instrumentos ({parts})" },
+  "inst.actual":        { en: "actual", ko: "실제", zh: "实际", es: "real" },
+  "inst.hood":          { en: "hood", ko: "후드", zh: "遮蔽", es: "capucha" },
+  "inst.sim":           { en: "sim", ko: "시뮬레이터", zh: "模拟机", es: "sim" },
+} satisfies Record<string, Entry>;
+
+const GRAND_DECLARED_RE = /^Total time \(declared: (.+)\)$/;
+const INSTRUMENT_COMPOSITE_RE = /^Instrument time \((.+)\)$/;
+
+/**
+ * Display label for a reconcile check. Fixed invariant ids are localised;
+ * anything else (declared totals, unknown ids) falls back to the library's
+ * label, which is the sheet's own text.
+ */
+export function checkLabel(s: ImportStrings, c: Pick<ReconcileCheck, "id" | "label">): string {
+  const { locale } = s;
+  const { id, label } = c;
+  if (id === "grand_total") {
+    const m = GRAND_DECLARED_RE.exec(label);
+    return m ? fill(pick(CHECK_LABEL.grand_total_declared, locale), { src: m[1] }) : pick(CHECK_LABEL.grand_total, locale);
+  }
+  if (id === "hours_gt_24" || id === "row_totals" || id === "split_rows" || id === "date_order" || id === "future_dates" || id === "night_gt_total") {
+    return pick(CHECK_LABEL[id], locale);
+  }
+  if (id.startsWith("skipped:")) {
+    const key = `skip.${id.slice("skipped:".length)}`;
+    if (isImportStringKey(key)) return fill(pick(CHECK_LABEL.skipped, locale), { reason: s(key) });
+    return label;
+  }
+  if (id.startsWith("declared:composite:")) {
+    const m = INSTRUMENT_COMPOSITE_RE.exec(label);
+    if (!m) return label;
+    const parts = m[1].split(" + ").map((p) => {
+      const k = `inst.${p.trim()}`;
+      return has(CHECK_LABEL, k) ? pick(CHECK_LABEL[k], locale) : p;
+    });
+    return fill(pick(CHECK_LABEL.instrument_composite, locale), { parts: parts.join(" + ") });
+  }
+  return label;
 }
 
 /** Display names for the legacy exact-format detector's ids. */

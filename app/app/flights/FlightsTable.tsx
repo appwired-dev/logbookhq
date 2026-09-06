@@ -10,6 +10,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 // FlightForm is being reworked). Fold it into the icon map in a later pass.
 import { Pencil } from "@/components/ui/icons";
 import { Icon, Pill, categoryPill, rolePill } from "@/components/ui";
+import type { Locale } from "@/lib/i18n";
 import type { FlightDerived } from "@/lib/types";
 import { fmt, type FlightsStrings } from "./flights-strings";
 import type { Agg, SortDir, SortKey } from "./use-flight-filters";
@@ -158,16 +159,27 @@ function buildColumns(s: FlightsStrings): Col[] {
     { id: "precision_approaches", group: "app", label: s.colPrec, width: 64, sortKey: "precision_approaches", align: "right", cell: (f) => count(f.precision_approaches), foot: (a) => footCount(a.prec) },
     { id: "non_precision_approaches", group: "app", label: s.colNonPrec, width: 84, sortKey: "non_precision_approaches", align: "right", cell: (f) => count(f.non_precision_approaches), foot: (a) => footCount(a.nonPrec) },
     { id: "holds", group: "app", label: s.colHolds, width: 76, sortKey: "holds", align: "right", cell: (f) => count(f.holds), foot: (a) => footCount(a.holds) },
-    // Takeoffs / landings (day + night; the split is in the tooltip)
+    // Takeoffs / landings (day + night). The split is the tooltip for pointer
+    // users and sr-only text for everyone else — `title` is not reliably read.
     {
       id: "takeoffs", group: "tol", label: s.colTakeoffs, width: 60, sortKey: "takeoffs", align: "right",
-      cell: (f) => count(n(f.takeoffs_day) + n(f.takeoffs_night)),
+      cell: (f) => (
+        <>
+          {count(n(f.takeoffs_day) + n(f.takeoffs_night))}
+          <span className="sr-only"> ({fmt(s.tolSplit, { d: n(f.takeoffs_day), n: n(f.takeoffs_night) })})</span>
+        </>
+      ),
       text: (f) => fmt(s.tolSplit, { d: n(f.takeoffs_day), n: n(f.takeoffs_night) }),
       foot: (a) => footCount(a.takeoffs),
     },
     {
       id: "landings", group: "tol", label: s.colLandings, width: 60, sortKey: "landings", align: "right",
-      cell: (f) => count(n(f.landings_day) + n(f.landings_night)),
+      cell: (f) => (
+        <>
+          {count(n(f.landings_day) + n(f.landings_night))}
+          <span className="sr-only"> ({fmt(s.tolSplit, { d: n(f.landings_day), n: n(f.landings_night) })})</span>
+        </>
+      ),
       text: (f) => fmt(s.tolSplit, { d: n(f.landings_day), n: n(f.landings_night) }),
       foot: (a) => footCount(a.landings),
     },
@@ -243,9 +255,11 @@ const Row = memo(function Row({ f, index, cols, tdClass, highlighted, onOpen }: 
       onAuxClick={onAuxClick}
       onKeyDown={onKeyDown}
       style={ROW_STYLE}
-      className={`cursor-pointer transition-colors duration-fast motion-reduce:transition-none
+      // `.row-focus` draws the keyboard ring as inset shadows on the cells
+      // (globals.css): WebKit does not reliably paint `outline` on a <tr>.
+      className={`row-focus cursor-pointer transition-colors duration-fast motion-reduce:transition-none
         hover:bg-canvas
-        focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand/60 focus-visible:bg-brand/5
+        focus-visible:outline-none focus-visible:bg-brand/5
         ${highlighted ? "row-saved" : ""}`}
     >
       {cols.map((c, i) => (
@@ -301,6 +315,8 @@ export type FlightsTableProps = {
   rows: readonly FlightDerived[];
   agg: Agg;
   s: FlightsStrings;
+  /** UI locale for number formatting — SSR and the client must agree. */
+  locale: Locale;
   sortKey: SortKey;
   sortDir: SortDir;
   onSort: (key: SortKey) => void;
@@ -309,13 +325,16 @@ export type FlightsTableProps = {
   highlightId: number | null;
 };
 
-export function FlightsTable({ rows, agg, s, sortKey, sortDir, onSort, onOpen, augHalfCredit, highlightId }: FlightsTableProps) {
+export function FlightsTable({ rows, agg, s, locale, sortKey, sortDir, onSort, onOpen, augHalfCredit, highlightId }: FlightsTableProps) {
   const cols = useMemo(() => buildColumns(s), [s]);
   // Cells carry no height of their own — see the *_STYLE constants above.
+  // The first (date) column is pinned to the left edge (`.col-pin`, globals.css)
+  // so the row's identity stays visible while the 2,300 px table scrolls.
   const tdClass = useMemo(() => cols.map((c, i) => [
     "px-3 py-0 align-middle whitespace-nowrap overflow-hidden text-ellipsis border-b border-border/60",
     alignClass(c.align),
     c.id === "actions" ? "px-1" : "",
+    i === 0 ? "col-pin z-[1]" : "",
     isGroupStart(cols, i) ? GROUP_BORDER : "",
   ].join(" ")), [cols]);
 
@@ -388,7 +407,8 @@ export function FlightsTable({ rows, agg, s, sortKey, sortDir, onSort, onOpen, a
           </colgroup>
 
           <thead>
-            <tr style={GROUP_ROW_STYLE}>
+            {/* aria-rowindex is 1-based over header + body + footer; body rows continue at 3. */}
+            <tr style={GROUP_ROW_STYLE} aria-rowindex={1}>
               {groups.map((g, gi) => (
                 <th
                   key={g.id}
@@ -400,7 +420,7 @@ export function FlightsTable({ rows, agg, s, sortKey, sortDir, onSort, onOpen, a
                 </th>
               ))}
             </tr>
-            <tr style={HEADER_ROW_STYLE}>
+            <tr style={HEADER_ROW_STYLE} aria-rowindex={2}>
               {cols.map((c, i) => {
                 const sk = c.sortKey;
                 const state: SortDir | "none" | undefined = sk ? (sk === sortKey ? sortDir : "none") : undefined;
@@ -412,7 +432,9 @@ export function FlightsTable({ rows, agg, s, sortKey, sortDir, onSort, onOpen, a
                     scope="col"
                     aria-sort={ariaSort}
                     style={HEADER_STICKY_STYLE}
-                    className={`sticky z-10 p-0 bg-surface border-b border-border text-2xs font-semibold uppercase tracking-[0.06em] whitespace-nowrap
+                    // The pinned corner sticks on both axes and sits above the other header cells.
+                    className={`sticky p-0 bg-surface border-b border-border text-2xs font-semibold uppercase tracking-[0.06em] whitespace-nowrap
+                      ${i === 0 ? "col-pin z-20" : "z-10"}
                       ${alignClass(c.align)} ${active ? "text-ink-1" : "text-ink-2"} ${isGroupStart(cols, i) ? GROUP_BORDER : ""}`}
                   >
                     {sk && state ? (
@@ -465,14 +487,19 @@ export function FlightsTable({ rows, agg, s, sortKey, sortDir, onSort, onOpen, a
           </tbody>
 
           <tfoot>
-            <tr style={FOOT_ROW_STYLE}>
-              <td
-                colSpan={leading}
-                className="sticky bottom-0 z-10 px-3 bg-surface border-t border-border text-xs font-semibold text-ink-1 whitespace-nowrap overflow-hidden text-ellipsis"
-              >
+            <tr style={FOOT_ROW_STYLE} aria-rowindex={rows.length + 3}>
+              {/* The label sits in the pinned date column so "Totals" stays put
+                  while the sums scroll; the count / note fill the remaining
+                  non-numeric columns. */}
+              <td className="col-pin sticky bottom-0 z-20 px-3 bg-surface border-t border-border text-xs font-semibold text-ink-1 whitespace-nowrap overflow-hidden text-ellipsis">
                 {s.totals}
-                <span className="ml-2 font-normal text-ink-3 num">· {agg.count.toLocaleString()}</span>
-                {augHalfCredit && <span className="ml-2 font-normal text-ink-3">· {s.augNote}</span>}
+              </td>
+              <td
+                colSpan={leading - 1}
+                className="sticky bottom-0 z-10 pl-0 pr-3 bg-surface border-t border-border text-xs text-ink-3 whitespace-nowrap overflow-hidden text-ellipsis"
+              >
+                <span className="num">· {agg.count.toLocaleString(locale)}</span>
+                {augHalfCredit && <span className="ml-2">· {s.augNote}</span>}
               </td>
               {cols.slice(leading).map((c, j) => {
                 const i = leading + j;

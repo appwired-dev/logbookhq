@@ -31,10 +31,13 @@ export function useMediaQuery(query: string, serverDefault = false): boolean {
 export const MD_QUERY = "(min-width: 768px)";
 
 /**
- * True at `md` and up. The server assumes desktop so SSR emits the full table
- * (the larger, more useful tree for crawlers and for most sessions); phones
- * correct to the card list right after hydration.
+ * True at `md` and up.
+ *
+ * `serverDefault` is what SSR and the hydration pass render. Pass the
+ * request's device hint from a Server Component (lib/device-hint.ts) so
+ * phones paint the card list on the first frame instead of the 2,300 px table
+ * and then swapping; without a hint the server assumes desktop.
  */
-export function useIsDesktop(): boolean {
-  return useMediaQuery(MD_QUERY, true);
+export function useIsDesktop(serverDefault = true): boolean {
+  return useMediaQuery(MD_QUERY, serverDefault);
 }

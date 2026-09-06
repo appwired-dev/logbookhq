@@ -317,3 +317,46 @@
 @media (prefers-reduced-motion: reduce) {
   .row-saved, .card.row-saved { animation: none; background-color: rgb(var(--brand) / 0.12); }
 }
+
+/* Keyboard focus rail for table rows. WebKit does not reliably paint
+   `outline` on a <tr>, so the ring is drawn as inset box-shadows on the row's
+   cells (top + bottom on every cell, plus the outer edge on the first / last).
+   The row itself keeps its `focus-visible:bg-brand/5` tint. */
+tr.row-focus:focus-visible > td {
+  box-shadow: inset 0 2px 0 0 rgb(var(--brand)), inset 0 -2px 0 0 rgb(var(--brand));
+}
+tr.row-focus:focus-visible > td:first-child {
+  box-shadow:
+    inset 2px 0 0 0 rgb(var(--brand)),
+    inset 0 2px 0 0 rgb(var(--brand)),
+    inset 0 -2px 0 0 rgb(var(--brand)),
+    inset -1px 0 0 0 rgb(var(--border));
+}
+tr.row-focus:focus-visible > td:last-child {
+  box-shadow: inset -2px 0 0 0 rgb(var(--brand)), inset 0 2px 0 0 rgb(var(--brand)), inset 0 -2px 0 0 rgb(var(--brand));
+}
+
+/* Pinned identity column (Date). Sticks to the left edge while the table
+   scrolls sideways; a right hairline separates it from the moving cells. It
+   must stay opaque, so the row's transparent states are mirrored here with an
+   opaque base: hover → canvas, keyboard focus → brand tint layered as a
+   background-image, saved pulse → the card variant that settles on surface.
+   z-index is set per element (Tailwind) so the header corner can sit above. */
+.col-pin {
+  position: sticky;
+  left: 0;
+  background-color: rgb(var(--surface));
+  box-shadow: inset -1px 0 0 0 rgb(var(--border));
+}
+tbody tr:hover > .col-pin { background-color: rgb(var(--canvas)); }
+tr.row-focus:focus-visible > .col-pin {
+  background-image: linear-gradient(rgb(var(--brand) / 0.05), rgb(var(--brand) / 0.05));
+}
+.row-saved > .col-pin { animation: flightSavedPulseCard 1.6s var(--ease-out) both; }
+@media (prefers-reduced-motion: reduce) {
+  .row-saved > .col-pin {
+    animation: none;
+    background-color: rgb(var(--surface));
+    background-image: linear-gradient(rgb(var(--brand) / 0.12), rgb(var(--brand) / 0.12));
+  }
+}

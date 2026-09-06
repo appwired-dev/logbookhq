@@ -22,16 +22,21 @@ export type FlightsClientProps = {
   locale: Locale;
   /** profiles.aug_half_credit — SIC time counts 50 % in the credited totals. */
   augHalfCredit?: boolean;
+  /**
+   * Server-side device hint (lib/device-hint.ts): what SSR renders before
+   * `matchMedia` takes over. Defaults to the table.
+   */
+  initialIsDesktop?: boolean;
 };
 
 /**
  * Flights list. URL contract: ?q=&y=&cat=&role=&sort=<key>:<asc|desc>
  * (+ one-shot ?saved=<id> to pulse a just-saved row).
  */
-export default function FlightsClient({ flights, locale, augHalfCredit = false }: FlightsClientProps) {
+export default function FlightsClient({ flights, locale, augHalfCredit = false, initialIsDesktop = true }: FlightsClientProps) {
   const s = useMemo(() => getFlightsStrings(locale), [locale]);
   const router = useRouter();
-  const isDesktop = useIsDesktop();
+  const isDesktop = useIsDesktop(initialIsDesktop);
   const { filters, setQ, setYear, setCat, setRole, toggleSort, clear, active } = useFlightFilters();
   const highlightId = useSavedFlightId();
   // Keep typing responsive: the input echoes `filters.q` immediately, the
@@ -62,7 +67,10 @@ export default function FlightsClient({ flights, locale, augHalfCredit = false }
     () => applyFilters(flights, haystack, { q: deferredQ, year: filters.year, cat: filters.cat, role: filters.role }),
     [flights, haystack, deferredQ, filters.year, filters.cat, filters.role],
   );
-  const rows = useMemo(() => sortFlights(filtered, filters.sortKey, filters.sortDir), [filtered, filters.sortKey, filters.sortDir]);
+  const rows = useMemo(
+    () => sortFlights(filtered, filters.sortKey, filters.sortDir, locale),
+    [filtered, filters.sortKey, filters.sortDir, locale],
+  );
   const agg = useMemo(() => aggregate(rows, augHalfCredit), [rows, augHalfCredit]);
 
   const open = useCallback((id: number) => router.push(`/app/flights/${id}`), [router]);
@@ -120,6 +128,7 @@ export default function FlightsClient({ flights, locale, augHalfCredit = false }
           rows={rows}
           agg={agg}
           s={s}
+          locale={locale}
           sortKey={filters.sortKey}
           sortDir={filters.sortDir}
           onSort={toggleSort}

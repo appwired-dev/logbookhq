@@ -1,8 +1,6 @@
 "use client";
 
 import { useId, useState, type DragEvent, type RefObject } from "react";
-// CloudUpload / FileSpreadsheet are not in components/ui/icons yet (read-only for this change).
-import { CloudUpload, FileSpreadsheet } from "@/components/ui/icons";
 import { Alert, Button, CardFooter, Icon, Pill, Skeleton } from "@/components/ui";
 import type { ImportStrings } from "./import-strings";
 
@@ -83,7 +81,7 @@ export default function StepUpload({
           }}
         />
         <span aria-hidden className="w-11 h-11 rounded-xl bg-brand/10 text-brand grid place-items-center mb-1">
-          <CloudUpload size={22} strokeWidth={1.75} />
+          <Icon.CloudUpload size={22} strokeWidth={1.75} />
         </span>
         <span className="text-sm font-semibold text-ink-1">{s("dropTitle")}</span>
         <span className="text-sm text-ink-2">{s("dropBody")}</span>
@@ -92,12 +90,12 @@ export default function StepUpload({
 
       {file && (
         <div className="flex items-center gap-3 rounded-control border border-border bg-surface-2/60 px-3 py-2">
-          <FileSpreadsheet size={18} strokeWidth={1.75} aria-hidden className="text-brand-deep shrink-0" />
+          <Icon.FileSpreadsheet size={18} strokeWidth={1.75} aria-hidden className="text-brand-deep shrink-0" />
           <div className="min-w-0 flex-1">
             <div className="text-sm font-medium text-ink-1 truncate">{file.name}</div>
             <div className="text-xs text-ink-3 num">{formatSize(file.size)}</div>
           </div>
-          <Button variant="ghost" icon aria-label={s("removeFile")} onClick={() => onFile(null)} disabled={busy}>
+          <Button variant="ghost" icon className="h-11 w-11 sm:h-9 sm:w-9" aria-label={s("removeFile")} onClick={() => onFile(null)} disabled={busy}>
             <Icon.X size={16} strokeWidth={2} aria-hidden />
           </Button>
         </div>
@@ -123,7 +121,7 @@ export default function StepUpload({
 
           <details className="group rounded-control border border-border bg-surface-2/40 px-3 py-2 text-sm">
             <summary className="cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden flex items-center gap-1.5 font-medium text-ink-2 rounded-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60">
-              <Icon.ChevronDown size={14} strokeWidth={2} aria-hidden className="transition-transform duration-fast group-open:rotate-180" />
+              <Icon.ChevronDown size={14} strokeWidth={2} aria-hidden className="transition-transform duration-fast motion-reduce:transition-none group-open:rotate-180" />
               {s("whereToExport")}
             </summary>
             <ul className="mt-2 space-y-1.5 text-xs text-ink-2 list-disc pl-5">

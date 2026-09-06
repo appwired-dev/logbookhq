@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { creditedHours } from "@/lib/derive";
+import type { Locale } from "@/lib/i18n";
 import type { Category, FlightDerived, Role } from "@/lib/types";
 
 /* -------------------------------------------------------------------------- */
@@ -236,13 +237,28 @@ export function sortValue(f: FlightDerived, k: SortKey): number | string | null 
   }
 }
 
-const collator = new Intl.Collator(undefined, { sensitivity: "base", numeric: true });
+/**
+ * One collator per UI locale, built lazily. The locale is passed explicitly
+ * (never `undefined`) so the server and the browser sort text identically —
+ * their default locales differ, and a different order would be a hydration
+ * mismatch.
+ */
+const collators = new Map<Locale, Intl.Collator>();
+function collatorFor(locale: Locale): Intl.Collator {
+  let c = collators.get(locale);
+  if (!c) {
+    c = new Intl.Collator(locale, { sensitivity: "base", numeric: true });
+    collators.set(locale, c);
+  }
+  return c;
+}
 /** Newest first, then highest id — keeps equal keys in a stable, predictable order. */
 const tieBreak = (a: FlightDerived, b: FlightDerived) => (a.date < b.date ? 1 : a.date > b.date ? -1 : b.id - a.id);
 
-export function sortFlights(rows: readonly FlightDerived[], key: SortKey, dir: SortDir): FlightDerived[] {
+export function sortFlights(rows: readonly FlightDerived[], key: SortKey, dir: SortDir, locale: Locale): FlightDerived[] {
   const sign = dir === "asc" ? 1 : -1;
   const isoDate = key === "date";
+  const collator = collatorFor(locale);
   const decorated = rows.map((f) => ({ f, v: sortValue(f, key) }));
   decorated.sort((a, b) => {
     const av = a.v, bv = b.v;
