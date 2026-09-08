@@ -55,7 +55,7 @@ const readOrigin = () => window.location.origin;
 const useOrigin = () => useSyncExternalStore(subscribeNoop, readOrigin, emptyString);
 
 export default function SettingsForm({
-  profile, locale, billing, backup,
+  profile, locale, billing, backup, support,
 }: {
   profile: Profile;
   locale: Locale;
@@ -63,6 +63,8 @@ export default function SettingsForm({
   billing?: ReactNode;
   /** Backup card — a sibling client component the page composes. */
   backup?: ReactNode;
+  /** Support card — an in-app message form the page composes. */
+  support?: ReactNode;
 }) {
   const t = makeT(locale);
   const s = settingsStrings(locale);
@@ -399,6 +401,7 @@ export default function SettingsForm({
 
           {billing}
           {backup}
+          {support}
         </div>
       </div>
 

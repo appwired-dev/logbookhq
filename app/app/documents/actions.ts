@@ -115,10 +115,14 @@ export async function updateDocument(id: number, formData: FormData) {
 export async function deleteDocument(id: number, storagePath: string) {
   try {
     const supabase = await createClient();
+    // Defense in depth (same as the flights actions): require a session and
+    // scope the delete to the caller's own rows, not RLS alone.
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: "Not signed in." };
     // Storage remove failure shouldn't block DB delete — if the file is
     // already gone, we still want to clean up the metadata row.
     await supabase.storage.from("documents").remove([storagePath]).catch(() => {});
-    const { error } = await supabase.from("documents").delete().eq("id", id);
+    const { error } = await supabase.from("documents").delete().eq("id", id).eq("user_id", user.id);
     if (error) return { error: error.message };
     revalidatePath("/app/documents");
     revalidatePath("/app");
