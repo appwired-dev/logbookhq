@@ -86,42 +86,45 @@ export default function LandingPage() {
         <Showcase
           eyebrow="The switch"
           title="Changing logbooks shouldn't mean re-typing your career."
-          lede="Every other app assumes you start from zero, or that you fly for the FAA. Drop in the logbook you kept for years — CSV, Excel, ForeFlight, LogTen, a Numbers file — and the wizard detects your columns, then reconciles the import against the totals you already trust before it saves a thing."
-        >
-          <Shot src={transferShot} alt="The import and export screen: a drag-and-drop wizard that reads ForeFlight, LogTen, MyFlightbook, Apple Numbers and CSV, plus PDF and CSV export." />
-        </Showcase>
+          lede="Every other app assumes you start from zero, or that you fly for the FAA. Drop in the logbook you kept for years — CSV, Excel, ForeFlight, LogTen, a Numbers file — and it detects your columns, then reconciles the import against the totals you already trust before it saves a thing."
+          src={transferShot}
+          alt="The import and export screen: reads ForeFlight, LogTen, MyFlightbook, Apple Numbers and CSV; exports PDF and CSV."
+        />
 
         <Showcase
+          flip
           eyebrow="Your logbook, totalled"
           title="Every hour, added up the way you keep them."
-          lede="Total time, PIC, night, cross-country, instrument, multi-engine — each credited to your own convention, augmenting time at 50% if that's how you count. Here: 8,484 hours across 5,334 flights, live."
-        >
-          <Shot src={dashboardShot} alt="The dashboard: stat tiles showing 8,484 total hours, PIC, FO, cross-country and instrument time, each with a 30-day trend." />
-        </Showcase>
+          lede="Total time, PIC, night, cross-country, instrument, multi-engine — each credited to your own convention, augmenting time at 50% if that's how you count. Here: 8,484 hours across 5,334 flights."
+          src={dashboardShot}
+          alt="The dashboard: stat tiles showing 8,484 total hours, PIC, FO, cross-country and instrument time, each with a 30-day trend."
+        />
 
         <Showcase
           eyebrow="See the whole career"
           title="Every year, into every type, into every seat."
           lede="One flow of your entire logbook — each year into each aircraft into each crew seat, ribbon width in hours. Twenty-five years of flying, read in a single glance."
-        >
-          <Shot src={sankeyShot} alt="A Sankey diagram flowing from year (1999 to 2026) to aircraft type to crew role — PIC, FO, dual, SIC — with ribbon width scaled to hours." />
-        </Showcase>
+          src={sankeyShot}
+          alt="A Sankey diagram flowing from year (1999 to 2026) to aircraft type to crew role — PIC, FO, dual, SIC — with ribbon width scaled to hours."
+        />
 
         <Showcase
+          flip
+          dark
           eyebrow="The map"
           title="Every route you've flown, on a living globe."
           lede="Spun up from the airports in your own logbook — 147 routes across 97 airports here — with your busiest legs ranked beside it. Drag to spin, scroll to zoom."
-        >
-          <Shot src={globeShot} alt="An interactive 3D globe of flown routes over North America, arcs weighted by number of flights, with a top-routes panel." dark />
-        </Showcase>
+          src={globeShot}
+          alt="An interactive 3D globe of flown routes over North America, arcs weighted by number of flights, with a top-routes panel."
+        />
 
         <Showcase
           eyebrow="Every authority"
           title="Your limits and currency follow you."
           lede="Rolling flight-time limits and recency under the rules you actually fly — CAR 700.28 here, or FAR 117, ORO.FTL and more — each window green until it isn't."
-        >
-          <Shot src={limitsShot} alt="Flight-time-limit bars for the last 365, 90 and 28 days, a calendar heatmap of flying days, and IFR and passenger recency cards, all showing current." />
-        </Showcase>
+          src={limitsShot}
+          alt="Flight-time-limit bars for the last 365, 90 and 28 days, a calendar heatmap of flying days, and IFR and passenger recency cards, all showing current."
+        />
 
         {/* ---- feature narrative (the rest of the panel) ---- */}
         <section className="mx-auto max-w-6xl px-5 pt-8 pb-10">
@@ -286,35 +289,25 @@ function Feature({ eyebrow, title, body, children }: { eyebrow: string; title: s
 }
 
 /* ---------------------------------------------------------------------------
-   Product showcase — real app captures, framed as a browser window
+   Product showcase — real app captures as compact tiles beside the copy,
+   sides alternating down the page. No browser chrome.
    --------------------------------------------------------------------------- */
-function Showcase({ eyebrow, title, lede, children }: { eyebrow: string; title: string; lede: string; children: React.ReactNode }) {
+function Showcase({ eyebrow, title, lede, src, alt, dark = false, flip = false }: {
+  eyebrow: string; title: string; lede: string; src: StaticImageData; alt: string; dark?: boolean; flip?: boolean;
+}) {
   return (
-    <section className="mx-auto max-w-6xl px-5 py-9">
-      <div className="max-w-2xl">
-        <div className="lp-eyebrow" style={{ color: "var(--lp-amber)" }}>{eyebrow}</div>
-        <h2 className="lp-h2 mt-2" style={{ fontSize: "clamp(24px,3.4vw,34px)" }}>{title}</h2>
-        <p className="lp-lede mt-3">{lede}</p>
+    <section className="mx-auto max-w-6xl px-5 py-8">
+      <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
+        <div className={flip ? "lg:order-2" : ""}>
+          <div className="lp-eyebrow" style={{ color: "var(--lp-amber)" }}>{eyebrow}</div>
+          <h2 className="lp-h2 mt-2" style={{ fontSize: "clamp(22px,3vw,30px)" }}>{title}</h2>
+          <p className="lp-lede mt-3" style={{ fontSize: 15 }}>{lede}</p>
+        </div>
+        <figure className={`lp-shot${dark ? " lp-shot-frame-dark" : ""}${flip ? " lg:order-1" : ""}`}>
+          <Image src={src} alt={alt} sizes="(max-width: 1024px) 100vw, 560px" placeholder="blur" className="lp-shot-img" />
+        </figure>
       </div>
-      <div className="mt-7">{children}</div>
     </section>
-  );
-}
-
-function Shot({ src, alt, dark = false }: { src: StaticImageData; alt: string; dark?: boolean }) {
-  return (
-    <figure className={`lp-shot${dark ? " lp-shot-frame-dark" : ""}`}>
-      <div className="lp-shot-bar">
-        <span className="lp-shot-tl" />
-        <span className="lp-shot-tl" />
-        <span className="lp-shot-tl" />
-        <span className="lp-shot-url">
-          <span className="lp-dot" style={{ background: "var(--lp-cyan)", boxShadow: "none" }} />
-          app.pilotlogbookhq.com
-        </span>
-      </div>
-      <Image src={src} alt={alt} sizes="(max-width: 1024px) 100vw, 1040px" placeholder="blur" className="lp-shot-img" />
-    </figure>
   );
 }
 
