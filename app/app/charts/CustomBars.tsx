@@ -37,7 +37,19 @@ export function paletteForIndex(i: number) {
   };
 }
 
-const SHADOW = { fill: "rgb(var(--ink-3))", fillOpacity: 0.45, filter: "blur(1.2px)" } as const;
+/** Single faded-blue face — the Sankey's PIC blue (--role-pic), so the per-type
+ *  bars read as the same family as the career flow above. */
+function neutralPalette() {
+  const base = "rgb(var(--role-pic))";
+  return {
+    lite: `color-mix(in srgb, ${base} 34%, rgb(var(--surface)))`,
+    mid: `color-mix(in srgb, ${base} 86%, rgb(var(--surface)))`,
+    dark: `color-mix(in srgb, ${base} 66%, rgb(var(--ink-1)))`,
+  };
+}
+
+// Soft, light contact shadow — a hint stronger than a flat drop.
+const SHADOW = { fill: "rgb(var(--ink-3))", fillOpacity: 0.3, filter: "blur(2px)" } as const;
 const HIGHLIGHT = { stroke: "rgb(var(--surface) / 0.5)" } as const;
 
 interface ShapeProps {
@@ -48,21 +60,22 @@ interface ShapeProps {
   index?: number;
   fill?: string;
   colored?: boolean;
+  /** Force the single slate palette (matches the Sankey aircraft nodes). */
+  neutral?: boolean;
 }
 
 /** Vertical 3D bar — grows upward, flat top. */
 export function ArrowBar3D(props: ShapeProps) {
-  const { x = 0, y = 0, width = 0, height = 0, index = 0, colored = false } = props;
+  const { x = 0, y = 0, width = 0, height = 0, index = 0, colored = false, neutral = false } = props;
   if (height <= 0 || width <= 0) return null;
 
-  const pal = paletteForIndex(colored ? index : 0);
+  const pal = neutral ? neutralPalette() : paletteForIndex(colored ? index : 0);
   const depth = Math.min(width * 0.42, 11);
   const id = `varr-${Math.round(x)}-${Math.round(y)}-${Math.round(width)}`;
 
-  // Shadow offset: push roughly one bar-width to the right so it falls into
-  // the next column band, plus a small vertical drop.
-  const shDx = Math.round(width * 0.85);
-  const shDy = 6;
+  // Soft contact shadow — a short offset, not a full bar-width away.
+  const shDx = Math.round(width * 0.5);
+  const shDy = 4;
 
   const front = [`M ${x},${y + height}`, `L ${x},${y}`, `L ${x + width},${y}`, `L ${x + width},${y + height}`, "Z"].join(" ");
   const side = [`M ${x + width},${y}`, `L ${x + width + depth},${y - depth}`, `L ${x + width + depth},${y + height - depth}`, `L ${x + width},${y + height}`, "Z"].join(" ");
@@ -89,17 +102,16 @@ export function ArrowBar3D(props: ShapeProps) {
 
 /** Horizontal 3D bar — grows rightward, flat right edge. */
 export function ArrowBar3DHorizontal(props: ShapeProps) {
-  const { x = 0, y = 0, width = 0, height = 0, index = 0, colored = false } = props;
+  const { x = 0, y = 0, width = 0, height = 0, index = 0, colored = false, neutral = false } = props;
   if (height <= 0 || width <= 0) return null;
 
-  const pal = paletteForIndex(colored ? index : 0);
+  const pal = neutral ? neutralPalette() : paletteForIndex(colored ? index : 0);
   const depth = Math.min(height * 0.42, 9);
   const id = `harr-${Math.round(x)}-${Math.round(y)}-${Math.round(width)}-${index}`;
 
-  // Shadow offset: push down by roughly one bar-height so it lands in the
-  // next row's band.
-  const shDx = 6;
-  const shDy = Math.round(height * 0.85);
+  // Soft contact shadow — a short drop, not a full bar-height away.
+  const shDx = 4;
+  const shDy = Math.round(height * 0.5);
 
   const front = [`M ${x},${y}`, `L ${x + width},${y}`, `L ${x + width},${y + height}`, `L ${x},${y + height}`, "Z"].join(" ");
   const top = [`M ${x},${y}`, `L ${x + width},${y}`, `L ${x + width + depth},${y - depth}`, `L ${x + depth},${y - depth}`, "Z"].join(" ");
@@ -129,6 +141,11 @@ export function ArrowBar3DHorizontal(props: ShapeProps) {
 /** Same as ArrowBar3DHorizontal but cycles the chart palette by index. */
 export function ArrowBar3DHorizontalColored(props: ShapeProps) {
   return <ArrowBar3DHorizontal {...props} colored />;
+}
+
+/** Single slate face — matches the aircraft nodes in the career Sankey. */
+export function ArrowBar3DHorizontalNeutral(props: ShapeProps) {
+  return <ArrowBar3DHorizontal {...props} neutral />;
 }
 
 /** @deprecated — kept for backward compat. Use ArrowBar3DHorizontal instead. */
@@ -218,7 +235,7 @@ export default function TypeHoursChart({
                 itemStyle={{ color: "rgb(var(--ink-1))", fontWeight: 600 }}
                 formatter={(v: unknown) => [`${nf(Number(v))} ${hoursUnit}`, strings.colHours]}
               />
-              <Bar dataKey="hours" shape={<ArrowBar3DHorizontalColored />} isAnimationActive={!reduceMotion}>
+              <Bar dataKey="hours" shape={<ArrowBar3DHorizontalNeutral />} isAnimationActive={!reduceMotion}>
                 <LabelList dataKey="hours" position="right" offset={14} className="num" formatter={(v: unknown) => nf(Number(v))} />
               </Bar>
             </BarChart>

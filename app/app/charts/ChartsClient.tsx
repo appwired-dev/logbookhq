@@ -334,8 +334,8 @@ export default function ChartsClient({
               <AreaChart data={rolling} margin={{ top: 16, right: 8, bottom: 4, left: 0 }}>
                 <defs>
                   <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" style={{ stopColor: "rgb(var(--chart-area))", stopOpacity: 0.65 }} />
-                    <stop offset="100%" style={{ stopColor: "rgb(var(--chart-area))", stopOpacity: 0.04 }} />
+                    <stop offset="0%" style={{ stopColor: "rgb(var(--role-fo))", stopOpacity: 0.65 }} />
+                    <stop offset="100%" style={{ stopColor: "rgb(var(--role-fo))", stopOpacity: 0.04 }} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="2 4" vertical={false} />
@@ -362,7 +362,7 @@ export default function ChartsClient({
                 <Area
                   type="monotone"
                   dataKey="hours"
-                  stroke="rgb(var(--chart-area))"
+                  stroke="rgb(var(--role-fo))"
                   strokeWidth={2.5}
                   fill={`url(#${gradientId})`}
                   isAnimationActive={!reduceMotion}

@@ -26,7 +26,7 @@ export default function Brand({
       </span>
       <span className="leading-tight">
         <span className={`block font-semibold tracking-tight ${word} ${text}`}>
-          Pilot Logbook <span className={accent}>HQ</span>
+          Pilot Logbook <span className={`${accent} hq-sheen`}>HQ</span>
         </span>
         {subtitle}
       </span>

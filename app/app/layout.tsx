@@ -9,6 +9,7 @@ import { Pill } from "@/components/ui";
 import { ToastProvider } from "@/components/ui/toast";
 import { getT, getLocale } from "@/lib/i18n-server";
 import HtmlLang from "@/components/HtmlLang";
+import CursorGlow from "@/app/CursorGlow";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
@@ -43,7 +44,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <ToastProvider locale={locale}>
-    <div className="min-h-screen flex flex-col">
+    <div className="app-shell min-h-screen flex flex-col relative isolate">
+      <CursorGlow className="app-cursor-glow" />
       <HtmlLang locale={locale} />
       <header className="sticky top-0 z-30 h-16 bg-surface-inverse/90 backdrop-blur-xl border-b border-white/10">
         <div className="mx-auto h-full max-w-[1440px] px-4 sm:px-6 flex items-center gap-4">
