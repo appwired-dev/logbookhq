@@ -16,7 +16,7 @@ import type {
   CanonicalTarget, ColumnAssignment, ColumnMapping, FieldTarget, Grid, HeaderBand, HeaderPath, ImportTemplate,
   TimeCategory, TimeCondition, TimeRole,
 } from "./types";
-import { facetsOf, facetsOfPath, isGenericTimeLeaf, type Facets } from "./synonyms";
+import { facetsOf, facetsOfPath, hasInheritableFacets, isGenericTimeLeaf, isUnitLeaf, normaliseSegment, type Facets } from "./synonyms";
 import { columnStats, shapeScore, type ColumnStats } from "./shape";
 import { templateAssignments } from "./templates";
 import { TOTAL_ROW_RE } from "./util";
@@ -98,6 +98,12 @@ interface Candidate { target: CanonicalTarget; syn: number; reason: string; conf
 
 interface ColumnContext {
   path: HeaderPath;
+  /**
+   * The path the facets are read from: `path.path` minus trailing unit
+   * leaves ("Landings › no." → ["Landings"], "Approaches › #" → ["Approaches"])
+   * whenever the remaining parents carry facets worth inheriting.
+   */
+  segs: string[];
   stats: ColumnStats;
   leaf: Facets;
   all: Facets;
@@ -110,10 +116,18 @@ function cand(target: CanonicalTarget, syn: number, reason: string): Candidate {
   return { target, syn, reason, confidence: 0 };
 }
 
+/** Drop unit-only leaves ("hrs", "no.", "#", "count") while a parent above them says what is counted. */
+export function effectiveSegs(segs: string[]): string[] {
+  let out = segs;
+  while (out.length > 1 && isUnitLeaf(out[out.length - 1]) && hasInheritableFacets(facetsOfPath(out.slice(0, -1)))) {
+    out = out.slice(0, -1);
+  }
+  return out;
+}
+
 function synonymCandidates(ctx: ColumnContext): Candidate[] {
-  const { leaf, all, parents, path } = ctx;
+  const { leaf, all, parents, path, segs } = ctx;
   const out: Candidate[] = [];
-  const segs = path.path;
   const leafText = segs[segs.length - 1] ?? "";
   const label = path.label;
   const s = leaf.strength || 0.85;
@@ -155,7 +169,13 @@ function synonymCandidates(ctx: ColumnContext): Candidate[] {
   if (leaf.field && leaf.field !== "cfi_time") {
     const f = leaf.field;
     out.push(cand(field(f), (f === "date" || f === "registration" ? 1 : 0.95) * s, `header "${leafText}" matched ${FIELD_LABEL[f]}`));
-    if (f === "make_model") out.push(cand(field("registration"), 0.6, `"${leafText}" could be an identifier`));
+    if (f === "make_model") {
+      out.push(cand(field("registration"), 0.6, `"${leafText}" could be an identifier`));
+      // "Aeroplane" / "Aircraft" over a column of hours is aeroplane TIME, not a type.
+      if (ctx.stats.n > 0 && ctx.stats.nNum / ctx.stats.n >= 0.8) {
+        out.push(cand(time("any", "any", "any"), 0.7, `"${leafText}" holds hours, not aircraft types`));
+      }
+    }
     if (f === "registration") out.push(cand(field("make_model"), 0.6, `"${leafText}" could be a type`));
     return out;
   }
@@ -195,7 +215,9 @@ function synonymCandidates(ctx: ColumnContext): Candidate[] {
     if (hasTimeFacet) {
       out.push(cand(time(all.cat ?? "any", all.cond ?? "any", all.role ?? "any"), 0.9, `"${leafText}" under "${segs.slice(0, -1).join(" › ")}"`));
     } else {
-      out.push(cand(field("total_time"), leaf.total ? 0.9 * s : 0.8 * s, `header "${label}" is the row total`));
+      // Block time runs a little longer than flight time: when both exist the flight-time column should be the row total.
+      const totalSyn = leaf.total ? 0.9 : leaf.blockWord ? 0.75 : 0.8;
+      out.push(cand(field("total_time"), totalSyn * s, `header "${label}" is the row total`));
       out.push(cand(time("any", "any", "any"), 0.6, `header "${label}" could be flight time`));
     }
     return out;
@@ -229,12 +251,22 @@ function shapeCandidates(ctx: ColumnContext, headerKnown: boolean): Candidate[] 
   const cap = headerKnown ? 0.5 : 0.55;
   const add = (t: CanonicalTarget, why: string) => out.push({ target: t, syn: 0, reason: why, confidence: Math.min(cap, shapeScore(t, s) * cap) });
   if (s.n === 0) return out;
+  const tailR = s.nText > 0 ? s.tail / s.nText : 0;
+  const strongR = s.nText > 0 ? s.strongTail / s.nText : 0;
+  const typeR = s.nText > 0 ? s.typeCode / s.nText : 0;
   if (s.dateLike / s.n >= 0.8) add(field("date"), "cells look like dates");
   if (s.nText > 0 && s.pair / s.nText >= 0.5) add(field("route"), "cells look like airport pairs");
-  if (s.nText > 0 && s.tail / s.nText >= 0.6 && s.avgLen <= 8) add(field("registration"), "cells look like tail numbers");
+  // Registrations: hyphenated / N-number / HL1234 shapes first; loose tails only when they are not mostly type codes.
+  if (s.nText > 0 && s.avgLen <= 8 && (strongR >= 0.6 || (tailR >= 0.6 && typeR < 0.5))) add(field("registration"), "cells look like tail numbers");
+  if (!headerKnown && s.nText > 0 && typeR >= 0.6) add(field("make_model"), "cells look like aircraft type codes");
+  // A column of bare airport codes is a departure or an arrival — whichever is still free.
+  if (s.nText > 0 && s.apt / s.nText >= 0.6 && s.pair / s.nText < 0.5) {
+    add(field("from"), "cells look like airport codes");
+    add(field("to"), "cells look like airport codes");
+  }
   if (s.nText > 0 && s.longText / s.nText >= 0.4) add(field("remarks"), "cells look like free text");
   if (!headerKnown && s.nNum / s.n >= 0.8 && s.maxNum <= 24 && (s.hasDecimal || s.clock > 0)) add(time("any", "any", "any"), "cells look like hours");
-  if (!headerKnown && s.nNum / s.n >= 0.8 && s.allInt && s.maxNum <= 20 && s.maxNum > 1) add(field("ifr_approaches"), "cells look like small counts");
+  if (!headerKnown && s.nNum / s.n >= 0.8 && s.allInt && s.maxNum <= 20 && s.maxNum > 1) add(field("landings_day"), "cells look like small counts");
   if (s.nText > 0 && s.catText / s.n >= 0.6) add(field("category"), "cells look like SE/ME/SIM");
   if (s.nText > 0 && s.roleText / s.n >= 0.6) add(field("role"), "cells look like PIC/FO/DUAL");
   return out;
@@ -276,9 +308,9 @@ export function mapColumns(
   const firstNumericCol = stats.findIndex((s) => s.n > 0 && s.nNum / s.n >= 0.5);
 
   const contexts: ColumnContext[] = paths.map((p, i) => {
-    const segs = p.path;
+    const segs = effectiveSegs(p.path);
     const leaf = segs.length ? facetsOf(segs[segs.length - 1]) : facetsOf("");
-    return { path: p, stats: stats[i], leaf, all: facetsOfPath(segs), parents: facetsOfPath(segs.slice(0, -1)), firstNumericCol };
+    return { path: p, segs, stats: stats[i], leaf, all: facetsOfPath(segs), parents: facetsOfPath(segs.slice(0, -1)), firstNumericCol };
   });
 
   const assigned = new Map<number, ColumnAssignment>();
@@ -313,6 +345,7 @@ export function mapColumns(
   for (const { col, c } of queue) {
     if (assigned.has(col)) continue;
     if (c.target.kind === "field" && !SUMMABLE_FIELDS.has(c.target.field)) {
+      // An identity field already owned by a stronger column: fall through to this column's next candidate.
       if (owner.has(c.target.field)) continue;
       owner.set(c.target.field, col);
     }
@@ -328,20 +361,101 @@ export function mapColumns(
     });
   }
 
-  // 3. Generic "Landings"/"Takeoffs" next to explicit day/night columns double-count — drop them.
+  const isAuto = (a: ColumnAssignment) => a.source !== "template" && a.source !== "user";
+  const isField = (a: ColumnAssignment, f: FieldTarget) => a.target.kind === "field" && a.target.field === f;
+
+  // 3. Headerless hours: several shape-guessed hour columns cannot all be the flight time —
+  //    keep the one that dominates row by row (ties → right-most), the rest wait for review.
+  const guessedHours = [...assigned.values()].filter((a) => a.source === "shape" && a.target.kind === "time" && targetKey(a.target) === "time:any:any:any");
+  if (guessedHours.length > 1) {
+    const keep = dominantHoursCol(grid, dataStart, guessedHours.map((a) => a.col));
+    for (const a of guessedHours) {
+      if (a.col === keep) continue;
+      assigned.set(a.col, { ...a, target: IGNORE, confidence: 0.4, reason: `hours column without a header — flight time is taken from column ${colLetter(keep)}` });
+    }
+  }
+
+  // 4. Generic "Landings"/"Takeoffs" next to explicit day/night columns double-count — drop one side.
   for (const f of ["landings_day", "takeoffs_day"] as const) {
-    const claims = [...assigned.values()].filter((a) => a.target.kind === "field" && a.target.field === f && a.source !== "template" && a.source !== "user");
+    const claims = [...assigned.values()].filter((a) => isField(a, f) && isAuto(a));
     if (claims.length < 2) continue;
     const specific = claims.filter((a) => contexts[a.col]?.all.cond === "day");
-    if (specific.length === 0) continue;
-    for (const a of claims) {
-      if (contexts[a.col]?.all.cond === "day") continue;
+    const generic = claims.filter((a) => contexts[a.col]?.all.cond !== "day");
+    if (specific.length === 0 || generic.length === 0) continue;
+    if (f === "landings_day" && specific.every((a) => contexts[a.col]?.all.fullStop)) {
+      // "FS Day Landings" is a subset of "Landings": keep the generic column (apply subtracts the night landings from it).
+      for (const a of specific) {
+        assigned.set(a.col, { ...a, target: IGNORE, confidence: 0.85, reason: `full-stop subset of the "${paths[generic[0].col].label}" landings column` });
+      }
+      continue;
+    }
+    for (const a of generic) {
       assigned.set(a.col, { ...a, target: IGNORE, confidence: 0.85, reason: `covered by the day/night ${f.startsWith("land") ? "landings" : "takeoffs"} columns` });
+    }
+  }
+
+  // 5. A bare "IFR"/"Instrument" hours column yields to explicit Actual / Hood columns (it is their sum, or IFR-rules time).
+  const instCols = [...assigned.values()].filter((a) => (isField(a, "actual_inst") || isField(a, "hood_inst")) && a.source === "synonym");
+  const explicitInst = instCols.some((a) => { const lf = contexts[a.col]?.leaf; return Boolean(lf && lf.inst && !lf.instrumentWord); });
+  if (explicitInst) {
+    for (const a of instCols) {
+      const ctx = contexts[a.col];
+      if (!ctx || !isField(a, "actual_inst") || !ctx.leaf.instrumentWord || ctx.parents.inst) continue;
+      assigned.set(a.col, { ...a, target: IGNORE, confidence: 0.85, reason: "covered by the actual/hood columns" });
+    }
+  }
+
+  // 5b. A block-time column ("Block", "Blockzeit") yields to an explicit flight-time column: block time runs
+  //     chocks-off to chocks-on and is not what a logbook credits, so keeping both would double-count.
+  const blockCols = [...assigned.values()].filter((a) => a.target.kind === "time" && a.source === "synonym" && Boolean(contexts[a.col]?.leaf.blockWord));
+  if (blockCols.length > 0) {
+    const nonBlock = [...assigned.values()].filter((a) => !contexts[a.col]?.leaf.blockWord);
+    const flightTime = nonBlock.find((a) => isField(a, "total_time")) ?? nonBlock.find((a) => a.target.kind === "time");
+    if (flightTime) {
+      for (const a of blockCols) {
+        assigned.set(a.col, { ...a, target: IGNORE, confidence: 0.85, reason: `block time — flight time comes from "${paths[flightTime.col].label}"` });
+      }
+    }
+  }
+
+  // 6. Exact duplicate headers ("Night", "Night"): both stay mapped, the later one is flagged for review.
+  const byLabel = new Map<string, number[]>();
+  for (const p of paths) {
+    if (p.path.length === 0) continue;
+    const key = p.path.map(normaliseSegment).join(" › ");
+    if (!key.trim()) continue;
+    byLabel.set(key, [...(byLabel.get(key) ?? []), p.col]);
+  }
+  for (const cols of byLabel.values()) {
+    if (cols.length < 2) continue;
+    const first = assigned.get(cols[0]);
+    if (!first || first.target.kind === "ignore") continue;
+    for (const col of cols.slice(1)) {
+      const a = assigned.get(col);
+      if (!a || !isAuto(a) || a.target.kind === "ignore" || !sameTarget(a.target, first.target)) continue;
+      assigned.set(col, { ...a, confidence: Math.min(a.confidence, 0.5), reason: `duplicate header "${paths[col].label}" (also column ${colLetter(cols[0])})` });
     }
   }
 
   const columns = [...assigned.values()].sort((a, b) => a.col - b.col);
   return { columns, conventions: detectConventions(columns, grid, dataStart, contexts, opts.template?.mapping.conventions) };
+}
+
+/** Among hour-like columns, the one whose value is the row maximum most often — the total; ties go to the right-most column. */
+function dominantHoursCol(grid: Grid, dataStart: number, cols: number[], maxRows = 500): number {
+  const dom = new Map<number, number>();
+  const end = Math.min(grid.rows.length, dataStart + maxRows);
+  for (let r = dataStart; r < end; r++) {
+    const row = grid.rows[r];
+    if (!row) continue;
+    const vals = cols.map((c) => { const cell = row[c]; return cell?.kind === "number" ? Math.abs(cell.value) : 0; });
+    const max = Math.max(0, ...vals);
+    if (max <= 0) continue;
+    vals.forEach((v, i) => { if (v >= max) dom.set(cols[i], (dom.get(cols[i]) ?? 0) + 1); });
+  }
+  let best = cols[0];
+  for (const c of cols) if ((dom.get(c) ?? 0) >= (dom.get(best) ?? 0)) best = c;
+  return best;
 }
 
 function round2(x: number): number { return Math.round(x * 100) / 100; }

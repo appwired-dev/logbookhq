@@ -15,39 +15,96 @@ export function collapse(s: string): string {
 }
 
 /**
- * Parse a numeric cell, handling US ("1.6", "1,234.56") and European /
- * Korean ("1,6", "0,9") decimal conventions. Copy of import-formats.ts:num.
+ * Parse a plain numeric cell, handling US ("1.6", "1,234.56") and European /
+ * Korean ("1,6", "0,9") decimal conventions. Returns null for anything that
+ * is not wholly a number — "1h30", "90 min", "abc" are never prefix-parsed
+ * to 1 / 90 / NaN the way `parseFloat` would (the unit forms belong to
+ * `parseDurationText`).
  */
-export function num(v: string | undefined): number {
+export function num(v: string | undefined): number | null {
   const s = (v ?? "").trim();
-  if (!s) return 0;
-  if (/^-?\d+,\d{1,2}$/.test(s)) {
+  if (!s) return null;
+  if (/^[-+]?\d+,\d{1,2}$/.test(s)) {
     const n = parseFloat(s.replace(",", "."));
-    return Number.isFinite(n) ? n : 0;
+    return Number.isFinite(n) ? n : null;
   }
-  const n = parseFloat(s.replace(/[,$]/g, ""));
-  return Number.isFinite(n) ? n : 0;
+  const cleaned = s.replace(/[,$]/g, "");
+  if (!/^[-+]?(?:\d+\.?\d*|\.\d+)$/.test(cleaned)) return null;
+  const n = parseFloat(cleaned);
+  return Number.isFinite(n) ? n : null;
+}
+
+const HOUR_UNIT = "(?:h|hr|hrs|hour|hours|std|시간|小时|小時)";
+const MIN_UNIT = "(?:m|min|mins|minute|minutes|분|分|分钟|分鐘)";
+const DUR_CLOCK_RE = /^(\d{1,5}):(\d{1,2})(?::(\d{1,2}))?$/;
+const DUR_PLUS_RE = /^(\d{1,5})\+(\d{2})$/;
+const DUR_H_M_RE = new RegExp(`^(\\d{1,5})\\s*${HOUR_UNIT}\\s*(\\d{1,2})\\s*${MIN_UNIT}?\\.?$`, "i");
+const DUR_H_RE = new RegExp(`^(\\d+(?:[.,]\\d+)?)\\s*${HOUR_UNIT}\\.?$`, "i");
+const DUR_M_RE = /^(\d+(?:[.,]\d+)?)\s*(?:min|mins|minute|minutes|분|分|分钟|分鐘)\.?$/i;
+
+/**
+ * Duration written with separators or units → decimal hours; null when the
+ * text is not a duration.
+ *
+ *   1:30  1:30:00  1001:30  ([h]:mm totals)     1+30
+ *   1h30  1 h 30  0h30  1h30m  1 hr 30 min       1h  1.5h  1,5 h  2 hrs
+ *   90 min  90min  45 minutes
+ *
+ * Plain numbers ("1.5", "0130") are deliberately NOT durations here — the
+ * caller decides how to read those.
+ */
+export function parseDurationText(s: string): number | null {
+  const t = collapse(s ?? "");
+  if (!t) return null;
+  let m = DUR_CLOCK_RE.exec(t);
+  if (m) {
+    const h = +m[1], mm = +m[2], ss = +(m[3] ?? 0);
+    return mm < 60 && ss < 60 ? h + mm / 60 + ss / 3600 : null;
+  }
+  m = DUR_PLUS_RE.exec(t);
+  if (m) {
+    const mm = +m[2];
+    return mm < 60 ? +m[1] + mm / 60 : null;
+  }
+  m = DUR_H_M_RE.exec(t);
+  if (m) {
+    const mm = +m[2];
+    return mm < 60 ? +m[1] + mm / 60 : null;
+  }
+  m = DUR_H_RE.exec(t);
+  if (m) return parseFloat(m[1].replace(",", "."));
+  m = DUR_M_RE.exec(t);
+  if (m) return parseFloat(m[1].replace(",", ".")) / 60;
+  return null;
 }
 
 /**
  * Duration text → decimal hours. "1:30" → 1.5, "0130" → 1.5, "1,5" → 1.5,
- * "1.5" → 1.5. Copy of import-formats.ts:parseTimeValue.
+ * "1.5" → 1.5, "1h30" → 1.5, "90 min" → 1.5; 0 for anything unparseable
+ * (legacy contract: import-formats.ts:parseTimeValue).
  */
 export function parseTimeValue(s: string): number {
   const t = (s ?? "").toString().trim();
   if (!t) return 0;
-  const hm = t.match(/^(\d{1,3}):(\d{1,2})(?::\d{1,2})?$/);
-  if (hm) {
-    const h = parseInt(hm[1], 10);
-    const mm = parseInt(hm[2], 10);
-    if (mm < 60) return h + mm / 60;
-  }
+  const dur = parseDurationText(t);
+  if (dur != null) return dur;
   if (/^\d{4}$/.test(t)) {
     const h = parseInt(t.slice(0, 2), 10);
     const mm = parseInt(t.slice(2), 10);
     if (h < 24 && mm < 60) return h + mm / 60;
   }
-  return num(t);
+  return num(t) ?? 0;
+}
+
+/**
+ * "0130" / "0045" / "1005" — four digits that read as HHMM (hours < 24,
+ * minutes < 60). Only a *column* of these is clock evidence (see
+ * grid.ts:resolveHHMMColumns); a lone "2024" is a year.
+ */
+export function looksLikeHHMM(raw: string): boolean {
+  if (!/^\d{4}$/.test(raw)) return false;
+  const h = parseInt(raw.slice(0, 2), 10), mm = parseInt(raw.slice(2), 10);
+  return h < 24 && mm < 60;
 }
 
 /** Clock time-of-day → minutes since midnight ("08:30" → 510, "0830" → 510). */
@@ -126,9 +183,24 @@ export interface DateReading {
  *   2024년 3월 5일   2024年3月5日   2024. 3. 5.
  *
  * `preferDayFirst` decides ambiguous numeric forms; when undefined the
- * separator decides ("/" → month-first, "." and "-" → day-first).
+ * separator decides ("/" → month-first, "." and "-" → day-first). A value
+ * that is only valid the other way round ("13/06/2024" under month-first)
+ * still parses — the preference is a tie-break, not a filter.
+ *
+ * Two call shapes:
+ *   parseDateText(raw)                    → DateReading | null (grid typing)
+ *   parseDateText(raw, dayFirst)          → DateReading | null (legacy)
+ *   parseDateText(raw, { dayFirst })      → ISO string | null — for apply.ts
+ *     re-parsing a date cell's `raw` under the convention analyze.ts settled on.
  */
-export function parseDateText(input: string, preferDayFirst?: boolean): DateReading | null {
+export function parseDateText(input: string, opts: { dayFirst: boolean }): string | null;
+export function parseDateText(input: string, preferDayFirst?: boolean): DateReading | null;
+export function parseDateText(input: string, arg?: boolean | { dayFirst: boolean }): DateReading | string | null {
+  if (typeof arg === "object" && arg !== null) return parseDateReading(input, arg.dayFirst)?.iso ?? null;
+  return parseDateReading(input, arg);
+}
+
+function parseDateReading(input: string, preferDayFirst?: boolean): DateReading | null {
   let t = collapse(input ?? "");
   if (!t) return null;
   // Strip a trailing time component ("2024-05-12 14:30", "5/12/2024 2:30 PM").
@@ -269,8 +341,13 @@ export const SIM_MAKE_RE = /^sim$|^ftd$|sim|alsim/i;
  */
 export const MULTI_MAKE_RE = /\b(king\s?air|seneca|baron|navajo|duchess|twin|multi[-\s]?engine|crj|dh[c]?8|dhc|atr|a3\d|a32|a33|a34|a35|a38|b7\d{2}|md\d|e\d{3}|ea\d{2}|cl65)/i;
 
-/** Text that marks a totals / subtotal / header-repeat row. */
-export const TOTAL_ROW_RE = /^(?:sub\s*)?totals?\b|^grand\s*total|^sum(?:me)?\b|^합계|^총\s*계|^총계|^소계|^总计|^總計|^合计|^合計|^小计|^gesamt|^summe|^totale?s?\b|^carried\s*forward|^brought\s*forward|^c\/f\b|^b\/f\b/i;
+/**
+ * Text that marks a totals / subtotal / header-repeat row:
+ * "Total", "Totals 2019", "Sub-total", "2020 Total", "Year total",
+ * "Grand Total", "Sum", "Summe", "Carried forward", "Brought forward",
+ * "C/F", "B/F" and the CJK / German / Romance equivalents.
+ */
+export const TOTAL_ROW_RE = /^(?:sub[\s-]*)?totals?\b|^\d{4}\s*(?:sub[\s-]*)?totals?\b|^year(?:ly)?\s*(?:sub[\s-]*)?totals?\b|^grand\s*totals?\b|^sum(?:me)?\b|^합계|^총\s*계|^총계|^소계|^总计|^總計|^合计|^合計|^小计|^gesamt|^summe|^totale?s?\b|^carried\s*forward|^brought\s*forward|^c\/f\b|^b\/f\b/i;
 
 /** Truthy flag cell ("Y", "yes", "✓", "x", "1", "true"). */
 export function isTruthyFlag(v: string | number): boolean {

@@ -65,6 +65,7 @@ Sample rows (index=value):
 ${sampleLines}
 
 Decide the target for these columns: ${cols.join(", ")}.
+A column whose current guess is "ignore" had a header the heuristics did not recognise but holds data — assign a target only when the header and the sample values clearly mean one, otherwise answer "ignore".
 Legal target keys: ${legalKeys.join(", ")}.`;
 
   const { default: Anthropic } = await import("@anthropic-ai/sdk");

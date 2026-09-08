@@ -8,21 +8,25 @@
  *
  * Every cell is typed once here so the rest of the pipeline never touches
  * strings it does not understand:
- *   - numbers: "1.5", "1,5" (decimal comma), "1,234.5", "1:30" (→ 1.5 h) —
- *     the raw text is kept so conventions can be detected later and block
- *     times can still be read as clock times; Excel duration cells (serial
- *     0.0625 formatted "h:mm", which `cellDates` hands over as a Date on the
- *     1899-12-30 epoch) become the same 1.5 h / "1:30" cell;
+ *   - numbers: "1.5", "1,5" (decimal comma), "1,234.5", "1:30" / "1001:30" /
+ *     "1h30" / "90 min" (→ hours) — the raw text is kept so conventions can
+ *     be detected later and block times can still be read as clock times;
+ *     Excel duration cells (serial 0.0625 formatted "h:mm", which
+ *     `cellDates` hands over as a Date on the 1899-12-30 epoch) become the
+ *     same 1.5 h / "1:30" cell; a column of colon-less "0130" values is
+ *     read as HHMM (value 1.5, raw "01:30");
  *   - dates: Date objects, ISO / dd/mm/yyyy / mm/dd/yyyy / yyyy.mm.dd /
  *     dd-MMM-yy / 2024년 3월 5일 … Day-vs-month ambiguity is resolved per
  *     column by which reading keeps every value valid and the column
- *     roughly monotonic;
+ *     roughly monotonic; a genuine tie is recorded in `Grid.dateCols` as
+ *     ambiguous (raw kept) for analyze.ts to settle with priors;
  *   - "-", "—", "n/a" and friends are empty.
  */
 import * as XLSX from "xlsx";
 import type { Cell, Grid, Workbook } from "./types";
 import {
-  collapse, dateObjectToISO, excelDurationHours, excelEpochFraction, isValidYMD, isoDate, parseDateText, parseTimeValue,
+  collapse, dateObjectToISO, excelDurationHours, excelEpochFraction, isValidYMD, isoDate, looksLikeHHMM, parseDateText,
+  parseDurationText,
   type DateReading,
 } from "./util";
 
@@ -228,9 +232,12 @@ export function gridFromValues(sheet: string, raw: RawValue[][]): Grid {
     for (let c = 0; c < width; c++) out[c] = typeValue(r[c]);
     return out;
   });
-  resolveDateColumns(prov, width);
+  const dateCols = resolveDateColumns(prov, width);
+  resolveHHMMColumns(prov, width);
   const rows: Cell[][] = prov.map((r) => r.map((p) => p.cell));
-  return { sheet, rows, width };
+  const grid: Grid = { sheet, rows, width };
+  if (Object.keys(dateCols).length > 0) grid.dateCols = dateCols;
+  return grid;
 }
 
 function typeValue(v: RawValue): Provisional {
@@ -263,12 +270,17 @@ function durationCell(days: number): Provisional {
 const NUM_PLAIN = /^[-+]?\d+(\.\d+)?$/;
 const NUM_THOUSANDS = /^[-+]?\d{1,3}(,\d{3})+(\.\d+)?$/;
 const NUM_DECIMAL_COMMA = /^[-+]?\d+,\d{1,2}$/;
-const NUM_CLOCK = /^\d{1,3}:\d{2}(:\d{2})?$/;
-const NUM_PLUS = /^\d{1,3}\+\d{2}$/;
-const NUM_UNIT = /^(\d+(?:[.,]\d+)?)\s*(h|hr|hrs|hour|hours|시간|小时|小時)$/i;
 const DATE_COMPACT = /^(19|20)\d{6}$/;
 
-/** One string → typed cell (dates provisional; see resolveDateColumns). */
+/**
+ * One string → typed cell (dates provisional; see resolveDateColumns).
+ *
+ * Durations in any written form — "1:30", "1:30:00", "1001:30" ([h]:mm
+ * totals of 1000 h and more), "1+30", "1h30", "1 h 30", "0h30", "1h",
+ * "1.5h", "90 min", "90min" — become hours with the text kept as `raw`.
+ * A bare "0130" is a plain number here; resolveHHMMColumns turns a whole
+ * column of those into clock times.
+ */
 export function typeText(input: string): Provisional {
   const t = collapse(input);
   if (EMPTY_TOKENS.has(t.toLowerCase())) return { cell: EMPTY };
@@ -280,13 +292,8 @@ export function typeText(input: string): Provisional {
   if (NUM_PLAIN.test(t)) return { cell: { kind: "number", value: parseFloat(t), raw: t } };
   if (NUM_THOUSANDS.test(t)) return { cell: { kind: "number", value: parseFloat(t.replace(/,/g, "")), raw: t } };
   if (NUM_DECIMAL_COMMA.test(t)) return { cell: { kind: "number", value: parseFloat(t.replace(",", ".")), raw: t } };
-  if (NUM_CLOCK.test(t)) return { cell: { kind: "number", value: parseTimeValue(t), raw: t } };
-  if (NUM_PLUS.test(t)) {
-    const [h, mm] = t.split("+").map((x) => parseInt(x, 10));
-    if (mm < 60) return { cell: { kind: "number", value: h + mm / 60, raw: t } };
-  }
-  const unit = NUM_UNIT.exec(t);
-  if (unit) return { cell: { kind: "number", value: parseFloat(unit[1].replace(",", ".")), raw: t } };
+  const duration = parseDurationText(t);
+  if (duration != null) return { cell: { kind: "number", value: duration, raw: t } };
 
   const reading = parseDateText(t);
   if (reading) return { cell: { kind: "date", value: reading.iso, raw: t }, reading };
@@ -298,9 +305,14 @@ export function typeText(input: string): Provisional {
  * Decide day-first vs month-first per column for numeric dates such as
  * "05/03/2024": prefer the reading under which every ambiguous value is a
  * valid calendar date; when both are, the one with fewer out-of-order
- * steps; then the separator default ("/" → month-first, "." "-" → day-first).
+ * steps. When that still ties, the data alone cannot decide: the column is
+ * recorded as `ambiguous` in `Grid.dateCols` (with the separator default as
+ * a provisional reading) so analyze.ts can apply a locale / registration
+ * prior and apply.ts can re-parse each cell's `raw` under the convention it
+ * settles on. Every text-parsed date keeps its `raw` for exactly that.
  */
-function resolveDateColumns(prov: Provisional[][], width: number): void {
+function resolveDateColumns(prov: Provisional[][], width: number): NonNullable<Grid["dateCols"]> {
+  const dateCols: NonNullable<Grid["dateCols"]> = {};
   for (let c = 0; c < width; c++) {
     const readings: { r: number; reading: DateReading }[] = [];
     for (let r = 0; r < prov.length; r++) {
@@ -309,24 +321,28 @@ function resolveDateColumns(prov: Provisional[][], width: number): void {
     }
     const ambiguous = readings.filter((x) => x.reading.numeric);
     if (ambiguous.length === 0) continue;
-    const dayFirst = decideDayFirst(readings.map((x) => x.reading));
+    const decision = dayFirstDecision(readings.map((x) => x.reading));
+    dateCols[c] = decision;
     for (const { r, reading } of ambiguous) {
       const n = reading.numeric!;
-      const iso = dayFirst ? (n.dayFirstIso ?? n.monthFirstIso) : (n.monthFirstIso ?? n.dayFirstIso);
+      const iso = decision.dayFirst ? (n.dayFirstIso ?? n.monthFirstIso) : (n.monthFirstIso ?? n.dayFirstIso);
       const cell = prov[r][c].cell;
       if (iso && cell.kind === "date") prov[r][c] = { cell: { kind: "date", value: iso, raw: cell.raw }, reading };
     }
   }
+  return dateCols;
 }
 
-export function decideDayFirst(readings: DateReading[]): boolean {
+/** Day-first decision for one column's readings; see resolveDateColumns for the rules. */
+export function dayFirstDecision(readings: DateReading[]): { dayFirst: boolean; ambiguous: boolean } {
   const amb = readings.filter((r) => r.numeric);
-  if (amb.length === 0) return false;
+  if (amb.length === 0) return { dayFirst: false, ambiguous: false };
   const dfValid = amb.every((r) => r.numeric!.dayFirstIso);
   const mfValid = amb.every((r) => r.numeric!.monthFirstIso);
   const separatorDefault = amb[0].numeric!.defaultDayFirst;
-  if (dfValid !== mfValid) return dfValid;
-  if (!dfValid) return separatorDefault; // mixed validity — per-cell fallback handles it
+  if (dfValid !== mfValid) return { dayFirst: dfValid, ambiguous: false };
+  // Mixed validity — neither convention fits every cell; the per-cell fallback handles it.
+  if (!dfValid) return { dayFirst: separatorDefault, ambiguous: false };
   const seq = (dayFirst: boolean) => readings.map((r) => {
     if (!r.numeric) return r.iso;
     return (dayFirst ? r.numeric.dayFirstIso : r.numeric.monthFirstIso) ?? r.iso;
@@ -342,8 +358,45 @@ export function decideDayFirst(readings: DateReading[]): boolean {
   const rev = (s: string[]) => [...s].reverse();
   const dayScore = Math.min(invDay, inversions(rev(seq(true))));
   const monthScore = Math.min(invMonth, inversions(rev(seq(false))));
-  if (dayScore !== monthScore) return dayScore < monthScore;
-  return separatorDefault;
+  if (dayScore !== monthScore) return { dayFirst: dayScore < monthScore, ambiguous: false };
+  // Every value is a valid date both ways and both orders are equally
+  // monotonic: the separator is a hint, not evidence — leave it to priors.
+  return { dayFirst: separatorDefault, ambiguous: true };
+}
+
+/** Boolean view of `dayFirstDecision` (kept for callers that only need the reading). */
+export function decideDayFirst(readings: DateReading[]): boolean {
+  return dayFirstDecision(readings).dayFirst;
+}
+
+/**
+ * Columns written as HHMM without a colon ("0130", "0045", "1005"): when at
+ * least 60 % of a column's numeric cells read as HHMM and at least one has
+ * a leading zero (a column of years — "2019", "2020" — or flight numbers
+ * never does), each such cell becomes the hours cell "01:30" would have
+ * produced: value 1.5, raw "01:30". shape.ts then counts the raw as clock
+ * evidence and the mapping sets `clockTimes`, exactly as for "1:30" text.
+ */
+function resolveHHMMColumns(prov: Provisional[][], width: number): void {
+  for (let c = 0; c < width; c++) {
+    let numeric = 0, hhmm = 0, leadingZero = 0;
+    for (let r = 0; r < prov.length; r++) {
+      const cell = prov[r][c]?.cell;
+      if (!cell || cell.kind !== "number") continue;
+      numeric++;
+      if (cell.raw && looksLikeHHMM(cell.raw)) {
+        hhmm++;
+        if (cell.raw.startsWith("0")) leadingZero++;
+      }
+    }
+    if (hhmm === 0 || leadingZero === 0 || hhmm < numeric * 0.6) continue;
+    for (let r = 0; r < prov.length; r++) {
+      const cell = prov[r][c]?.cell;
+      if (!cell || cell.kind !== "number" || !cell.raw || !looksLikeHHMM(cell.raw)) continue;
+      const h = parseInt(cell.raw.slice(0, 2), 10), mm = parseInt(cell.raw.slice(2), 10);
+      prov[r][c] = { cell: { kind: "number", value: h + mm / 60, raw: `${cell.raw.slice(0, 2)}:${cell.raw.slice(2)}` } };
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------

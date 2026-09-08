@@ -2,8 +2,13 @@
  * Header band detection.
  *
  * The header band is the run of ≤ 4 consecutive text rows directly above the
- * first row that looks like flight data (a date plus either ≥ 2 numeric
- * cells or an aircraft-looking text cell). Title rows (one non-empty cell),
+ * first row that looks like flight data (a date plus either a numeric cell
+ * or an aircraft-looking text cell — one hours column and a free-text
+ * aircraft such as "Piper Cherokee" is a flight). Date-bearing rows sitting
+ * directly above that first row are data too (an entry with no hours yet),
+ * so `dataStart` is never below a dated row; any dated row that remains
+ * above the band (a "Printed 05/03/2024" preamble) is counted in
+ * `dateRowsAbove` for reconcile to flag. Title rows (one non-empty cell),
  * blank rows and preambles end the band.
  *
  * Multi-row headers exported from Numbers/Excel lose their merged cells:
@@ -27,12 +32,17 @@ export function isDateLikeCell(c: Cell): boolean {
   return c.kind === "number" && Number.isInteger(c.value) && looksLikeExcelSerial(c.value);
 }
 
+/** A row with at least one date-like cell (a real date or an Excel serial in the logbook range). */
+export function hasDateCell(row: Cell[] | undefined): boolean {
+  return !!row && row.some(isDateLikeCell);
+}
+
+/** A flight row: a date plus either a numeric cell (hours, landings) or an aircraft-looking text cell. */
 export function looksLikeDataRow(row: Cell[] | undefined): boolean {
   if (!row || rowIsEmpty(row)) return false;
-  const hasDate = row.some(isDateLikeCell);
-  if (!hasDate) return false;
+  if (!hasDateCell(row)) return false;
   const k = countKinds(row);
-  if (k.number >= 2) return true;
+  if (k.number >= 1) return true;
   return row.some((c) => c.kind === "text" && AIRCRAFT_TEXT_RE.test(c.value));
 }
 
@@ -50,6 +60,9 @@ function nonEmptyCount(row: Cell[]): number {
   return k.number + k.date + k.text;
 }
 
+/** Blank spacer rows tolerated between the data and its header (before any band row is found). */
+const MAX_SPACER_ROWS = 2;
+
 export function detectHeaderBand(grid: Grid): HeaderBand {
   const rows = grid.rows;
   let firstData = rows.findIndex((r) => looksLikeDataRow(r));
@@ -58,15 +71,26 @@ export function detectHeaderBand(grid: Grid): HeaderBand {
     // No data-looking rows: take the first text row as the header (an
     // empty logbook still gets a mapping table), data starts right after.
     const hdr = rows.findIndex((r) => isTextRow(r) && nonEmptyCount(r) >= 2);
-    if (hdr < 0) return { rows: [], dataStart: rows.length, paths: emptyPaths(grid.width) };
+    if (hdr < 0) return { rows: [], dataStart: rows.length, paths: emptyPaths(grid.width), dateRowsAbove: countDateRows(rows, rows.length) };
     firstData = hdr + 1;
+  } else {
+    // Dated rows directly above the first data-looking row are entries too
+    // (no hours logged yet, aircraft not recognised): a date never sits
+    // above dataStart when it is contiguous with the data.
+    while (firstData > 0 && hasDateCell(rows[firstData - 1])) firstData--;
   }
 
   const bandDesc: number[] = [];
+  let spacers = 0;
   for (let r = firstData - 1; r >= 0 && bandDesc.length < MAX_HEADER_ROWS; r--) {
     const row = rows[r];
-    if (rowIsEmpty(row)) break;
-    if (looksLikeDataRow(row)) break;
+    if (rowIsEmpty(row)) {
+      // A blank spacer between the data and its header is skipped; a blank
+      // above a found band ends it (title + blank + header layouts).
+      if (bandDesc.length === 0 && spacers < MAX_SPACER_ROWS) { spacers++; continue; }
+      break;
+    }
+    if (looksLikeDataRow(row) || hasDateCell(row)) break;
     const n = nonEmptyCount(row);
     if (n === 1 && bandDesc.length > 0) break; // title row above the band
     if (n === 1 && bandDesc.length === 0) {
@@ -78,7 +102,14 @@ export function detectHeaderBand(grid: Grid): HeaderBand {
     bandDesc.push(r);
   }
   const band = bandDesc.reverse();
-  return { rows: band, dataStart: firstData, paths: buildPaths(grid, band) };
+  return { rows: band, dataStart: firstData, paths: buildPaths(grid, band), dateRowsAbove: countDateRows(rows, firstData) };
+}
+
+/** Date-bearing rows in rows[0, end) — rows the band left above dataStart. */
+function countDateRows(rows: Cell[][], end: number): number {
+  let n = 0;
+  for (let r = 0; r < Math.min(end, rows.length); r++) if (hasDateCell(rows[r])) n++;
+  return n;
 }
 
 function emptyPaths(width: number): HeaderPath[] {
