@@ -363,16 +363,93 @@ tr.row-focus:focus-visible > .col-pin {
 
 /* Phase 3 — charts */
 :root {
-  /* Globe stage backdrop ("space"). The WebGL scene itself (ocean, land,
-     arcs) is coloured by three.js materials and cannot read CSS variables,
-     so those literals stay in app/app/charts/Globe.tsx. */
+  /* Globe stage backdrop ("space"). */
   --globe-space-1: 28 41 66;
   --globe-space-2: 15 23 42;
   --globe-space-3: 11 17 32;
+
+  /* Globe HUD — panels, buttons and text floating over the dark stage. */
+  --globe-hud: 2 6 23;
+  --globe-ink: 255 255 255;
+  --globe-ink-accent: 253 230 138;
+  --globe-ink-info: 186 230 253;
+
+  /* WebGL scene palette. three.js and globe.gl parse colour strings with their
+     own regexes and cannot resolve var(), so app/app/charts/Globe.tsx reads
+     these triples off :root at runtime through its cssVar() helper. This is
+     the only place the globe's deliberately dark "space" palette is defined —
+     no colour literals live in the TSX. */
+  --globe-ocean: 18 64 122;
+  --globe-ocean-deep: 10 42 85;
+  --globe-ocean-spec: 59 95 149;
+  --globe-land: 63 125 90;
+  --globe-land-hover: 90 163 119;
+  --globe-graticule: 226 240 220;
+  --globe-atmosphere: 96 165 250;
+  --globe-hub: 251 191 36;
+  --globe-dot: 255 255 255;
+  --globe-arc-from: 253 224 71;
+  --globe-arc-to: 217 119 6;
+  --globe-arc-sel-from: 254 240 138;
+  --globe-arc-sel-to: 245 158 11;
+  --globe-ring: 251 191 36;
+  --globe-light: 255 255 255;
+  --globe-light-sky: 230 240 255;
+  --globe-light-ground: 11 26 51;
 }
 .globe-stage {
   background: radial-gradient(ellipse at 50% 42%,
     rgb(var(--globe-space-1)) 0%, rgb(var(--globe-space-2)) 62%, rgb(var(--globe-space-3)) 100%);
+}
+
+@layer components {
+  /* Floating panels over the globe stage (route badge, top-routes list). */
+  .globe-hud {
+    @apply backdrop-blur;
+    background: rgb(var(--globe-hud) / 0.58);
+    border: 1px solid rgb(var(--globe-ink) / 0.12);
+    color: rgb(var(--globe-ink) / 0.92);
+  }
+  /* Text on the dark stage: the --ink-* floor governs light surfaces, these
+     three carry the equivalent contrast against "space". */
+  .globe-ink-1 { color: rgb(var(--globe-ink) / 0.95); }
+  .globe-ink-2 { color: rgb(var(--globe-ink) / 0.74); }
+  .globe-ink-accent { color: rgb(var(--globe-ink-accent)); }
+  .globe-ink-info { color: rgb(var(--globe-ink-info)); }
+
+  /* Icon buttons — 44px targets below sm, compact from sm up. */
+  .globe-btn {
+    @apply grid place-items-center w-11 h-11 sm:w-8 sm:h-8 rounded-control backdrop-blur
+           transition-colors duration-fast
+           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-glow;
+    background: rgb(var(--globe-hud) / 0.58);
+    border: 1px solid rgb(var(--globe-ink) / 0.12);
+    color: rgb(var(--globe-ink) / 0.85);
+  }
+  .globe-btn:hover { background: rgb(var(--globe-hud) / 0.8); color: rgb(var(--globe-ink)); }
+
+  /* Touch-arming pill ("Tap to explore the globe" / "Done"). */
+  .globe-pill {
+    @apply inline-flex items-center gap-1.5 min-h-11 sm:min-h-9 px-3.5 rounded-pill
+           text-2xs font-semibold backdrop-blur transition-colors duration-fast
+           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-glow;
+    background: rgb(var(--globe-hud) / 0.62);
+    border: 1px solid rgb(var(--globe-ink) / 0.2);
+    color: rgb(var(--globe-ink) / 0.95);
+  }
+  .globe-pill:hover { background: rgb(var(--globe-hud) / 0.82); }
+
+  /* Top-routes rows + their traffic meter. */
+  .globe-route {
+    @apply block w-full min-h-11 rounded-control px-1.5 py-1 text-left opacity-80
+           transition-opacity duration-fast
+           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-glow;
+  }
+  .globe-route:hover, .globe-route.is-selected { @apply opacity-100; }
+  .globe-meter { background: rgb(var(--globe-ink) / 0.14); }
+  .globe-meter-fill {
+    background: linear-gradient(90deg, rgb(var(--globe-arc-from)), rgb(var(--globe-arc-to)));
+  }
 }
 /* Recharts paints its internals with presentation attributes; stylesheet
    rules win over those, which is how the design tokens reach the axis ticks,

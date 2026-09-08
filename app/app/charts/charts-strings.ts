@@ -62,6 +62,8 @@ type LocalStrings = {
   colType: string;
   colHours: string;
   colShare: string;
+  typesEmptyTitle: string;
+  typesEmptyBody: string;
   rollingEyebrow: string;
   /** `{peak}` / `{ceiling}` / `{reference}` are interpolated. */
   rollingCaption: string;
@@ -94,6 +96,8 @@ const LOCAL: Record<Locale, LocalStrings> = {
     colType: "Aircraft type",
     colHours: "Hours",
     colShare: "Share",
+    typesEmptyTitle: "No aircraft types yet",
+    typesEmptyBody: "Flights need a make and model before they can be totalled by type.",
     rollingEyebrow: "Flight-time limit",
     rollingCaption: "Peak {peak} h · ceiling {ceiling} h · {reference}",
     ceilingLabel: "{reference} · {ceiling} h",
@@ -141,6 +145,8 @@ const LOCAL: Record<Locale, LocalStrings> = {
     colType: "기종",
     colHours: "시간",
     colShare: "비율",
+    typesEmptyTitle: "아직 기종이 없습니다",
+    typesEmptyBody: "기종이 입력된 비행만 기종별로 집계됩니다.",
     rollingEyebrow: "비행시간 제한",
     rollingCaption: "최고 {peak}시간 · 상한 {ceiling}시간 · {reference}",
     ceilingLabel: "{reference} · {ceiling}시간",
@@ -188,6 +194,8 @@ const LOCAL: Record<Locale, LocalStrings> = {
     colType: "机型",
     colHours: "小时",
     colShare: "占比",
+    typesEmptyTitle: "暂无机型",
+    typesEmptyBody: "只有填写了机型的飞行才能按机型汇总。",
     rollingEyebrow: "飞行时间限制",
     rollingCaption: "峰值 {peak} 小时 · 上限 {ceiling} 小时 · {reference}",
     ceilingLabel: "{reference} · {ceiling} 小时",
@@ -235,6 +243,8 @@ const LOCAL: Record<Locale, LocalStrings> = {
     colType: "Tipo de aeronave",
     colHours: "Horas",
     colShare: "Proporción",
+    typesEmptyTitle: "Aún no hay tipos de aeronave",
+    typesEmptyBody: "Los vuelos necesitan marca y modelo para sumarse por tipo.",
     rollingEyebrow: "Límite de tiempo de vuelo",
     rollingCaption: "Pico {peak} h · techo {ceiling} h · {reference}",
     ceilingLabel: "{reference} · {ceiling} h",
