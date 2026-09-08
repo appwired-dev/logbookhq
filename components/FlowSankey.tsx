@@ -53,7 +53,7 @@ function NodeShape({ x = 0, y = 0, width = 0, height = 0, payload, fmt, mode, la
   const compact = nameOnly || height < 24;
   return (
     <g>
-      <rect x={x} y={y} width={width} height={Math.max(height, 2)} rx={3} style={{ fill: payload?.color ?? NODE_NEUTRAL }} />
+      <rect className="lp-snode" x={x} y={y} width={width} height={Math.max(height, 2)} rx={3} style={{ fill: payload?.color ?? NODE_NEUTRAL }} />
       {compact ? (
         <text x={lx} y={y + height / 2} textAnchor={anchor} dominantBaseline="middle" className="text-2xs fill-ink-1">
           <tspan fontWeight={600}>{name}</tspan>
@@ -89,7 +89,7 @@ function LinkShape({
     `C${targetControlX},${targetY + h} ${sourceControlX},${sourceY + h} ${sourceX},${sourceY + h}`,
     "Z",
   ].join(" ");
-  return <path d={d} stroke="none" style={{ fill: payload?.target?.color ?? NODE_NEUTRAL, fillOpacity: 0.38 }} />;
+  return <path className="lp-ribbon" d={d} stroke="none" style={{ fill: payload?.target?.color ?? NODE_NEUTRAL }} />;
 }
 
 type TooltipEntry = { payload?: unknown; value?: unknown };

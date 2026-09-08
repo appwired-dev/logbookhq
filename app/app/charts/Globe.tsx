@@ -93,6 +93,10 @@ export interface GlobeProps {
 }
 
 // ---------- spherical helpers ----------
+// OrbitControls auto-rotate: full orbit ≈ 60 / speed seconds (three.js default
+// is 2.0 = 30 s). 0.08 ≈ one slow orbit every ~12 min.
+const AUTO_ROTATE_SPEED = 0.08;
+
 const R_EARTH_KM = 6371;
 const toRad = (d: number) => (d * Math.PI) / 180;
 const toDeg = (r: number) => (r * 180) / Math.PI;
@@ -278,6 +282,14 @@ export default function FlightGlobe({ airports, arcs: rawArcs, strings, locale }
     if (c) c.autoRotate = rotateOn;
   }, [rotateOn]);
 
+  // Auto-rotate speed in its own effect, not only in onGlobeReady (which fires
+  // once at init and is NOT re-run by Fast Refresh) — so tuning the value
+  // actually re-applies to the live globe instead of needing a hard reload.
+  useEffect(() => {
+    const c = globeRef.current?.controls();
+    if (c) c.autoRotateSpeed = AUTO_ROTATE_SPEED;
+  }, [ready]);
+
   const onHoverObj = useCallback((obj: object | null) => {
     hoveringRef.current = Boolean(obj);
     const c = globeRef.current?.controls();
@@ -302,7 +314,7 @@ export default function FlightGlobe({ airports, arcs: rawArcs, strings, locale }
     controls.minDistance = 125;
     controls.maxDistance = 480;
     controls.autoRotate = rotateOnRef.current;
-    controls.autoRotateSpeed = 0.45;
+    controls.autoRotateSpeed = AUTO_ROTATE_SPEED;
     controls.addEventListener("start", () => {
       draggingRef.current = true;
       controls.autoRotate = false;

@@ -782,3 +782,79 @@ tr.row-focus:focus-visible > .col-pin {
 @media (prefers-reduced-motion: reduce) {
   .lp-h1-3d { animation: none; background-position: 0 0; }
 }
+
+/* ============================================================================
+   Light-app polish (Phase 5): background gradient, pointer light, header HQ
+   sheen, and an interactive / 3D Sankey. Scoped to the logged-in app.
+   ========================================================================== */
+
+/* subtle depth gradient behind the app shell (was a flat canvas) */
+.app-shell {
+  background:
+    radial-gradient(1150px 540px at 50% -10%, rgb(var(--brand) / 0.06), transparent 60%),
+    radial-gradient(900px 520px at 94% 2%, rgb(var(--chart-4) / 0.05), transparent 58%),
+    linear-gradient(180deg, #F8FAFD 0%, #EDF1F7 100%);
+  background-attachment: fixed;
+}
+
+/* pointer light — a soft brand-tinted shade that eases to the cursor and
+   settles, casting gentle depth over the light UI (multiply = reads as a
+   colored soft shadow rather than a glow). Below the header, above content. */
+.app-cursor-glow {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 560px;
+  height: 560px;
+  margin: -280px 0 0 -280px;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: -1; /* behind the cards/tiles, above the shell gradient */
+  background: radial-gradient(circle, rgb(var(--brand) / 0.12) 0%, rgb(var(--brand) / 0.06) 36%, transparent 68%);
+  mix-blend-mode: multiply;
+  opacity: 0;
+  transition: opacity .6s ease;
+  will-change: transform;
+}
+.app-cursor-glow.is-on { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .app-cursor-glow { display: none; } }
+@media (hover: none) { .app-cursor-glow { display: none; } }
+
+/* header wordmark: a glint travels WITHIN the "HQ" letters, then settles back
+   to the accent colour (currentColor keeps it correct on dark and light). */
+.hq-sheen {
+  display: inline-block;
+  background: linear-gradient(100deg, currentColor 0 42%, rgba(255,255,255,.95) 50%, currentColor 58% 100%);
+  background-size: 260% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: hq-sheen 7s ease-in-out 2.5s infinite;
+}
+@keyframes hq-sheen {
+  0%        { background-position: 150% 0; }
+  22%, 100% { background-position: -50% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hq-sheen { -webkit-text-fill-color: currentColor; animation: none; }
+}
+
+/* Sankey: 3D ribbons + nodes, and a hover that lifts one string and dims the
+   rest (the recharts tooltip supplies the "applicable text"). */
+.lp-ribbon {
+  fill-opacity: 0.4;
+  filter: drop-shadow(0 1px 2px rgb(15 23 42 / 0.09));
+  transition: fill-opacity .18s ease, filter .18s ease;
+  cursor: pointer;
+}
+.lp-snode {
+  filter: drop-shadow(0 1px 2px rgb(15 23 42 / 0.13));
+}
+/* Hover: lighten the rest, nudge the hovered one only a hint darker than
+   its resting 0.4 — a gentle emphasis, not a bold highlight. */
+svg:has(.lp-ribbon:hover) .lp-ribbon { fill-opacity: 0.2; }
+.lp-ribbon:hover {
+  fill-opacity: 0.52 !important;
+  filter: drop-shadow(0 2px 5px rgb(15 23 42 / 0.16));
+}
+@media (prefers-reduced-motion: reduce) { .lp-ribbon { transition: none; } }

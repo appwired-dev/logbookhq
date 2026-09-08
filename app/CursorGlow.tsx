@@ -8,7 +8,7 @@ import { useEffect, useRef } from "react";
  * transform updates on a rAF loop that idles once the glow has caught up, so it
  * costs nothing when the mouse is still. Disabled for touch / reduced-motion.
  */
-export default function CursorGlow() {
+export default function CursorGlow({ className = "lp-cursor-glow" }: { className?: string }) {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -56,5 +56,5 @@ export default function CursorGlow() {
     };
   }, []);
 
-  return <div ref={ref} className="lp-cursor-glow" aria-hidden />;
+  return <div ref={ref} className={className} aria-hidden />;
 }
