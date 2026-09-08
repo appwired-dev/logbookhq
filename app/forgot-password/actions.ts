@@ -115,8 +115,10 @@ export async function requestPasswordReset(formData: FormData): Promise<ForgotPa
     return { status: "error" };
   }
   const supabase = await createClient();
+  const captchaToken = String(formData.get("cf-turnstile-response") ?? "") || undefined;
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
     redirectTo: `${origin}/auth/callback?next=/reset-password`,
+    captchaToken,
   });
 
   if (error && !isRateLimited(error)) {

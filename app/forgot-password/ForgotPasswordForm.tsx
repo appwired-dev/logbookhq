@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Alert, Button, Field } from "@/components/ui";
 import { recoveryStrings } from "@/app/auth/recovery-strings";
 import { looksLikeEmail } from "@/app/auth/recovery";
+import { Turnstile } from "@/components/ui/Turnstile";
 import type { Locale } from "@/lib/i18n";
 import { requestPasswordReset, type ForgotPasswordResult } from "./actions";
 
@@ -34,6 +35,8 @@ export default function ForgotPasswordForm({ locale }: { locale: Locale }) {
   const [fieldError, setFieldError] = useState<string | null>(null);
   const outcomeRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  // Single-use token: a rejected send remounts the widget for a fresh one.
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     if (outcome) outcomeRef.current?.focus();
@@ -59,6 +62,7 @@ export default function ForgotPasswordForm({ locale }: { locale: Locale }) {
         inputRef.current?.focus();
         return;
       }
+      if (result.status === "error") setAttempt((n) => n + 1);
       setSubmitted(email);
       setOutcome(result.status);
     });
@@ -120,6 +124,8 @@ export default function ForgotPasswordForm({ locale }: { locale: Locale }) {
           onChange={() => fieldError && setFieldError(null)}
         />
       </Field>
+
+      <Turnstile key={attempt} />
 
       <Button type="submit" variant="primary" className={`w-full ${CONTROL}`} loading={pending}>
         {pending ? s("sending") : s("sendLink")}
