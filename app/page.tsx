@@ -49,7 +49,7 @@ export default function LandingPage() {
           <div className="grid lg:grid-cols-[1.05fr_0.95fr] gap-12 lg:gap-10 items-center">
             <div>
               <div className="lp-eyebrow lp-rise" style={{ animationDelay: "0ms" }}>Import · any format · any language</div>
-              <h1 className="lp-h1 mt-4 lp-rise" style={{ animationDelay: "40ms" }}>
+              <h1 className="lp-h1 lp-h1-3d mt-4">
                 Bring the logbook<br />you already have.
               </h1>
               <p className="lp-lede mt-5 max-w-xl lp-rise" style={{ animationDelay: "90ms" }}>
@@ -197,7 +197,7 @@ export default function LandingPage() {
         <section className="mx-auto max-w-3xl px-5 pb-24 pt-6 text-center">
           <h2 className="lp-h2">Bring your logbook.<br /><span className="lp-amber-text">We&apos;ll read every column.</span></h2>
           <div className="mt-7 flex justify-center">
-            <Link className="lp-btn lp-btn-primary" style={{ height: 52, padding: "0 28px", fontSize: 16 }} href="/signup">
+            <Link className="lp-btn lp-btn-primary lp-btn-sheen" style={{ height: 52, padding: "0 28px", fontSize: 16 }} href="/signup">
               Import your logbook free
             </Link>
           </div>
