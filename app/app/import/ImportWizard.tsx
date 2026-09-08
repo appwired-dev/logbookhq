@@ -1,5 +1,6 @@
 "use client";
 
+import { prepareUpload } from "./shrink-upload";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 // CircleCheck is not in components/ui/icons yet (read-only for this change) — fold it in later.
@@ -37,6 +38,8 @@ export default function ImportWizard({ locale, augHalfCredit }: { locale: Locale
 
   const [step, setStep] = useState<Step>(1);
   const [file, setFile] = useState<File | null>(null);
+  /** What actually goes over the wire: the picked file, or its compact .xlsx rewrite when it is a .numbers file or too big for a function payload. */
+  const [upload, setUpload] = useState<File | null>(null);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [mapping, setMapping] = useState<ColumnMapping | null>(null);
   const [preview, setPreview] = useState<PreviewData | null>(null);
@@ -92,6 +95,7 @@ export default function ImportWizard({ locale, augHalfCredit }: { locale: Locale
 
   function pickFile(f: File | null) {
     setError(null);
+    setUpload(null);
     if (!f) { setFile(null); return; }
     if (!isAllowedExtension(f.name)) { setFile(null); setError(s("errType")); return; }
     if (f.size > MAX_FILE_BYTES) { setFile(null); setError(s("errTooLarge", { size: (f.size / 1024 / 1024).toFixed(1) })); return; }
@@ -102,8 +106,15 @@ export default function ImportWizard({ locale, augHalfCredit }: { locale: Locale
     if (!file) { setError(s("errNoFile")); return; }
     setBusy("analyze");
     setError(null);
+    const prepared = await prepareUpload(file);
+    if (!prepared.ok) {
+      setBusy(null);
+      setError(prepared.reason === "too_large" ? s("errTooLargeUpload") : s("errUnreadable"));
+      return;
+    }
+    setUpload(prepared.file);
     const fd = new FormData();
-    fd.set("file", file);
+    fd.set("file", prepared.file);
     const r = await run(() => analyzeImportAction(fd));
     setBusy(null);
     if (!r) return;
@@ -188,7 +199,7 @@ export default function ImportWizard({ locale, augHalfCredit }: { locale: Locale
     setBusy("preview");
     setError(null);
     const fd = new FormData();
-    fd.set("file", file);
+    fd.set("file", upload ?? file);
     fd.set("analysis", JSON.stringify(analysis));
     fd.set("mapping", key);
     const r = await run(() => previewImportAction(fd));
@@ -206,7 +217,7 @@ export default function ImportWizard({ locale, augHalfCredit }: { locale: Locale
     setBusy("commit");
     setError(null);
     const fd = new FormData();
-    fd.set("file", file);
+    fd.set("file", upload ?? file);
     fd.set("analysis", JSON.stringify(analysis));
     fd.set("mapping", JSON.stringify(mapping));
     fd.set("mode", mode);
