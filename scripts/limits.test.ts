@@ -8,7 +8,7 @@
  *      and `REGIME_RULES[r].flightTimeWindows` still mirrors `ruleSets[0]`
  *      (the charts page reads the top-level field).
  *   2. Canada's rule-set switch: CAR 700.28 is the default (1,000 h / 365 d),
- *      the pre-2020 CARs 700.15 set stays selectable (1,200 h / 365 d).
+ *      the superseded CARs 700.15 set is NOT offered.
  *   3. Rolling windows over a synthetic flight list. Window semantics:
  *      BOTH ENDS INCLUSIVE — a `days: 28` window ending 2026-03-15 starts
  *      2026-02-16 and covers 28 calendar dates; a flight dated exactly on
@@ -161,31 +161,27 @@ test("ICAO is presented as typical State limits, not a hard rule", () => {
 // 2. Canada: 700.28 default, 700.15 legacy — and yearlyCeiling
 // ---------------------------------------------------------------------------
 
-test("CA defaults to CAR 700.28 and keeps CARs 700.15 selectable", () => {
+test("CA offers only the current CAR 700.28 set; the superseded 700.15 rules are gone", () => {
   const sets = ruleSetsFor("CA");
-  assert.equal(sets.length, 2);
-  assert.equal(sets[0].id, "car-700-28");
+  assert.equal(sets.length, 1, "only the current rule set is offered");
   assert.equal(sets[0].reference, "CAR 700.28");
-  assert.equal(sets[1].id, "cars-700-15");
-  assert.match(sets[1].label, /pre-2020/);
-  assert.deepEqual(rowsOf(sets[1].flightTimeWindows), [
-    [365, 1200, "rolling-days", undefined],
-    [90, 300, "rolling-days", undefined],
-    [30, 120, "rolling-days", undefined],
-    [7, 40, "rolling-days", undefined],
-  ]);
+  assert.deepEqual(
+    sets[0].flightTimeWindows.map((w) => [w.days, w.max]),
+    [[365, 1000], [90, 300], [28, 112]],
+  );
+  // Nothing anywhere may still cite the repealed section or its 1,200 h ceiling.
+  const all = ruleSetsFor("CA").flatMap((x) => x.flightTimeWindows);
+  assert.ok(!all.some((w) => /700\.15/.test(w.citation ?? "")), "no superseded citation");
+  assert.ok(!all.some((w) => w.max === 1200), "no 1,200 h ceiling");
 });
 
-test("yearlyCeiling: CA = 1,000 h (700.28), legacy set = 1,200 h (700.15)", () => {
-  const current = yearlyCeiling("CA");
-  assert.equal(current.max, 1000);
-  assert.equal(current.days, 365);
-  assert.match(current.reference, /700\.28/);
-
-  const legacy = yearlyCeiling("CA", "cars-700-15");
-  assert.equal(legacy.max, 1200);
-  assert.equal(legacy.days, 365);
-  assert.match(legacy.reference, /700\.15/);
+test("yearlyCeiling: CA = 1,000 h (700.28), and an unknown set id falls back to the default", () => {
+  const ca = yearlyCeiling("CA");
+  assert.equal(ca.max, 1000);
+  assert.equal(ca.days, 365);
+  assert.match(ca.reference, /700\.28/);
+  // A stale id persisted in a browser must not resurrect old numbers.
+  assert.equal(yearlyCeiling("CA", "cars-700-15").max, 1000);
 });
 
 test("yearlyCeiling: annual cap per regime", () => {
@@ -200,9 +196,10 @@ test("yearlyCeiling: annual cap per regime", () => {
 });
 
 test("resolveRuleSet falls back to the default for unknown/absent ids", () => {
-  assert.equal(resolveRuleSet("CA").id, "car-700-28");
-  assert.equal(resolveRuleSet("CA", "nope").id, "car-700-28");
-  assert.equal(resolveRuleSet("CA", "cars-700-15").id, "cars-700-15");
+  assert.equal(resolveRuleSet("CA").reference, "CAR 700.28");
+  assert.equal(resolveRuleSet("CA", "nope").reference, "CAR 700.28");
+  // CA has a single set, so it resolves through the synthesized default like every other single-set regime.
+  assert.equal(resolveRuleSet("CA", "cars-700-15").reference, "CAR 700.28", "a stale id resolves to the current set");
   assert.equal(resolveRuleSet("EASA", "cars-700-15").id, ruleSetsFor("EASA")[0].id);
 });
 
@@ -272,11 +269,9 @@ test("rule-set choice changes the caps but not the hours", () => {
   const today = day("2026-03-15");
   const flights = [flight("2026-03-01", 50)];
   const current = computeCurrencyForRegime(flights, "CA", today).windows[0];
-  const legacy = computeCurrencyForRegime(flights, "CA", today, "cars-700-15").windows[0];
-  assert.equal(current.max, 1000);
-  assert.equal(legacy.max, 1200);
-  assert.equal(current.used, 50);
-  assert.equal(legacy.used, 50);
+  const stale = computeCurrencyForRegime(flights, "CA", today, "cars-700-15").windows[0];
+  assert.equal(stale.max, 1000, "a stale rule-set id yields the current ceiling, not 1,200");
+  assert.equal(stale.used, 50);
 });
 
 // ---------------------------------------------------------------------------

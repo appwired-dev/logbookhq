@@ -10,8 +10,9 @@
  *
  * Sources (flight-time limits — audited 2026-09):
  *   CA    — CAR 700.28 (SOR/2018-269; in force 12 Dec 2020 for 705 operators,
- *           12 Dec 2022 for 703/704). The pre-2020 CARs 700.15 set is kept
- *           selectable for logbooks that pre-date the change.
+ *           12 Dec 2022 for 703/704). The superseded CARs 700.15 numbers are
+ *           deliberately NOT offered — a repealed ceiling sitting beside the
+ *           current one is something a pilot could plan against by mistake.
  *   ICAO  — Annex 6 Part I, 4.10 + Attachment A. ICAO sets NO numbers; the
  *           State of the Operator does. Our ICAO set is labelled "typical
  *           State limits" and must not be read as a hard rule.
@@ -147,18 +148,6 @@ const CA_700_28: FlightTimeWindow[] = [
   { label: "Last 28 Days",  days: 28,  max: 112,  citation: "CAR 700.28" },
 ];
 
-/** Canada, superseded. CARs 700.15 as it stood before the 2018 FDT overhaul. */
-const CA_700_15: FlightTimeWindow[] = [
-  // 700.15(1)(a) — 1,200 h in any 365 consecutive days.
-  { label: "Last 365 Days", days: 365, max: 1200, citation: "CARs 700.15 (superseded)" },
-  // 700.15(1)(b) — 300 h in any 90 consecutive days.
-  { label: "Last 90 Days",  days: 90,  max: 300,  citation: "CARs 700.15 (superseded)" },
-  // 700.15(1)(c) — 120 h in any 30 consecutive days.
-  { label: "Last 30 Days",  days: 30,  max: 120,  citation: "CARs 700.15 (superseded)" },
-  // 700.15(1)(d) — 40 h in any 7 consecutive days.
-  { label: "Last 7 Days",   days: 7,   max: 40,   citation: "CARs 700.15 (superseded)" },
-];
-
 /**
  * FAA Part 117 (Part 121 passenger flightcrew, and Part 91K/135 crews flown
  * under 117 by election). §117.23(b) has exactly two flight-time caps — the
@@ -290,10 +279,10 @@ export const REGIME_RULES: Record<Regime, RegimeRules> = {
     authority: "Transport Canada",
     reference: "CAR 700.28",
     flightTimeWindows: CA_700_28,
-    ruleSets: [
-      { id: "car-700-28",  label: "Canada — current (CAR 700.28)",       reference: "CAR 700.28",   flightTimeWindows: CA_700_28 },
-      { id: "cars-700-15", label: "Canada — pre-2020 (CARs 700.15)",     reference: "CARs 700.15",  flightTimeWindows: CA_700_15 },
-    ],
+    // One set only: CARs 700.15 was superseded by the 2018 FDT overhaul
+    // (705 operators Dec 2020, 703/704 Dec 2022) and is deliberately not
+    // offered — showing a repealed ceiling next to the current one invites
+    // a pilot to plan against the wrong number.
     recency: TCCA_RECENCY,
   },
   ICAO: {
