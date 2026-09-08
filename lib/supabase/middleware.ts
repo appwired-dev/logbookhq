@@ -1,4 +1,5 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
+import type { User } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 
 /**
@@ -14,10 +15,18 @@ import { NextResponse, type NextRequest } from "next/server";
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  // Tolerate a MISSING Supabase config (e.g. a preview deployment that hasn't
+  // had the env vars scoped to it) as well as an unreachable Supabase. Without
+  // this guard, createServerClient throws "URL and Key are required" — which is
+  // an uncaught throw in Edge middleware and 500s EVERY route, the public
+  // marketing pages included. Treat the request as signed out: public pages
+  // render, and protected /app routes fall through to the /login redirect below.
+  let user: User | null = null;
+  if (supabaseUrl && supabaseKey) {
+    const supabase = createServerClient(supabaseUrl, supabaseKey, {
       cookies: {
         getAll() {
           return request.cookies.getAll();
@@ -30,16 +39,12 @@ export async function updateSession(request: NextRequest) {
           );
         },
       },
-    },
-  );
-
-  // Tolerate Supabase unreachable (e.g. placeholder env vars) — treat as no user.
-  let user = null as Awaited<ReturnType<typeof supabase.auth.getUser>>["data"]["user"];
-  try {
-    const r = await supabase.auth.getUser();
-    user = r.data.user;
-  } catch {
-    user = null;
+    });
+    try {
+      user = (await supabase.auth.getUser()).data.user;
+    } catch {
+      user = null;
+    }
   }
 
   const path = request.nextUrl.pathname;
