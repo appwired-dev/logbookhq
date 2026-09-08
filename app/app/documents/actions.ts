@@ -73,6 +73,45 @@ export async function createDocument(formData: FormData) {
   }
 }
 
+/**
+ * Update a document's metadata (type, name, reference, dates, notes). The
+ * stored file is left untouched — replacing it means delete + re-upload.
+ * Same FormData field names as createDocument so the edit form can reuse it.
+ */
+export async function updateDocument(id: number, formData: FormData) {
+  try {
+    if (!Number.isInteger(id) || id <= 0) return { error: "Invalid document" };
+
+    const docType = String(formData.get("doc_type") ?? "OTHER") as DocumentType;
+    if (!ALLOWED_TYPES.includes(docType)) return { error: "Invalid doc type" };
+
+    const name = String(formData.get("name") ?? "").trim();
+    if (!name) return { error: "Name required" };
+
+    const reference = String(formData.get("reference") ?? "").trim() || null;
+    const issued_on = String(formData.get("issued_on") ?? "").trim() || null;
+    const expires_on = String(formData.get("expires_on") ?? "").trim() || null;
+    const notes = String(formData.get("notes") ?? "").trim() || null;
+
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: "Not signed in" };
+
+    const { error } = await supabase
+      .from("documents")
+      .update({ doc_type: docType, name, reference, issued_on, expires_on, notes })
+      .eq("id", id)
+      .eq("user_id", user.id);
+    if (error) return { error: error.message };
+
+    revalidatePath("/app/documents");
+    revalidatePath("/app");
+    return { ok: true };
+  } catch (e) {
+    return failure("Update failed", e);
+  }
+}
+
 export async function deleteDocument(id: number, storagePath: string) {
   try {
     const supabase = await createClient();

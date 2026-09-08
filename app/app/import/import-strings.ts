@@ -7,9 +7,10 @@ import type { Locale } from "@/lib/i18n";
 import type { SkipReason } from "@/lib/import";
 import type { FieldTarget, ReconcileCheck, TimeCategory, TimeCondition, TimeRole } from "@/lib/import/types";
 
-type Entry = Record<Locale, string>;
+/** One string in every app locale. Shared with ./check-messages.ts. */
+export type Entry = Record<Locale, string>;
 
-const pick = (entry: Entry, locale: Locale): string => entry[locale] ?? entry.en;
+export const pick = (entry: Entry, locale: Locale): string => entry[locale] ?? entry.en;
 const fill = (str: string, vars: Record<string, string | number>): string => {
   let out = str;
   for (const [k, v] of Object.entries(vars)) out = out.split(`{${k}}`).join(String(v));
@@ -183,7 +184,7 @@ export const TARGET_GROUP = {
   "Single-engine time":                { en: "Single-engine time", ko: "단발 시간", zh: "单发时间", es: "Tiempo monomotor" },
   "Multi-engine time":                 { en: "Multi-engine time", ko: "다발 시간", zh: "多发时间", es: "Tiempo multimotor" },
   "Sea / helicopter / simulator time": { en: "Sea / helicopter / simulator time", ko: "수상기 / 헬리콥터 / 시뮬레이터 시간", zh: "水上 / 直升机 / 模拟机时间", es: "Tiempo hidroavión / helicóptero / simulador" },
-  "Cross-country & instrument":        { en: "Cross-country & instrument", ko: "크로스컨트리 및 계기", zh: "转场与仪表", es: "Travesía e instrumentos" },
+  "Cross-country & instrument":        { en: "Cross-country & instrument", ko: "장거리 및 계기", zh: "越野与仪表", es: "Travesía e instrumentos" },
   "Approaches, holds, landings":       { en: "Approaches, holds, landings", ko: "접근, 홀딩, 착륙", zh: "进近、等待、着陆", es: "Aproximaciones, esperas, aterrizajes" },
   "Crew & other":                      { en: "Crew & other", ko: "승무원 및 기타", zh: "机组与其他", es: "Tripulación y otros" },
 } satisfies Record<string, Entry>;
@@ -203,8 +204,8 @@ export const TARGET_LABEL = {
   "field:remarks":                  { en: "Remarks", ko: "비고", zh: "备注", es: "Observaciones" },
   "field:category":                 { en: "Category (SE/ME/SIM…)", ko: "구분 (SE/ME/SIM…)", zh: "类别（SE/ME/SIM…）", es: "Categoría (SE/ME/SIM…)" },
   "field:role":                     { en: "Role (PIC/FO/DUAL…)", ko: "역할 (PIC/FO/DUAL…)", zh: "角色（PIC/FO/DUAL…）", es: "Rol (PIC/FO/DUAL…)" },
-  "field:xc_time":                  { en: "Cross-country time", ko: "크로스컨트리 시간", zh: "转场时间", es: "Tiempo de travesía" },
-  "field:xc_flag":                  { en: "Cross-country flag", ko: "크로스컨트리 표시", zh: "转场标记", es: "Marca de travesía" },
+  "field:xc_time":                  { en: "Cross-country time", ko: "장거리 시간", zh: "越野时间", es: "Tiempo de travesía" },
+  "field:xc_flag":                  { en: "Cross-country flag", ko: "장거리 표시", zh: "越野标记", es: "Marca de travesía" },
   "field:actual_inst":              { en: "Actual instrument", ko: "실제 계기", zh: "实际仪表", es: "Instrumentos reales" },
   "field:hood_inst":                { en: "Hood / simulated instrument", ko: "후드 / 모의 계기", zh: "遮蔽 / 模拟仪表", es: "Instrumentos simulados (capucha)" },
   "field:sim_inst":                 { en: "Simulator time", ko: "시뮬레이터 시간", zh: "模拟机时间", es: "Tiempo de simulador" },

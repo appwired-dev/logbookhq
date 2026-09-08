@@ -14,6 +14,8 @@
     "build:world": "tsx scripts/build-world.ts",
     "fix:route": "tsx scripts/fix-route.ts",
     "test:import": "tsx scripts/run-import-tests.ts",
+    "test:limits": "tsx scripts/limits.test.ts",
+    "test:auth": "tsx scripts/auth.test.ts",
     "check:client-graph": "tsx scripts/check-client-graph.ts app/app/import/ImportWizard.tsx app/app/import/StepMapping.tsx app/app/import/StepReconcile.tsx app/app/flights/FlightsClient.tsx app/app/flights/FlightForm.tsx"
   },
   "dependencies": {

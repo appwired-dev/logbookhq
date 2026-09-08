@@ -40,6 +40,8 @@ type LocalStrings = {
   noMatchBody: string;
   /** `{d}` / `{n}` are interpolated. */
   tolSplit: string;
+  /** Toast title after a create/update redirect (`?saved=<id>`). */
+  flightSaved: string;
   roleShort: Record<Role, string>;
 };
 
@@ -71,6 +73,7 @@ const LOCAL: Record<Locale, LocalStrings> = {
     noMatchTitle: "No flights match",
     noMatchBody: "Try a different search or clear the filters.",
     tolSplit: "Day {d} · Night {n}",
+    flightSaved: "Flight saved",
     roleShort: { PIC: "PIC", DUAL: "Dual", FO: "FO", SIC: "SO", CHECK: "Check" },
   },
   ko: {
@@ -100,6 +103,7 @@ const LOCAL: Record<Locale, LocalStrings> = {
     noMatchTitle: "일치하는 비행이 없습니다",
     noMatchBody: "다른 검색어를 입력하거나 필터를 지워 보세요.",
     tolSplit: "주간 {d} · 야간 {n}",
+    flightSaved: "비행이 저장되었습니다",
     roleShort: { PIC: "기장", DUAL: "교육", FO: "부기장", SIC: "보조", CHECK: "검열" },
   },
   zh: {
@@ -129,6 +133,7 @@ const LOCAL: Record<Locale, LocalStrings> = {
     noMatchTitle: "没有匹配的飞行记录",
     noMatchBody: "请尝试其他搜索词或清除筛选。",
     tolSplit: "白天 {d} · 夜间 {n}",
+    flightSaved: "飞行记录已保存",
     roleShort: { PIC: "机长", DUAL: "教学", FO: "副驾驶", SIC: "辅助", CHECK: "检查" },
   },
   es: {
@@ -158,6 +163,7 @@ const LOCAL: Record<Locale, LocalStrings> = {
     noMatchTitle: "Ningún vuelo coincide",
     noMatchBody: "Prueba otra búsqueda o limpia los filtros.",
     tolSplit: "Día {d} · Noche {n}",
+    flightSaved: "Vuelo guardado",
     roleShort: { PIC: "PIC", DUAL: "Doble", FO: "FO", SIC: "SO", CHECK: "Check" },
   },
 };

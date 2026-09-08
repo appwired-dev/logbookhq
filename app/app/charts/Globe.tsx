@@ -1,10 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import * as THREE from "three";
 import type { GlobeMethods } from "react-globe.gl";
 import type { Airport } from "@/lib/airports";
+import type { Locale } from "@/lib/i18n";
+import { useReducedMotion } from "@/lib/use-reduced-motion";
+import { Icon } from "@/components/ui";
+// TODO(icons): fold Pause / Play into components/ui/icons.ts (owned by another
+// phase); imported directly until then, same as CustomBars.tsx.
+import { Pause, Play } from "lucide-react";
+import { fmt, type GlobeStrings } from "./charts-strings";
 
 /**
  * Career flight globe.
@@ -20,20 +27,52 @@ import type { Airport } from "@/lib/airports";
  *  - Zoom-dependent sizes (arc stroke, dot radius, label size) are driven by a
  *    QUANTISED altitude (0.25 steps). Feeding raw zoom into React state made
  *    globe.gl rebuild every arc/point on every wheel tick — visible stutter.
- *  - `prefers-reduced-motion` disables auto-rotate, arc dash animation and rings.
+ *  - `prefers-reduced-motion` disables auto-rotate, arc dash animation, rings
+ *    and every camera fly-through.
+ *
+ * Input notes:
+ *  - Coarse pointers (phones, tablets) get the stage in a *parked* state:
+ *    `touch-action: pan-y` and no OrbitControls touch gestures, so a swipe
+ *    scrolls the page instead of trapping the finger on a WebGL canvas. A
+ *    "Tap to explore" pill arms it; "Done" parks it again.
+ *  - Wheel zoom only engages while the stage is hovered or focused, so a page
+ *    scroll that happens to pass over the globe doesn't zoom it.
+ *  - The stage is focusable: arrow keys nudge the camera.
  */
 const Globe = dynamic(() => import("react-globe.gl"), { ssr: false });
 
 // ---------- palette ----------
-const OCEAN = "#12407a";
-const OCEAN_DEEP = "#0a2a55";
-const LAND = "#3f7d5a";
-const LAND_HOVER = "#5aa377";
-const BORDER = "rgba(226, 240, 220, 0.55)";
-const ATMOSPHERE = "#60a5fa";
-const HUB = "#fbbf24";
-const DOT = "rgba(255,255,255,0.9)";
-const SPACE_BG = "radial-gradient(ellipse at 50% 42%, #1c2942 0%, #0f172a 62%, #0b1120 100%)";
+// three.js and globe.gl parse colour strings themselves and cannot resolve
+// `var()`, so every scene colour is read off :root at runtime instead. The
+// tokens live in the "Phase 3 — charts" block of app/globals.css.
+const GLOBE_TOKENS = [
+  "ocean", "ocean-deep", "ocean-spec", "land", "land-hover", "graticule",
+  "atmosphere", "hub", "dot", "arc-from", "arc-to", "arc-sel-from", "arc-sel-to",
+  "ring", "light", "light-sky", "light-ground",
+] as const;
+type GlobeToken = (typeof GLOBE_TOKENS)[number];
+/** Token name → the raw `"r g b"` triple held by the CSS variable. */
+type Palette = Record<GlobeToken, string>;
+
+/** Read one CSS custom property off :root. Empty during SSR. */
+function cssVar(name: string): string {
+  if (typeof document === "undefined") return "";
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+function readPalette(): Palette {
+  const out = {} as Palette;
+  for (const token of GLOBE_TOKENS) out[token] = cssVar(`--globe-${token}`) || "0 0 0";
+  return out;
+}
+
+// Legacy comma syntax on purpose: three.js `Color.setStyle` and globe.gl's
+// colour parsing both match `rgb(r, g, b)` / `rgba(r, g, b, a)` only — the
+// modern space-separated form silently fails to parse.
+const parts = (triple: string) => triple.split(/\s+/).filter(Boolean);
+const rgb = (triple: string) => `rgb(${parts(triple).join(",")})`;
+const rgba = (triple: string, alpha: number) => `rgba(${parts(triple).join(",")},${alpha})`;
+const color = (triple: string) => new THREE.Color(rgb(triple));
 
 interface ArcDatum {
   id: string; from: string; to: string;
@@ -49,7 +88,8 @@ interface CountryFeature { properties?: { name?: string } }
 export interface GlobeProps {
   airports: Record<string, Airport>;
   arcs: Array<{ from: string; to: string; count: number }>;
-  year: string;
+  strings: GlobeStrings;
+  locale: Locale;
 }
 
 // ---------- spherical helpers ----------
@@ -78,23 +118,44 @@ function hash01(s: string) {
   return ((h >>> 0) % 1000) / 1000;
 }
 
-export default function FlightGlobe({ airports, arcs: rawArcs, year }: GlobeProps) {
+/** Keyboard nudge per arrow press, in degrees (Shift = coarse step). */
+const NUDGE_DEG = 6;
+const NUDGE_DEG_FAST = 20;
+
+export default function FlightGlobe({ airports, arcs: rawArcs, strings, locale }: GlobeProps) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const globeRef = useRef<GlobeMethods | undefined>(undefined);
+  const hintId = useId();
+  const reduceMotion = useReducedMotion();
   const [size, setSize] = useState({ w: 900, h: 560 });
   const [countries, setCountries] = useState<object[]>([]);
   const [ready, setReady] = useState(false);
   const [altQ, setAltQ] = useState(2.0);
   const [rotateOn, setRotateOn] = useState(true);
-  const [reduceMotion, setReduceMotion] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
   const [hoverCountry, setHoverCountry] = useState<object | null>(null);
+  /** Primary pointer is touch — the stage stays parked until the user arms it. */
+  const [coarse, setCoarse] = useState(false);
+  const [armed, setArmed] = useState(false);
+  /** Pointer is over the stage, or focus is inside it — gates wheel zoom. */
+  const [zoomHot, setZoomHot] = useState(false);
 
   const rotateOnRef = useRef(true);
   const draggingRef = useRef(false);
   const hoveringRef = useRef(false);
   const resumeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const homeRef = useRef({ lat: 30, lng: -40 });
+
+  // Resolved once per mount. `useMemo` recomputes during the client's
+  // hydration render, which is the first moment :root actually has values.
+  const pal = useMemo(readPalette, []);
+  /** Fully transparent — used where the scene must show the CSS backdrop. */
+  const clear = useMemo(() => rgba(pal.dot, 0), [pal]);
+
+  const flightCount = useCallback(
+    (n: number) => fmt(n === 1 ? strings.flightOne : strings.flightMany, { n: n.toLocaleString(locale) }),
+    [strings, locale],
+  );
 
   // ---------- data ----------
   const arcs = useMemo<ArcDatum[]>(() => {
@@ -156,9 +217,15 @@ export default function FlightGlobe({ airports, arcs: rawArcs, year }: GlobeProp
       .catch(() => setCountries([]));
   }, []);
 
+  useEffect(() => { if (reduceMotion) setRotateOn(false); }, [reduceMotion]);
+
   useEffect(() => {
-    const mq = window.matchMedia?.("(prefers-reduced-motion: reduce)");
-    if (mq?.matches) { setReduceMotion(true); setRotateOn(false); }
+    const mq = window.matchMedia?.("(pointer: coarse)");
+    if (!mq) return;
+    const update = () => setCoarse(mq.matches);
+    update();
+    mq.addEventListener?.("change", update);
+    return () => mq.removeEventListener?.("change", update);
   }, []);
 
   useEffect(() => {
@@ -177,6 +244,24 @@ export default function FlightGlobe({ airports, arcs: rawArcs, year }: GlobeProp
   }, []);
 
   useEffect(() => () => { if (resumeTimer.current) clearTimeout(resumeTimer.current); }, []);
+
+  // ---------- input gating ----------
+  // Touch gestures are switched off wholesale on coarse pointers until the user
+  // arms the stage; the mouse bindings (`mouseButtons`) are never touched, so
+  // pointer devices behave exactly as before. OrbitControls forces
+  // `touch-action: none` onto the canvas when it connects, so the parked value
+  // has to be written back onto that same element.
+  const touchLive = !coarse || armed;
+  useEffect(() => {
+    const g = globeRef.current;
+    if (!g || !ready) return;
+    const c = g.controls();
+    c.touches.ONE = touchLive ? THREE.TOUCH.ROTATE : null;
+    c.touches.TWO = touchLive ? THREE.TOUCH.DOLLY_PAN : null;
+    c.enableZoom = coarse ? armed : zoomHot;
+    const canvas = c.domElement as HTMLElement | null;
+    if (canvas) canvas.style.touchAction = touchLive ? "none" : "pan-y";
+  }, [ready, coarse, armed, touchLive, zoomHot]);
 
   // ---------- rotation choreography ----------
   const scheduleResume = useCallback((ms: number) => {
@@ -235,15 +320,18 @@ export default function FlightGlobe({ airports, arcs: rawArcs, year }: GlobeProp
     // ocean follows the viewer instead of painting a fixed day/night line.
     const scene = g.scene();
     const camera = g.camera();
-    const key = new THREE.DirectionalLight(0xffffff, 0.5);
+    const key = new THREE.DirectionalLight(color(pal.light), 0.5);
     key.position.set(-1.2, 1.4, 1.6);
     camera.add(key);
     scene.add(camera);
-    g.lights([new THREE.AmbientLight(0xffffff, 0.75), new THREE.HemisphereLight(0xe6f0ff, 0x0b1a33, 0.7)]);
+    g.lights([
+      new THREE.AmbientLight(color(pal.light), 0.75),
+      new THREE.HemisphereLight(color(pal["light-sky"]), color(pal["light-ground"]), 0.7),
+    ]);
 
-    g.pointOfView({ ...homeRef.current, altitude: 2.0 }, 1400);
+    g.pointOfView({ ...homeRef.current, altitude: 2.0 }, reduceMotion ? 0 : 1400);
     setReady(true);
-  }, [scheduleResume]);
+  }, [scheduleResume, pal, reduceMotion]);
 
   // ---------- camera actions ----------
   const flyTo = useCallback((a: ArcDatum) => {
@@ -257,9 +345,9 @@ export default function FlightGlobe({ airports, arcs: rawArcs, year }: GlobeProp
     const c = g.controls();
     c.autoRotate = false;
     if (resumeTimer.current) clearTimeout(resumeTimer.current);
-    g.pointOfView({ lat: mid.lat, lng: mid.lng, altitude }, 1200);
+    g.pointOfView({ lat: mid.lat, lng: mid.lng, altitude }, reduceMotion ? 0 : 1200);
     scheduleResume(8000);
-  }, [scheduleResume]);
+  }, [scheduleResume, reduceMotion]);
 
   const selectRoute = useCallback((a: ArcDatum | null) => {
     setSelected((prev) => (a && prev === a.id ? null : a?.id ?? null));
@@ -270,19 +358,46 @@ export default function FlightGlobe({ airports, arcs: rawArcs, year }: GlobeProp
     const g = globeRef.current;
     if (!g) return;
     setSelected(null);
-    g.pointOfView({ ...homeRef.current, altitude: 2.0 }, 1200);
+    g.pointOfView({ ...homeRef.current, altitude: 2.0 }, reduceMotion ? 0 : 1200);
     scheduleResume(2000);
-  }, [scheduleResume]);
+  }, [scheduleResume, reduceMotion]);
+
+  /** Arrow-key camera nudge — the keyboard equivalent of a short drag. */
+  const nudge = useCallback((dLat: number, dLng: number) => {
+    const g = globeRef.current;
+    if (!g) return;
+    const pov = g.pointOfView();
+    const c = g.controls();
+    c.autoRotate = false;
+    if (resumeTimer.current) clearTimeout(resumeTimer.current);
+    g.pointOfView({
+      lat: Math.max(-85, Math.min(85, pov.lat + dLat)),
+      lng: ((((pov.lng + dLng + 180) % 360) + 360) % 360) - 180,
+      altitude: pov.altitude,
+    }, reduceMotion ? 0 : 240);
+    scheduleResume(4000);
+  }, [scheduleResume, reduceMotion]);
+
+  const onKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
+    const step = e.shiftKey ? NUDGE_DEG_FAST : NUDGE_DEG;
+    switch (e.key) {
+      case "ArrowLeft":  e.preventDefault(); nudge(0, -step); break;
+      case "ArrowRight": e.preventDefault(); nudge(0, step); break;
+      case "ArrowUp":    e.preventDefault(); nudge(step, 0); break;
+      case "ArrowDown":  e.preventDefault(); nudge(-step, 0); break;
+      default: break;
+    }
+  }, [nudge]);
 
   // ---------- accessors (object-typed to satisfy globe.gl's generics) ----------
   const arcColor = useCallback((o: object) => {
     const d = o as ArcDatum;
-    if (selected && d.id !== selected) return ["rgba(253,224,71,0.10)", "rgba(217,119,6,0.10)"];
-    if (selected === d.id) return ["rgba(254,240,138,1)", "rgba(245,158,11,1)"];
+    if (selected && d.id !== selected) return [rgba(pal["arc-from"], 0.1), rgba(pal["arc-to"], 0.1)];
+    if (selected === d.id) return [rgba(pal["arc-sel-from"], 1), rgba(pal["arc-sel-to"], 1)];
     const t = Math.pow(d.count / maxCount, 0.6);
     const a = 0.45 + 0.5 * t;
-    return [`rgba(253,224,71,${a})`, `rgba(217,119,6,${a})`];
-  }, [selected, maxCount]);
+    return [rgba(pal["arc-from"], a), rgba(pal["arc-to"], a)];
+  }, [selected, maxCount, pal]);
 
   const arcStroke = useCallback((o: object) => {
     const d = o as ArcDatum;
@@ -297,195 +412,230 @@ export default function FlightGlobe({ airports, arcs: rawArcs, year }: GlobeProp
   }, [maxTraffic, zoomScale]);
 
   const globeMaterial = useMemo(() => new THREE.MeshPhongMaterial({
-    color: new THREE.Color(OCEAN),
-    emissive: new THREE.Color(OCEAN_DEEP),
+    color: color(pal.ocean),
+    emissive: color(pal["ocean-deep"]),
     emissiveIntensity: 0.25,
     shininess: 18,
-    specular: new THREE.Color("#3b5f95"),
-  }), []);
+    specular: color(pal["ocean-spec"]),
+  }), [pal]);
 
-  if (arcs.length === 0) {
-    return (
-      <div className="text-center py-12 text-slate-500">
-        No flights with parsable routes in {year} yet.
-      </div>
-    );
-  }
+  if (arcs.length === 0) return null;
 
   const selectedArc = selected ? arcs.find((a) => a.id === selected) ?? null : null;
-  const plural = (n: number) => (n === 1 ? "" : "s");
+  const legend = coarse ? (armed ? strings.legendTouchArmed : strings.legendTouch) : strings.legend;
 
   return (
-    <div
-      ref={wrapRef}
-      className="relative w-full overflow-hidden rounded-2xl ring-1 ring-slate-900/10"
-      style={{ background: SPACE_BG, height: size.h }}
-    >
-      <Globe
-        ref={globeRef}
-        width={size.w}
-        height={size.h}
-        backgroundColor="rgba(0,0,0,0)"
-        rendererConfig={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
-        onGlobeReady={onGlobeReady}
-        showAtmosphere
-        atmosphereColor={ATMOSPHERE}
-        atmosphereAltitude={0.18}
-        globeImageUrl={null as unknown as string}
-        globeMaterial={globeMaterial}
+    <div className="relative min-w-0">
+      <p id={hintId} className="sr-only">{strings.stageHint}</p>
+      <div
+        ref={wrapRef}
+        tabIndex={0}
+        role="group"
+        aria-label={strings.stageLabel}
+        aria-describedby={hintId}
+        onKeyDown={onKeyDown}
+        onFocus={() => setZoomHot(true)}
+        onBlur={() => setZoomHot(false)}
+        onPointerEnter={(e) => { if (e.pointerType !== "touch") setZoomHot(true); }}
+        onPointerLeave={() => setZoomHot(false)}
+        className="globe-stage relative w-full overflow-hidden rounded-card ring-1 ring-ink-1/10
+                   focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-glow"
+        style={{ height: size.h, touchAction: coarse ? (armed ? "none" : "pan-y") : undefined }}
+      >
+        <Globe
+          ref={globeRef}
+          width={size.w}
+          height={size.h}
+          backgroundColor={clear}
+          rendererConfig={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
+          onGlobeReady={onGlobeReady}
+          showAtmosphere
+          atmosphereColor={rgb(pal.atmosphere)}
+          atmosphereAltitude={0.18}
+          globeImageUrl={null as unknown as string}
+          globeMaterial={globeMaterial}
 
-        polygonsData={countries}
-        polygonAltitude={(o: object) => (o === hoverCountry ? 0.012 : 0.006)}
-        polygonCapColor={(o: object) => (o === hoverCountry ? LAND_HOVER : LAND)}
-        polygonSideColor={() => "rgba(0,0,0,0)"}
-        polygonStrokeColor={() => BORDER}
-        polygonLabel={(o: object) => (o as CountryFeature).properties?.name ?? ""}
-        onPolygonHover={(o: object | null) => setHoverCountry(o)}
-        polygonsTransitionDuration={250}
+          polygonsData={countries}
+          polygonAltitude={(o: object) => (o === hoverCountry ? 0.012 : 0.006)}
+          polygonCapColor={(o: object) => (o === hoverCountry ? rgb(pal["land-hover"]) : rgb(pal.land))}
+          polygonSideColor={() => clear}
+          polygonStrokeColor={() => rgba(pal.graticule, 0.55)}
+          polygonLabel={(o: object) => (o as CountryFeature).properties?.name ?? ""}
+          onPolygonHover={(o: object | null) => setHoverCountry(o)}
+          polygonsTransitionDuration={reduceMotion ? 0 : 250}
 
-        arcsData={arcs}
-        arcStartLat="startLat"
-        arcStartLng="startLng"
-        arcEndLat="endLat"
-        arcEndLng="endLng"
-        arcColor={arcColor}
-        arcStroke={arcStroke}
-        arcAltitudeAutoScale={0.45}
-        arcDashLength={reduceMotion ? 1 : 0.45}
-        arcDashGap={reduceMotion ? 0 : 0.25}
-        arcDashInitialGap={(o: object) => hash01((o as ArcDatum).id)}
-        arcDashAnimateTime={reduceMotion ? 0 : 4500}
-        arcsTransitionDuration={0}
-        arcLabel={(o: object) => {
-          const d = o as ArcDatum;
-          return `${d.from} → ${d.to} · ${d.count} flight${plural(d.count)} · ${d.km.toLocaleString()} km`;
-        }}
-        onArcHover={(o: object | null) => onHoverObj(o)}
-        onArcClick={(o: object) => selectRoute(o as ArcDatum)}
+          arcsData={arcs}
+          arcStartLat="startLat"
+          arcStartLng="startLng"
+          arcEndLat="endLat"
+          arcEndLng="endLng"
+          arcColor={arcColor}
+          arcStroke={arcStroke}
+          arcAltitudeAutoScale={0.45}
+          arcDashLength={reduceMotion ? 1 : 0.45}
+          arcDashGap={reduceMotion ? 0 : 0.25}
+          arcDashInitialGap={(o: object) => hash01((o as ArcDatum).id)}
+          arcDashAnimateTime={reduceMotion ? 0 : 4500}
+          arcsTransitionDuration={0}
+          arcLabel={(o: object) => {
+            const d = o as ArcDatum;
+            const km = fmt(strings.km, { n: d.km.toLocaleString(locale) });
+            return `${d.from} → ${d.to} · ${flightCount(d.count)} · ${km}`;
+          }}
+          onArcHover={(o: object | null) => onHoverObj(o)}
+          onArcClick={(o: object) => selectRoute(o as ArcDatum)}
 
-        pointsData={points}
-        pointLat="lat"
-        pointLng="lng"
-        pointAltitude={0.006}
-        pointRadius={pointRadius}
-        pointColor={(o: object) => ((o as PointDatum).hub ? HUB : DOT)}
-        pointsTransitionDuration={0}
-        pointLabel={(o: object) => {
-          const d = o as PointDatum;
-          return `${d.code} — ${d.name}${d.country ? `, ${d.country}` : ""} · ${d.traffic} flight${plural(d.traffic)}`;
-        }}
-        onPointHover={(o: object | null) => onHoverObj(o)}
+          pointsData={points}
+          pointLat="lat"
+          pointLng="lng"
+          pointAltitude={0.006}
+          pointRadius={pointRadius}
+          pointColor={(o: object) => ((o as PointDatum).hub ? rgb(pal.hub) : rgba(pal.dot, 0.9))}
+          pointsTransitionDuration={0}
+          pointLabel={(o: object) => {
+            const d = o as PointDatum;
+            return `${d.code} — ${d.name}${d.country ? `, ${d.country}` : ""} · ${flightCount(d.traffic)}`;
+          }}
+          onPointHover={(o: object | null) => onHoverObj(o)}
 
-        labelsData={labels}
-        labelLat="lat"
-        labelLng="lng"
-        labelText="code"
-        labelSize={0.85 * zoomScale}
-        labelDotRadius={0}
-        labelIncludeDot={false}
-        labelColor={() => "rgba(255,255,255,0.88)"}
-        labelAltitude={0.012}
-        labelResolution={2}
-        labelsTransitionDuration={0}
-        onLabelHover={(o: object | null) => onHoverObj(o)}
+          labelsData={labels}
+          labelLat="lat"
+          labelLng="lng"
+          labelText="code"
+          labelSize={0.85 * zoomScale}
+          labelDotRadius={0}
+          labelIncludeDot={false}
+          labelColor={() => rgba(pal.dot, 0.88)}
+          labelAltitude={0.012}
+          labelResolution={2}
+          labelsTransitionDuration={0}
+          onLabelHover={(o: object | null) => onHoverObj(o)}
 
-        ringsData={reduceMotion ? [] : rings}
-        ringLat="lat"
-        ringLng="lng"
-        ringAltitude={0.008}
-        ringColor={() => (t: number) => `rgba(251,191,36,${Math.max(0, 0.55 * (1 - t))})`}
-        ringMaxRadius={2.6}
-        ringPropagationSpeed={1.1}
-        ringRepeatPeriod={2000}
+          ringsData={reduceMotion ? [] : rings}
+          ringLat="lat"
+          ringLng="lng"
+          ringAltitude={0.008}
+          ringColor={() => (t: number) => rgba(pal.ring, Math.max(0, 0.55 * (1 - t)))}
+          ringMaxRadius={2.6}
+          ringPropagationSpeed={1.1}
+          ringRepeatPeriod={2000}
 
-        onZoom={(pov: { altitude: number }) => {
-          const q = Math.round(pov.altitude * 4) / 4;
-          setAltQ((prev) => (prev === q ? prev : q));
-        }}
-      />
+          onZoom={(pov: { altitude: number }) => {
+            const q = Math.round(pov.altitude * 4) / 4;
+            setAltQ((prev) => (prev === q ? prev : q));
+          }}
+        />
 
-      {(!ready || countries.length === 0) && (
-        <div className="absolute inset-0 grid place-items-center pointer-events-none">
-          <div className="w-44 h-44 rounded-full bg-sky-400/10 ring-1 ring-sky-300/20 animate-pulse" />
-        </div>
-      )}
-
-      {/* Route / summary badge */}
-      <div className="absolute top-3 left-3 max-w-[70%] px-3 py-2 rounded-xl bg-slate-950/55 backdrop-blur border border-white/10 text-white text-xs">
-        {selectedArc ? (
-          <>
-            <div className="font-bold tracking-tight font-mono">{selectedArc.from} → {selectedArc.to}</div>
-            <div className="text-amber-200/90 text-[10px] uppercase tracking-wider">
-              {selectedArc.count} flight{plural(selectedArc.count)} · {selectedArc.km.toLocaleString()} km great-circle
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="font-bold tracking-tight">{year} flights</div>
-            <div className="text-sky-200/80 text-[10px] uppercase tracking-wider">
-              {arcs.length.toLocaleString()} routes · {points.length.toLocaleString()} airports
-            </div>
-          </>
+        {(!ready || countries.length === 0) && (
+          <div className="absolute inset-0 grid place-items-center pointer-events-none">
+            <div className="w-44 h-44 rounded-full bg-brand-glow/10 ring-1 ring-brand-glow/20 animate-pulse" />
+            <span className="sr-only">{strings.loading}</span>
+          </div>
         )}
-      </div>
 
-      {/* Controls */}
-      <div className="absolute top-3 right-3 flex gap-1.5">
-        <IconBtn title={rotateOn ? "Pause rotation" : "Resume rotation"} onClick={() => setRotateOn((v) => !v)}>
-          {rotateOn ? (
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1" /><rect x="14" y="5" width="4" height="14" rx="1" /></svg>
+        {/* Route / summary badge */}
+        <div className="globe-hud absolute top-3 left-3 max-w-[70%] px-3 py-2 rounded-control">
+          {selectedArc ? (
+            <>
+              <div className="globe-ink-1 font-mono text-xs font-bold tracking-tight">
+                {selectedArc.from} → {selectedArc.to}
+              </div>
+              <div className="globe-ink-accent mt-0.5 text-2xs uppercase tracking-wider">
+                {fmt(strings.greatCircle, {
+                  flights: flightCount(selectedArc.count),
+                  km: selectedArc.km.toLocaleString(locale),
+                })}
+              </div>
+            </>
           ) : (
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+            <>
+              <div className="globe-ink-1 text-xs font-bold tracking-tight">{strings.allTimeFlights}</div>
+              <div className="globe-ink-info mt-0.5 text-2xs uppercase tracking-wider">
+                {fmt(strings.routesAirports, {
+                  routes: arcs.length.toLocaleString(locale),
+                  airports: points.length.toLocaleString(locale),
+                })}
+              </div>
+            </>
           )}
-        </IconBtn>
-        <IconBtn title="Reset view" onClick={resetView}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12l9-8 9 8" /><path d="M5 10v10h14V10" /></svg>
-        </IconBtn>
-      </div>
-
-      {/* Top routes — click to fly */}
-      {topRoutes.length > 0 && (
-        <div className="absolute right-3 bottom-3 hidden md:block w-56 rounded-xl bg-slate-950/55 backdrop-blur border border-white/10 p-3 text-white">
-          <div className="text-[10px] uppercase tracking-[0.14em] text-slate-300/80 mb-2">Top routes</div>
-          <ul className="space-y-1.5">
-            {topRoutes.map((a) => (
-              <li key={a.id}>
-                <button
-                  type="button"
-                  onClick={() => selectRoute(a)}
-                  className={`w-full text-left transition-opacity ${selected === a.id ? "opacity-100" : "opacity-80 hover:opacity-100"}`}
-                >
-                  <div className="flex justify-between text-xs">
-                    <span className="font-mono">{a.from} → {a.to}</span>
-                    <span className="tabular-nums text-amber-200">{a.count}</span>
-                  </div>
-                  <div className="h-1 rounded-full bg-white/10 mt-1 overflow-hidden">
-                    <div className="h-full rounded-full bg-gradient-to-r from-amber-300 to-amber-500" style={{ width: `${(a.count / maxCount) * 100}%` }} />
-                  </div>
-                </button>
-              </li>
-            ))}
-          </ul>
         </div>
-      )}
 
-      <div className="absolute left-3 bottom-3 text-[10px] text-slate-300/70 pointer-events-none">
-        arc width = flights · dot size = traffic · drag to spin · scroll to zoom
+        {/* Controls */}
+        <div className="absolute top-3 right-3 flex gap-1.5">
+          <button
+            type="button"
+            className="globe-btn"
+            title={rotateOn ? strings.pauseRotation : strings.resumeRotation}
+            aria-label={rotateOn ? strings.pauseRotation : strings.resumeRotation}
+            aria-pressed={!rotateOn}
+            onClick={() => setRotateOn((v) => !v)}
+          >
+            {rotateOn
+              ? <Pause size={15} strokeWidth={2} aria-hidden />
+              : <Play size={15} strokeWidth={2} aria-hidden />}
+          </button>
+          <button
+            type="button"
+            className="globe-btn"
+            title={strings.resetView}
+            aria-label={strings.resetView}
+            onClick={resetView}
+          >
+            <Icon.RotateCcw size={15} strokeWidth={2} aria-hidden />
+          </button>
+        </div>
+
+        {/* Top routes — click to fly */}
+        {topRoutes.length > 0 && (
+          <nav
+            aria-label={strings.topRoutes}
+            className="globe-hud absolute right-3 bottom-3 hidden md:block w-56 rounded-control p-3"
+          >
+            <div className="globe-ink-2 mb-2 text-2xs uppercase tracking-[0.14em]">{strings.topRoutes}</div>
+            <ul className="space-y-1">
+              {topRoutes.map((a) => (
+                <li key={a.id}>
+                  <button
+                    type="button"
+                    onClick={() => selectRoute(a)}
+                    aria-pressed={selected === a.id}
+                    className={`globe-route ${selected === a.id ? "is-selected" : ""}`}
+                  >
+                    <span className="flex w-full justify-between gap-2 text-xs">
+                      <span className="globe-ink-1 font-mono">{a.from} → {a.to}</span>
+                      <span className="globe-ink-accent num">{a.count.toLocaleString(locale)}</span>
+                    </span>
+                    <span className="globe-meter mt-1 block h-1 w-full overflow-hidden rounded-pill">
+                      <span
+                        className="globe-meter-fill block h-full rounded-pill"
+                        style={{ width: `${(a.count / maxCount) * 100}%` }}
+                      />
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        )}
+
+        {/* Touch arming + legend. The md right inset clears the top-routes panel. */}
+        <div className="absolute left-3 bottom-3 flex flex-col items-start gap-2
+                        max-w-[calc(100%-1.5rem)] md:max-w-[calc(100%-15.5rem)]">
+          {coarse && (
+            <button
+              type="button"
+              className="globe-pill"
+              aria-pressed={armed}
+              onClick={() => setArmed((v) => !v)}
+            >
+              {armed
+                ? <><Icon.Check size={14} strokeWidth={2} aria-hidden />{strings.done}</>
+                : <><Icon.Globe2 size={14} strokeWidth={2} aria-hidden />{strings.tapToExplore}</>}
+            </button>
+          )}
+          <p className="globe-ink-2 text-2xs pointer-events-none">{legend}</p>
+        </div>
       </div>
     </div>
-  );
-}
-
-function IconBtn({ title, onClick, children }: { title: string; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      type="button"
-      title={title}
-      aria-label={title}
-      onClick={onClick}
-      className="w-8 h-8 grid place-items-center rounded-lg bg-slate-950/55 backdrop-blur border border-white/10 text-white/85 hover:text-white hover:bg-slate-950/75 transition-colors"
-    >
-      {children}
-    </button>
   );
 }

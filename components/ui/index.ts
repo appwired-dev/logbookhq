@@ -6,4 +6,6 @@ export { buttonClass, BUTTON_VARIANT, type ButtonVariant } from "./button-class"
 export { Field } from "./Field";
 export { Pill, rolePill, categoryPill, type PillVariant } from "./Pill";
 export { EmptyState, Alert, Skeleton, SkeletonText } from "./Feedback";
+export { Modal, ConfirmDialog, type ModalProps, type ConfirmDialogProps, type ModalSize } from "./modal";
+export { ToastProvider, useToast, type ToastInput, type ToastTone, type ToastApi } from "./toast";
 export * as Icon from "./icons";

@@ -5,20 +5,25 @@ import { ResponsiveContainer, Sankey, Tooltip } from "recharts";
 import type { Role } from "@/lib/types";
 
 // Single source of truth for role colours across every Sankey and the
-// dashboard legend (tailwind blue/emerald/amber/violet/fuchsia-500).
+// dashboard legend. Values are CSS colour strings built from the design
+// tokens in app/globals.css, so they are applied through `style` (SVG
+// presentation attributes and inline styles both resolve `var()`).
 export const ROLE_COLORS: Record<Role, string> = {
-  PIC: "#3b82f6",
-  FO: "#10b981",
-  DUAL: "#f59e0b",
-  SIC: "#8b5cf6",
-  CHECK: "#d946ef",
+  PIC: "rgb(var(--role-pic))",
+  FO: "rgb(var(--role-fo))",
+  DUAL: "rgb(var(--role-dual))",
+  SIC: "rgb(var(--role-sic))",
+  CHECK: "rgb(var(--role-check))",
 };
+/** Neutral node colour (aircraft types). */
+export const NODE_NEUTRAL = "rgb(var(--chart-8))";
+/** Softer neutral for context columns (years). */
+export const NODE_MUTED = "rgb(var(--chart-8) / 0.65)";
 
 export type FlowNode = { name: string; color: string; kind?: string };
 export type FlowLink = { source: number; target: number; value: number };
 
 type Fmt = (n: number) => string;
-const MONO = "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
 
 type NodeShapeProps = {
   x?: number; y?: number; width?: number; height?: number;
@@ -48,16 +53,16 @@ function NodeShape({ x = 0, y = 0, width = 0, height = 0, payload, fmt, mode, la
   const compact = nameOnly || height < 24;
   return (
     <g>
-      <rect x={x} y={y} width={width} height={Math.max(height, 2)} rx={3} fill={payload?.color ?? "#94a3b8"} />
+      <rect x={x} y={y} width={width} height={Math.max(height, 2)} rx={3} style={{ fill: payload?.color ?? NODE_NEUTRAL }} />
       {compact ? (
-        <text x={lx} y={y + height / 2} textAnchor={anchor} dominantBaseline="middle" fontSize={11} fill="#334155">
+        <text x={lx} y={y + height / 2} textAnchor={anchor} dominantBaseline="middle" className="text-2xs fill-ink-1">
           <tspan fontWeight={600}>{name}</tspan>
-          {!nameOnly && <tspan fill="#64748b" fontFamily={MONO} fontSize={10}>{`  ${value}`}</tspan>}
+          {!nameOnly && <tspan className="mono text-2xs fill-ink-3">{`  ${value}`}</tspan>}
         </text>
       ) : (
-        <text x={lx} y={y + height / 2} textAnchor={anchor} fontSize={12} fill="#1e293b">
+        <text x={lx} y={y + height / 2} textAnchor={anchor} className="text-xs fill-ink-1">
           <tspan x={lx} dy="-0.2em" fontWeight={600}>{name}</tspan>
-          <tspan x={lx} dy="1.3em" fill="#64748b" fontFamily={MONO} fontSize={11}>{value}</tspan>
+          <tspan x={lx} dy="1.3em" className="mono text-2xs fill-ink-3">{value}</tspan>
         </text>
       )}
     </g>
@@ -84,7 +89,7 @@ function LinkShape({
     `C${targetControlX},${targetY + h} ${sourceControlX},${sourceY + h} ${sourceX},${sourceY + h}`,
     "Z",
   ].join(" ");
-  return <path d={d} fill={payload?.target?.color ?? "#94a3b8"} fillOpacity={0.38} stroke="none" />;
+  return <path d={d} stroke="none" style={{ fill: payload?.target?.color ?? NODE_NEUTRAL, fillOpacity: 0.38 }} />;
 }
 
 type TooltipEntry = { payload?: unknown; value?: unknown };
@@ -95,12 +100,9 @@ function FlowTooltip({ active, payload, fmt }: { active?: boolean; payload?: Too
   const title = isLink ? `${p?.source?.name} → ${p?.target?.name}` : (p?.name ?? "");
   const raw = typeof p?.value === "number" ? p.value : Number(payload[0]?.value ?? 0);
   return (
-    <div style={{
-      borderRadius: 10, border: "1px solid #e2e8f0", padding: "8px 12px", fontSize: 12,
-      boxShadow: "0 8px 24px rgba(15,23,42,0.10)", background: "rgba(255,255,255,0.98)",
-    }}>
-      <div style={{ color: "#64748b" }}>{title}</div>
-      <div style={{ fontWeight: 700, color: "#0f172a", fontSize: 14, fontFamily: MONO }}>{fmt(raw)}</div>
+    <div className="card shadow-pop px-3 py-2 text-xs">
+      <div className="text-ink-3">{title}</div>
+      <div className="mono text-sm font-bold text-ink-1">{fmt(raw)}</div>
     </div>
   );
 }
@@ -136,7 +138,7 @@ export default function FlowSankey({
   if (nodes.length === 0 || links.length === 0) return null;
   if (!mounted) return <div className="skeleton w-full" style={{ height }} aria-hidden />;
   return (
-    <div style={{ height }}>
+    <div className="min-w-0" style={{ height }}>
       <ResponsiveContainer width="100%" height="100%" onResize={(w) => setWidth(w)}>
         {/* sort={false} + iterations={0} keep nodes in the order given, so a
             chronological input stays chronological instead of being shuffled

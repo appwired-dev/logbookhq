@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useDeferredValue, useMemo } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef } from "react";
 import { EmptyState, Icon, buttonClass } from "@/components/ui";
+import { useToast } from "@/components/ui/toast";
 import type { Locale } from "@/lib/i18n";
 import type { Category, FlightDerived, Role } from "@/lib/types";
 import { useIsDesktop } from "@/lib/use-media-query";
@@ -39,6 +40,16 @@ export default function FlightsClient({ flights, locale, augHalfCredit = false, 
   const isDesktop = useIsDesktop(initialIsDesktop);
   const { filters, setQ, setYear, setCat, setRole, toggleSort, clear, active } = useFlightFilters();
   const highlightId = useSavedFlightId();
+  // One "Flight saved" toast per consumed ?saved= id, alongside the row pulse.
+  // (The ref guards against Strict Mode's double effect run and the id's
+  // 1.7 s lifetime re-triggering it.)
+  const toast = useToast();
+  const toastedId = useRef<number | null>(null);
+  useEffect(() => {
+    if (highlightId == null || toastedId.current === highlightId) return;
+    toastedId.current = highlightId;
+    toast.push({ tone: "good", title: s.flightSaved });
+  }, [highlightId, s, toast]);
   // Keep typing responsive: the input echoes `filters.q` immediately, the
   // (heavier) filter pass follows on the deferred value.
   const deferredQ = useDeferredValue(filters.q);

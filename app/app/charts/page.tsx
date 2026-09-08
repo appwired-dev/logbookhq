@@ -4,14 +4,18 @@ import { fetchAllFlights } from "@/lib/fetch-flights";
 import { lookupMany, validateFlightCodes } from "@/lib/airports";
 import { parseRoute } from "@/lib/routes";
 import { getLocale } from "@/lib/i18n-server";
+import type { Regime } from "@/lib/currency-rules";
 import ChartsClient from "./ChartsClient";
 
 export default async function ChartsPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
+  // Same profile read as the dashboard (app/app/page.tsx): the regime drives
+  // the flight-time ceiling drawn on the rolling 365-day chart.
   const { data: profile } = await supabase
-    .from("profiles").select("aug_half_credit").eq("id", user!.id).maybeSingle();
+    .from("profiles").select("primary_regime, aug_half_credit").eq("id", user!.id).maybeSingle();
   const augHalfCredit = Boolean(profile?.aug_half_credit);
+  const regime = (profile?.primary_regime ?? "CA") as Regime;
   const flights = await fetchAllFlights(supabase, { orderAsc: true });
   const derived = flights.map(deriveFlight);
 
@@ -86,5 +90,14 @@ export default async function ChartsPage() {
   });
 
   const locale = await getLocale();
-  return <ChartsClient flights={derived} globeAirports={airports} globeArcs={arcs} globeYear="Career" locale={locale} augHalfCredit={augHalfCredit} />;
+  return (
+    <ChartsClient
+      flights={derived}
+      globeAirports={airports}
+      globeArcs={arcs}
+      locale={locale}
+      regime={regime}
+      augHalfCredit={augHalfCredit}
+    />
+  );
 }

@@ -2,22 +2,37 @@
  * Per-regime currency rules. Two distinct currency families:
  *
  *  1. Flight-time limits (rolling-window hour caps) — used by airline-style
- *     operators to enforce duty/rest. CARs 700.15, FAR 117, ORO.FTL, etc.
+ *     operators to enforce duty/rest. CAR 700.28, 14 CFR §117.23, ORO.FTL.210…
  *
  *  2. Recency requirements (IFR + day/night PAX) — what every pilot needs
  *     to legally carry passengers or fly IFR after a layoff. Counted against
  *     the recent flight history.
  *
- * Sources:
- *   CA    — CARs 700.15(1) hours; CARs 401.05 recency.
- *   ICAO  — Annex 6 Part I §9.5 hours; Annex 1 §2.1.10 recency baseline.
- *   FAA   — 14 CFR §117.23 hours; 14 CFR §61.57 recency.
- *   EASA  — ORO.FTL.210 hours; Part-FCL.060 recency.
- *   UKCAA — UK CAA ORS4 (post-Brexit, mirrors EASA with UK addenda).
+ * Sources (flight-time limits — audited 2026-09):
+ *   CA    — CAR 700.28 (SOR/2018-269; in force 12 Dec 2020 for 705 operators,
+ *           12 Dec 2022 for 703/704). The superseded CARs 700.15 numbers are
+ *           deliberately NOT offered — a repealed ceiling sitting beside the
+ *           current one is something a pilot could plan against by mistake.
+ *   ICAO  — Annex 6 Part I, 4.10 + Attachment A. ICAO sets NO numbers; the
+ *           State of the Operator does. Our ICAO set is labelled "typical
+ *           State limits" and must not be read as a hard rule.
+ *   FAA   — 14 CFR §117.23(b) (Part 121 passenger flightcrew). §121.471(a)
+ *           (domestic, non-117 e.g. all-cargo) is offered as a second set.
+ *   EASA  — ORO.FTL.210(a) (CAT operators).
+ *   CN    — CCAR-121-R7 第121.487条(b) (第P章), verified against the CAAC text:
+ *           100 h / calendar month, 900 h / calendar year. The (c) figures are
+ *           flight DUTY period, not flight time, and are not listed.
+ *   UKCAA — Retained Regulation (EU) No 965/2012, ORO.FTL.210 — same numbers.
+ *   GCAA  — UAE CAR-OPS 1 Subpart Q.
  *
- * Recency rules are simplified to the most-common interpretation per
- * authority. Edge cases (instrument proficiency check substitution, full-
- * stop vs. touch-and-go nuances) are commented inline.
+ * Recency: CARs 401.05 / FAR 61.57 / Part-FCL.060 / ICAO Annex 1, simplified
+ * to the most-common interpretation per authority. Edge cases (instrument
+ * proficiency check substitution, full-stop vs. touch-and-go nuances) are
+ * commented inline.
+ *
+ * NOTE — these figures are informational. The operator's approved FTL scheme
+ * or FRMS governs, and several regimes below are marked UNVERIFIED in code
+ * comments where a primary source could not be confirmed.
  */
 
 import type { Flight, CurrencyReport, CurrencyWindow, RecencyStatus } from "./types";
@@ -26,10 +41,44 @@ export type Regime =
   | "CA" | "ICAO" | "FAA" | "EASA" | "UKCAA"
   | "GCAA" | "GACA" | "QCAA" | "HKCAD" | "CAAC";
 
+/**
+ * How a flight-time window is anchored.
+ *   "rolling-days"     — the last N calendar dates, ending today (default).
+ *   "calendar-year"    — 1 January of the current year → today.
+ *   "calendar-months"  — the first day of the month (months − 1) back → today,
+ *                        i.e. "any N consecutive calendar months".
+ */
+export type FlightTimeBasis = "rolling-days" | "calendar-year" | "calendar-months";
+
 export interface FlightTimeWindow {
   label: string;
+  /**
+   * Nominal window length in days. Always populated — calendar-anchored
+   * windows carry their nominal length (365 for a calendar year, 30 × months
+   * for calendar months) so consumers that only understand rolling days still
+   * get a usable number.
+   */
   days: number;
   max: number;
+  /** Defaults to "rolling-days" when absent (back-compat). */
+  basis?: FlightTimeBasis;
+  /** Number of consecutive calendar months — only for basis "calendar-months". */
+  months?: number;
+  /** Regulatory citation for this specific window. */
+  citation?: string;
+}
+
+/**
+ * One selectable set of flight-time limits for a regime. A regime has more
+ * than one when the rules changed (Canada 2020) or when different operating
+ * rules apply to different fleets (FAA Part 117 vs. Part 121 domestic).
+ * The FIRST set in `ruleSets` is the default.
+ */
+export interface FlightTimeRuleSet {
+  id: string;
+  label: string;
+  reference: string;
+  flightTimeWindows: FlightTimeWindow[];
 }
 
 export interface RecencyRule {
@@ -46,8 +95,12 @@ export interface RegimeRules {
   code: Regime;
   name: string;
   authority: string;
+  /** Citation for the DEFAULT rule set (mirrors ruleSets[0].reference). */
   reference: string;
+  /** Windows of the DEFAULT rule set (mirrors ruleSets[0].flightTimeWindows). */
   flightTimeWindows: FlightTimeWindow[];
+  /** Present only where a regime offers a choice; default first. */
+  ruleSets?: FlightTimeRuleSet[];
   recency: RecencyRule[];
 }
 
@@ -80,6 +133,154 @@ const ICAO_RECENCY: RecencyRule[] = [
 ];
 
 // ============================================================
+// Flight-time window sets
+// ============================================================
+
+/**
+ * Canada, current rules. CAR 700.28 replaced CARs 700.15 for commercial air
+ * services (705 operators from 12 Dec 2020, 703/704 from 12 Dec 2022).
+ * Paragraph lettering below follows SOR/2018-269 as published; only the
+ * section number (700.28) is asserted in the citations.
+ */
+const CA_700_28: FlightTimeWindow[] = [
+  // 700.28 (a) — 1,000 h flight time in any 365 consecutive days.
+  { label: "Last 365 Days", days: 365, max: 1000, citation: "CAR 700.28" },
+  // 700.28 (b) — 300 h flight time in any 90 consecutive days.
+  { label: "Last 90 Days",  days: 90,  max: 300,  citation: "CAR 700.28" },
+  // 700.28 (c) — 112 h flight time in any 28 consecutive days.
+  { label: "Last 28 Days",  days: 28,  max: 112,  citation: "CAR 700.28" },
+];
+
+/**
+ * FAA Part 117 (Part 121 passenger flightcrew, and Part 91K/135 crews flown
+ * under 117 by election). §117.23(b) has exactly two flight-time caps — the
+ * "30 h / 7 days" figure that used to sit here is §121.471(a)(3), a domestic
+ * Part 121 limit, and has been moved to the second FAA set below.
+ */
+const FAA_117: FlightTimeWindow[] = [
+  // §117.23(b)(1) — 100 h in any 672 CONSECUTIVE HOURS. 672 h = 28 days
+  // exactly; logbook rows are date-granular, so we evaluate it as 28 calendar
+  // dates. A pilot near the cap should check the clock-hour figure.
+  { label: "Last 28 Days",  days: 28,  max: 100,  citation: "14 CFR §117.23(b)(1)" },
+  // §117.23(b)(2) — 1,000 h in any 365 consecutive calendar days.
+  { label: "Last 365 Days", days: 365, max: 1000, citation: "14 CFR §117.23(b)(2)" },
+];
+
+/**
+ * FAA Part 121 domestic (§121.471(a)) — still the governing flight-time rule
+ * for all-cargo operations that have not opted into Part 117.
+ * §121.471(a)(4) (8 h between required rest periods) is a per-duty limit, not
+ * a rolling window, so it is not modelled here.
+ */
+const FAA_121_DOMESTIC: FlightTimeWindow[] = [
+  // §121.471(a)(1) — 1,000 h in any CALENDAR YEAR.
+  { label: "Calendar Year", days: 365, max: 1000, basis: "calendar-year",   citation: "14 CFR §121.471(a)(1)" },
+  // §121.471(a)(2) — 100 h in any CALENDAR MONTH.
+  { label: "Calendar Month", days: 30, max: 100,  basis: "calendar-months", months: 1, citation: "14 CFR §121.471(a)(2)" },
+  // §121.471(a)(3) — 30 h in any 7 consecutive days.
+  { label: "Last 7 Days",   days: 7,   max: 30,   citation: "14 CFR §121.471(a)(3)" },
+];
+
+/**
+ * EASA ORO.FTL.210(a) — flight times for CAT operators. The "60 h / 7 days"
+ * entry that used to live here is ORO.FTL.210(b), a DUTY limit (60 duty hours
+ * in 7 consecutive days), not flight time, and has been removed.
+ */
+const EASA_FTL_210: FlightTimeWindow[] = [
+  // (a)(1) — 100 flight hours in any 28 consecutive days.
+  { label: "Last 28 Days",   days: 28,  max: 100,  citation: "ORO.FTL.210(a)(1)" },
+  // (a)(2) — 900 flight hours in any CALENDAR YEAR.
+  { label: "Calendar Year",  days: 365, max: 900,  basis: "calendar-year",   citation: "ORO.FTL.210(a)(2)" },
+  // (a)(3) — 1,000 flight hours in any 12 consecutive CALENDAR MONTHS.
+  { label: "Last 12 Months", days: 365, max: 1000, basis: "calendar-months", months: 12, citation: "ORO.FTL.210(a)(3)" },
+];
+
+/** UK CAA: retained ORO.FTL.210 — numerically identical to EASA. */
+const UK_FTL_210: FlightTimeWindow[] = [
+  { label: "Last 28 Days",   days: 28,  max: 100,  citation: "ORO.FTL.210(a)(1) (UK retained)" },
+  { label: "Calendar Year",  days: 365, max: 900,  basis: "calendar-year",   citation: "ORO.FTL.210(a)(2) (UK retained)" },
+  { label: "Last 12 Months", days: 365, max: 1000, basis: "calendar-months", months: 12, citation: "ORO.FTL.210(a)(3) (UK retained)" },
+];
+
+/**
+ * UAE GCAA CAR-OPS 1 Subpart Q. UNVERIFIED against a primary GCAA source —
+ * the two caps below are the ones the UAE scheme is generally quoted as
+ * carrying. A calendar-year cap (900 h, as in EU-OPS 1.1265 / ORO.FTL.210(a)(2))
+ * may also apply; it is deliberately NOT modelled rather than invented.
+ */
+const GCAA_SUBPART_Q: FlightTimeWindow[] = [
+  // 100 h flight time in any 28 consecutive days.
+  { label: "Last 28 Days",   days: 28,  max: 100,  citation: "UAE CAR-OPS 1 Subpart Q" },
+  // 1,000 h flight time in any 12 consecutive calendar months.
+  { label: "Last 12 Months", days: 365, max: 1000, basis: "calendar-months", months: 12, citation: "UAE CAR-OPS 1 Subpart Q" },
+];
+
+/**
+ * ICAO reference set. Annex 6 Part I, 4.10 requires the State of the Operator
+ * to ESTABLISH flight time limits — it prescribes no numbers, and Attachment A
+ * only offers guidance on building the scheme. The figures below are the
+ * values most States land on, shown as a yardstick, never as a hard rule.
+ */
+const ICAO_TYPICAL: FlightTimeWindow[] = [
+  // Typical State limit — 1,000 h / 365 days. Not an ICAO number.
+  { label: "Last 365 Days", days: 365, max: 1000, citation: "Annex 6 Part I, 4.10 (State-set)" },
+  // Typical State limit — 100 h / 28 days. Not an ICAO number.
+  { label: "Last 28 Days",  days: 28,  max: 100,  citation: "Annex 6 Part I, 4.10 (State-set)" },
+];
+
+/**
+ * Saudi GACA. GACAR is modelled on the FAR, and GACAR Part 117 mirrors
+ * 14 CFR §117.23. UNVERIFIED — treat as FAA-aligned until a GACA source is
+ * checked. The old "30 h / 7 days" row was inherited from the FAA set and is
+ * removed for the same reason (it is a §121.471 figure, not a 117 one).
+ */
+const GACA_117: FlightTimeWindow[] = [
+  { label: "Last 28 Days",  days: 28,  max: 100,  citation: "GACAR Part 117 (FAR-aligned)" },
+  { label: "Last 365 Days", days: 365, max: 1000, citation: "GACAR Part 117 (FAR-aligned)" },
+];
+
+/**
+ * Qatar QCAA. QCAR-OPS Subpart Q is EASA-aligned. UNVERIFIED — the numbers
+ * below are EASA's; confirm against QCAA before relying on them.
+ */
+const QCAA_SUBPART_Q: FlightTimeWindow[] = [
+  { label: "Last 28 Days",   days: 28,  max: 100,  citation: "QCAR-OPS Subpart Q (EASA-aligned)" },
+  { label: "Calendar Year",  days: 365, max: 900,  basis: "calendar-year",   citation: "QCAR-OPS Subpart Q (EASA-aligned)" },
+  { label: "Last 12 Months", days: 365, max: 1000, basis: "calendar-months", months: 12, citation: "QCAR-OPS Subpart Q (EASA-aligned)" },
+];
+
+/**
+ * Hong Kong CAD. The HK scheme derives from UK CAP 371: 100 h flying in any
+ * 28 consecutive days and 900 h in any 12 consecutive calendar months.
+ * UNVERIFIED against the current CAD 371 edition. The old "60 h / 7 days" row
+ * was a duty figure and is removed.
+ */
+const HKCAD_371: FlightTimeWindow[] = [
+  { label: "Last 28 Days",   days: 28,  max: 100, citation: "HK CAD 371 (CAP 371-derived)" },
+  { label: "Last 12 Months", days: 365, max: 900, basis: "calendar-months", months: 12, citation: "HK CAD 371 (CAP 371-derived)" },
+];
+
+/**
+ * China CAAC. CCAR-121-R7 (交通运输部令 2021 年第 5 号, seventh revision,
+ * in force 15 Mar 2021), 第121.487条(b) — verified against the CAAC's own
+ * published text. Two corrections to what used to sit here: the limits are
+ * CALENDAR month / CALENDAR year, not rolling windows, and they live in
+ * 第P章 (Subpart P), not Subpart Q.
+ *
+ *   (b)(1) 任一日历月，100 小时的飞行时间   — 100 h in any calendar month
+ *   (b)(2) 任一日历年，900 小时的飞行时间   — 900 h in any calendar year
+ *
+ * 121.487(c) adds 60 h / 7 consecutive calendar days and 210 h / calendar
+ * month, but those are 飞行值勤期 (flight DUTY period), not flight time, so
+ * they are deliberately not listed here — the same distinction that removed
+ * the bogus EASA 60 h/7 d row.
+ */
+const CAAC_121: FlightTimeWindow[] = [
+  { label: "Calendar Month", days: 30,  max: 100, basis: "calendar-months", months: 1, citation: "CCAR-121-R7 §121.487(b)(1)" },
+  { label: "Calendar Year",  days: 365, max: 900, basis: "calendar-year",              citation: "CCAR-121-R7 §121.487(b)(2)" },
+];
+
+// ============================================================
 // Regimes
 // ============================================================
 
@@ -88,36 +289,31 @@ export const REGIME_RULES: Record<Regime, RegimeRules> = {
     code: "CA",
     name: "Canada",
     authority: "Transport Canada",
-    reference: "CARs 700.15",
-    flightTimeWindows: [
-      { label: "Last 365 Days", days: 365, max: 1200 },
-      { label: "Last 90 Days",  days: 90,  max: 300 },
-      { label: "Last 30 Days",  days: 30,  max: 120 },
-      { label: "Last 7 Days",   days: 7,   max: 40 },
-    ],
+    reference: "CAR 700.28",
+    flightTimeWindows: CA_700_28,
+    // One set only: CARs 700.15 was superseded by the 2018 FDT overhaul
+    // (705 operators Dec 2020, 703/704 Dec 2022) and is deliberately not
+    // offered — showing a repealed ceiling next to the current one invites
+    // a pilot to plan against the wrong number.
     recency: TCCA_RECENCY,
   },
   ICAO: {
     code: "ICAO",
     name: "ICAO",
     authority: "ICAO",
-    reference: "Annex 6 Part I §9.5",
-    flightTimeWindows: [
-      { label: "Last 365 Days", days: 365, max: 1000 },
-      { label: "Last 28 Days",  days: 28,  max: 100 },
-      { label: "Last 7 Days",   days: 7,   max: 35 },
-    ],
+    reference: "Annex 6 Part I, 4.10 — typical State limits",
+    flightTimeWindows: ICAO_TYPICAL,
     recency: ICAO_RECENCY,
   },
   FAA: {
     code: "FAA",
     name: "United States",
     authority: "FAA",
-    reference: "14 CFR §117.23 (Part 121 flightcrew)",
-    flightTimeWindows: [
-      { label: "Last 365 Days", days: 365, max: 1000 },
-      { label: "Last 28 Days",  days: 28,  max: 100 },
-      { label: "Last 7 Days",   days: 7,   max: 30 },
+    reference: "14 CFR §117.23",
+    flightTimeWindows: FAA_117,
+    ruleSets: [
+      { id: "part-117",     label: "US — Part 117 (§117.23)",                   reference: "14 CFR §117.23",   flightTimeWindows: FAA_117 },
+      { id: "part-121-dom", label: "US — Part 121 domestic / cargo (§121.471)",  reference: "14 CFR §121.471",  flightTimeWindows: FAA_121_DOMESTIC },
     ],
     recency: FAA_RECENCY,
   },
@@ -125,89 +321,106 @@ export const REGIME_RULES: Record<Regime, RegimeRules> = {
     code: "EASA",
     name: "Europe",
     authority: "EASA",
-    reference: "ORO.FTL.210 (CAT operators)",
-    flightTimeWindows: [
-      { label: "Last 365 Days", days: 365, max: 1000 },
-      { label: "Last 28 Days",  days: 28,  max: 100 },
-      { label: "Last 7 Days",   days: 7,   max: 60 },
-    ],
+    reference: "ORO.FTL.210",
+    flightTimeWindows: EASA_FTL_210,
     recency: EASA_RECENCY,
   },
   UKCAA: {
     code: "UKCAA",
     name: "United Kingdom",
     authority: "UK CAA",
-    reference: "UK CAA ORS4 / retained EASA Part-ORO",
-    flightTimeWindows: [
-      // UK CAA retained the EASA caps post-Brexit.
-      { label: "Last 365 Days", days: 365, max: 1000 },
-      { label: "Last 28 Days",  days: 28,  max: 100 },
-      { label: "Last 7 Days",   days: 7,   max: 60 },
-    ],
+    reference: "ORO.FTL.210 (UK retained)",
+    flightTimeWindows: UK_FTL_210,
     recency: EASA_RECENCY, // Effectively identical for PPL/CPL recency.
   },
   GCAA: {
     code: "GCAA",
     name: "United Arab Emirates",
     authority: "GCAA",
-    reference: "UAE CAR-OPS 1 (mirrors EASA)",
-    flightTimeWindows: [
-      { label: "Last 365 Days", days: 365, max: 1000 },
-      { label: "Last 28 Days",  days: 28,  max: 100 },
-      { label: "Last 7 Days",   days: 7,   max: 55 },
-    ],
+    reference: "UAE CAR-OPS 1 Subpart Q",
+    flightTimeWindows: GCAA_SUBPART_Q,
     recency: EASA_RECENCY,
   },
   GACA: {
     code: "GACA",
     name: "Saudi Arabia",
     authority: "GACA",
-    reference: "GACAR Part 121 (FAR-aligned)",
-    flightTimeWindows: [
-      { label: "Last 365 Days", days: 365, max: 1000 },
-      { label: "Last 28 Days",  days: 28,  max: 100 },
-      { label: "Last 7 Days",   days: 7,   max: 30 },
-    ],
+    reference: "GACAR Part 117 (FAR-aligned)",
+    flightTimeWindows: GACA_117,
     recency: FAA_RECENCY, // Saudi GACAR mirrors FAR for recency.
   },
   QCAA: {
     code: "QCAA",
     name: "Qatar",
     authority: "QCAA",
-    reference: "QCAR Part-OPS (EASA-aligned)",
-    flightTimeWindows: [
-      { label: "Last 365 Days", days: 365, max: 1000 },
-      { label: "Last 28 Days",  days: 28,  max: 100 },
-      { label: "Last 7 Days",   days: 7,   max: 55 },
-    ],
+    reference: "QCAR-OPS Subpart Q (EASA-aligned)",
+    flightTimeWindows: QCAA_SUBPART_Q,
     recency: EASA_RECENCY,
   },
   HKCAD: {
     code: "HKCAD",
     name: "Hong Kong",
     authority: "HK CAD",
-    reference: "Cap. 448 ANO (UK-aligned)",
-    flightTimeWindows: [
-      { label: "Last 365 Days", days: 365, max: 1000 },
-      { label: "Last 28 Days",  days: 28,  max: 100 },
-      { label: "Last 7 Days",   days: 7,   max: 60 },
-    ],
+    reference: "HK CAD 371",
+    flightTimeWindows: HKCAD_371,
     recency: EASA_RECENCY,
   },
   CAAC: {
     code: "CAAC",
     name: "China",
     authority: "CAAC",
-    reference: "CCAR-121 / CCAR-61",
-    flightTimeWindows: [
-      // CAAC tends slightly stricter than ICAO baseline on weekly hours.
-      { label: "Last 365 Days", days: 365, max: 1000 },
-      { label: "Last 28 Days",  days: 28,  max: 100 },
-      { label: "Last 7 Days",   days: 7,   max: 30 },
-    ],
+    reference: "CCAR-121-R7 §121.487(b)",
+    flightTimeWindows: CAAC_121,
     recency: ICAO_RECENCY, // CCAR-61 currency aligns with ICAO baseline.
   },
 };
+
+// ============================================================
+// Rule-set helpers
+// ============================================================
+
+/**
+ * Every selectable rule set for a regime, default first. Regimes with a
+ * single set get a synthetic one built from the top-level fields, so callers
+ * never have to special-case `ruleSets === undefined`.
+ */
+export function ruleSetsFor(regime: Regime): FlightTimeRuleSet[] {
+  const rules = REGIME_RULES[regime];
+  return rules.ruleSets ?? [{
+    id: "default",
+    label: `${rules.name} — ${rules.reference}`,
+    reference: rules.reference,
+    flightTimeWindows: rules.flightTimeWindows,
+  }];
+}
+
+/** The named rule set, or the regime's default when the id is unknown/absent. */
+export function resolveRuleSet(regime: Regime, ruleSetId?: string): FlightTimeRuleSet {
+  const sets = ruleSetsFor(regime);
+  return sets.find((s) => s.id === ruleSetId) ?? sets[0];
+}
+
+/**
+ * The annual ceiling of a rule set — what a "hours this year" gauge should
+ * draw its red line at.
+ *
+ * Preference order: an explicit calendar-year window (EASA's 900 h is the cap
+ * that binds inside one calendar year), then a 365-day rolling window, then
+ * the longest calendar-months window of a year or more (EASA/UAE 1,000 h over
+ * 12 consecutive calendar months). `days` is the window's nominal length —
+ * 365 for both calendar-year and 12-calendar-month windows.
+ */
+export function yearlyCeiling(regime: Regime, ruleSetId?: string): { max: number; days: number; reference: string } {
+  const set = resolveRuleSet(regime, ruleSetId);
+  const w =
+    set.flightTimeWindows.find((x) => x.basis === "calendar-year") ??
+    set.flightTimeWindows.find((x) => (x.basis ?? "rolling-days") === "rolling-days" && x.days === 365) ??
+    set.flightTimeWindows.find((x) => x.basis === "calendar-months" && (x.months ?? 0) >= 12) ??
+    // Nothing annual in this set — fall back to its longest window so callers
+    // always get a number rather than undefined.
+    [...set.flightTimeWindows].sort((a, b) => b.days - a.days)[0];
+  return { max: w.max, days: w.days, reference: w.citation ?? set.reference };
+}
 
 // ============================================================
 // Compute
@@ -221,6 +434,44 @@ function localIso(d: Date): string {
 }
 
 const r1 = (n: number) => Math.round(n * 10) / 10;
+
+/**
+ * First calendar date inside `w`, given the day the window ends on.
+ * Windows are INCLUSIVE at both ends: a 28-day window ending 2026-01-28 starts
+ * 2026-01-01 and covers 28 calendar dates (not 29).
+ */
+export function flightTimeWindowStart(w: FlightTimeWindow, today: Date): Date {
+  const start = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  switch (w.basis ?? "rolling-days") {
+    case "calendar-year":
+      return new Date(today.getFullYear(), 0, 1);
+    case "calendar-months":
+      // "Any N consecutive calendar months" = the current month plus the
+      // N − 1 complete months before it.
+      return new Date(today.getFullYear(), today.getMonth() - ((w.months ?? 12) - 1), 1);
+    default:
+      start.setDate(start.getDate() - (w.days - 1));
+      return start;
+  }
+}
+
+/**
+ * Hours a flight contributes to a regulatory flight-time limit.
+ *
+ * Simulator sessions are NOT flight time — a category "SIM" row contributes
+ * nothing even when day_time/night_time are populated (several importers put
+ * session length there). `sim_inst` is simulated *instrument* time flown in a
+ * real aircraft under the hood, so it is already inside day/night time and is
+ * never added separately.
+ *
+ * The aug-half-credit preference (profiles.aug_half_credit) is deliberately
+ * ignored: it is an experience-totals convention, and the regulator counts
+ * every logged hour in the seat. See lib/derive.ts `creditedHours`.
+ */
+export function flightTimeHours(f: Flight): number {
+  if (f.category === "SIM") return 0;
+  return (Number(f.day_time) || 0) + (Number(f.night_time) || 0);
+}
 
 /**
  * Sum the count metric for a recency rule over flights in the window.
@@ -262,18 +513,20 @@ export function computeCurrencyForRegime(
   flights: Flight[],
   regime: Regime,
   today: Date = new Date(),
+  ruleSetId?: string,
 ): CurrencyReport {
   const rules = REGIME_RULES[regime];
+  const set = resolveRuleSet(regime, ruleSetId);
   const todayIso = localIso(today);
 
-  // ----- Flight-time windows (existing logic) -----
-  const windows: CurrencyWindow[] = rules.flightTimeWindows.map((w) => {
-    const start = new Date(today);
-    start.setDate(start.getDate() - (w.days - 1));
-    const startIso = localIso(start);
+  // ----- Flight-time windows -----
+  // Both ends inclusive: a flight dated exactly on `start_date` counts, a
+  // flight dated in the future (after `today`) does not.
+  const windows: CurrencyWindow[] = set.flightTimeWindows.map((w) => {
+    const startIso = localIso(flightTimeWindowStart(w, today));
     let used = 0;
     for (const f of flights) {
-      if (f.date >= startIso && f.date <= todayIso) used += Number(f.day_time) + Number(f.night_time);
+      if (f.date >= startIso && f.date <= todayIso) used += flightTimeHours(f);
     }
     used = r1(used);
     return {

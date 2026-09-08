@@ -6,6 +6,7 @@ import LocaleSwitcher from "@/components/LocaleSwitcher";
 import NavTabs, { BottomNav, type NavItem } from "@/components/NavTabs";
 import UserMenu from "@/components/UserMenu";
 import { Pill } from "@/components/ui";
+import { ToastProvider } from "@/components/ui/toast";
 import { getT, getLocale } from "@/lib/i18n-server";
 import HtmlLang from "@/components/HtmlLang";
 
@@ -41,6 +42,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const tier = profile?.tier ?? "free";
 
   return (
+    <ToastProvider locale={locale}>
     <div className="min-h-screen flex flex-col">
       <HtmlLang locale={locale} />
       <header className="sticky top-0 z-30 h-16 bg-surface-inverse/90 backdrop-blur-xl border-b border-white/10">
@@ -75,5 +77,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         locale={locale}
       />
     </div>
+    </ToastProvider>
   );
 }

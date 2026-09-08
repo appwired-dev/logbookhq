@@ -7,6 +7,7 @@ import type { LucideIcon } from "@/components/ui/icons";
 import { makeT, type Locale } from "@/lib/i18n";
 import type { Analysis, CheckStatus, ReconcileCheck } from "@/lib/import/types";
 import { checkLabel, skipReasonLabel, type ImportStringKey, type ImportStrings } from "./import-strings";
+import { explanationFor } from "./check-messages";
 import type { ImportMode, PreviewData } from "./wizard-types";
 
 const STATUS: Record<CheckStatus, { icon: LucideIcon; cls: string; key: ImportStringKey }> = {
@@ -297,6 +298,9 @@ export default function StepReconcile({
 function CheckRow({ c, s, augHalfCredit }: { c: ReconcileCheck; s: ImportStrings; augHalfCredit: boolean }) {
   const st = STATUS[c.status] ?? STATUS.info;
   const StatusIcon = st.icon;
+  // Explanations are rebuilt from the check's messageKey + vars; the label
+  // stays the sheet's own text for declared totals (see checkLabel).
+  const explanation = explanationFor(s, c);
   const delta = c.delta ?? (c.expected != null ? c.actual - c.expected : undefined);
   const showDelta = delta != null && Math.abs(delta) >= 0.05;
   return (
@@ -323,7 +327,7 @@ function CheckRow({ c, s, augHalfCredit }: { c: ReconcileCheck; s: ImportStrings
             )}
           </span>
         </div>
-        {c.explanation && <p className="mt-0.5 text-xs text-ink-2">{c.explanation}</p>}
+        {explanation && <p className="mt-0.5 text-xs text-ink-2">{explanation}</p>}
         {c.suggestion?.kind === "aug_half_credit" && (
           <p className="mt-1.5 text-xs text-ink-2 rounded-control border border-brand/20 bg-brand/5 px-2.5 py-1.5">
             {s("augNote", { state: s(augHalfCredit ? "stateOn" : "stateOff") })}{" "}

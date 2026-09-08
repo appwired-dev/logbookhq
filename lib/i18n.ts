@@ -208,7 +208,6 @@ const TRANSLATIONS = {
   "charts.flightMapSub":   { en: "{routes} unique routes · {airports} airports", ko: "고유 항로 {routes}개 · 공항 {airports}개", zh: "{routes} 条独特航线 · {airports} 个机场", es: "{routes} rutas únicas · {airports} aeropuertos" },
   "charts.years":          { en: "{years} years · peak {peak} hrs", ko: "{years}년 · 최고 {peak}시간", zh: "{years} 年 · 峰值 {peak} 小时", es: "{years} años · pico {peak} h" },
   "charts.types":          { en: "{n} types",              ko: "{n}개 기종", zh: "{n} 种机型",  es: "{n} tipos" },
-  "charts.rollingPeak":    { en: "Peak {peak} hrs · CARs ceiling 1200", ko: "최고 {peak}시간 · CARs 상한 1200", zh: "峰值 {peak} 小时 · CARs 上限 1200", es: "Pico {peak} h · techo CARs 1200" },
   "charts.calDays":        { en: "{year} · {days} flying days", ko: "{year} · 비행일 {days}일", zh: "{year} · {days} 个飞行日", es: "{year} · {days} días de vuelo" },
   "charts.emptyState":     { en: "No flights yet. Import a CSV to see charts.", ko: "비행 기록이 없습니다. CSV를 가져와서 차트를 확인하세요.", zh: "暂无飞行记录。导入 CSV 以查看图表。", es: "Aún no hay vuelos. Importe un CSV para ver los gráficos." },
 

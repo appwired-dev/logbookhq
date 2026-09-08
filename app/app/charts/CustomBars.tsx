@@ -1,45 +1,44 @@
-/**
- * Infographic-style 3D arrow bars for Recharts.
- *
- *   ArrowBar3D            — vertical bar with arrow tip pointing UP (Hours per year).
- *   ArrowBar3DHorizontal  — horizontal bar with arrow tip pointing RIGHT (Hours per aircraft type).
- *
- * Both share:
- *   - All-blue gradient (light → mid → dark)
- *   - Pentagonal front face + isometric depth face
- *   - Hard-edged drop shadow in light slate-grey, offset to the lower-RIGHT so
- *     the shadow of bar N visually lands in the band of bar N+1.
- */
-
-const BLUE_LITE = "#93c5fd";
-const BLUE_MID = "#3b82f6";
-const BLUE_DARK = "#1e40af";
-
-// Shared shadow color — both charts use the same light slate grey.
-const SHADOW_COLOR = "#94a3b8";
-const SHADOW_OPACITY = 0.55;
+"use client";
 
 /**
- * Colour palette for per-aircraft-type bars. Each slot has a light/mid/dark
- * triplet so the same gradient treatment can be applied without per-color math.
- * 10 distinct hues cycled by index — enough for typical pilot logbooks.
+ * Infographic-style 3D bars for Recharts, plus the "Hours per aircraft type"
+ * card that uses them.
+ *
+ *   ArrowBar3D            — vertical bar (flat top) for per-year charts.
+ *   ArrowBar3DHorizontal  — horizontal bar (flat right edge) for per-type charts.
+ *   TypeHoursChart        — card: horizontal bars + a table alternative.
+ *
+ * Colours come from the `--chart-n` tokens. The light and dark faces of each
+ * bar are mixed from the base token and the surface / ink tokens with
+ * `color-mix()`, so a theme swap re-shades every bar without a palette table.
+ * The drop shadow is the bar silhouette, offset so bar N's shadow lands in
+ * the band of bar N+1, blurred with a CSS filter.
  */
-export const COLORED_PALETTE = [
-  { lite: "#93c5fd", mid: "#3b82f6", dark: "#1e40af" }, // blue
-  { lite: "#6ee7b7", mid: "#10b981", dark: "#065f46" }, // emerald
-  { lite: "#fcd34d", mid: "#f59e0b", dark: "#92400e" }, // amber
-  { lite: "#c4b5fd", mid: "#8b5cf6", dark: "#5b21b6" }, // violet
-  { lite: "#f9a8d4", mid: "#ec4899", dark: "#9d174d" }, // pink
-  { lite: "#67e8f9", mid: "#06b6d4", dark: "#155e75" }, // cyan
-  { lite: "#fdba74", mid: "#f97316", dark: "#9a3412" }, // orange
-  { lite: "#bef264", mid: "#84cc16", dark: "#3f6212" }, // lime
-  { lite: "#d8b4fe", mid: "#a855f7", dark: "#6b21a8" }, // purple
-  { lite: "#5eead4", mid: "#14b8a6", dark: "#115e59" }, // teal
-] as const;
 
+import { useId, useState } from "react";
+import {
+  Bar, BarChart, CartesianGrid, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis,
+} from "recharts";
+// TODO(icons): fold ChartBar / Table2 into components/ui/icons.ts (owned by
+// another phase); imported directly until then.
+import { ChartBar, Table2 } from "lucide-react";
+import { Card, CardHeader, buttonClass } from "@/components/ui";
+import { useReducedMotion } from "@/lib/use-reduced-motion";
+
+const CHART_TOKENS = ["chart-1", "chart-2", "chart-3", "chart-4", "chart-5", "chart-6", "chart-7", "chart-8"] as const;
+
+/** Light / mid / dark faces for chart series `i` (cycles through --chart-1..8). */
 export function paletteForIndex(i: number) {
-  return COLORED_PALETTE[i % COLORED_PALETTE.length];
+  const base = `rgb(var(--${CHART_TOKENS[((i % CHART_TOKENS.length) + CHART_TOKENS.length) % CHART_TOKENS.length]}))`;
+  return {
+    lite: `color-mix(in srgb, ${base} 55%, rgb(var(--surface)))`,
+    mid: base,
+    dark: `color-mix(in srgb, ${base} 72%, rgb(var(--ink-1)))`,
+  };
 }
+
+const SHADOW = { fill: "rgb(var(--ink-3))", fillOpacity: 0.45, filter: "blur(1.2px)" } as const;
+const HIGHLIGHT = { stroke: "rgb(var(--surface) / 0.5)" } as const;
 
 interface ShapeProps {
   x?: number;
@@ -53,70 +52,37 @@ interface ShapeProps {
 
 /** Vertical 3D bar — grows upward, flat top. */
 export function ArrowBar3D(props: ShapeProps) {
-  const { x = 0, y = 0, width = 0, height = 0 } = props;
+  const { x = 0, y = 0, width = 0, height = 0, index = 0, colored = false } = props;
   if (height <= 0 || width <= 0) return null;
 
+  const pal = paletteForIndex(colored ? index : 0);
   const depth = Math.min(width * 0.42, 11);
   const id = `varr-${Math.round(x)}-${Math.round(y)}-${Math.round(width)}`;
 
   // Shadow offset: push roughly one bar-width to the right so it falls into
-  // the next year's column band, plus a small vertical drop.
+  // the next column band, plus a small vertical drop.
   const shDx = Math.round(width * 0.85);
   const shDy = 6;
 
-  // Front face: plain rectangle (no arrow tip).
-  const front = [
-    `M ${x},${y + height}`,
-    `L ${x},${y}`,
-    `L ${x + width},${y}`,
-    `L ${x + width},${y + height}`,
-    "Z",
-  ].join(" ");
-
-  // Right + top depth face — extruded back-up at an isometric angle.
-  const side = [
-    `M ${x + width},${y}`,
-    `L ${x + width + depth},${y - depth}`,
-    `L ${x + width + depth},${y + height - depth}`,
-    `L ${x + width},${y + height}`,
-    "Z",
-  ].join(" ");
-  const top = [
-    `M ${x},${y}`,
-    `L ${x + depth},${y - depth}`,
-    `L ${x + width + depth},${y - depth}`,
-    `L ${x + width},${y}`,
-    "Z",
-  ].join(" ");
+  const front = [`M ${x},${y + height}`, `L ${x},${y}`, `L ${x + width},${y}`, `L ${x + width},${y + height}`, "Z"].join(" ");
+  const side = [`M ${x + width},${y}`, `L ${x + width + depth},${y - depth}`, `L ${x + width + depth},${y + height - depth}`, `L ${x + width},${y + height}`, "Z"].join(" ");
+  const top = [`M ${x},${y}`, `L ${x + depth},${y - depth}`, `L ${x + width + depth},${y - depth}`, `L ${x + width},${y}`, "Z"].join(" ");
 
   return (
     <g>
       <defs>
         <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={BLUE_LITE} />
-          <stop offset="50%" stopColor={BLUE_MID} />
-          <stop offset="100%" stopColor={BLUE_DARK} />
+          <stop offset="0%" style={{ stopColor: pal.lite }} />
+          <stop offset="50%" style={{ stopColor: pal.mid }} />
+          <stop offset="100%" style={{ stopColor: pal.dark }} />
         </linearGradient>
-        <filter id={`${id}-shadow`} x="-20%" y="-20%" width="200%" height="200%">
-          <feDropShadow
-            dx={shDx}
-            dy={shDy}
-            stdDeviation="1.2"
-            floodColor={SHADOW_COLOR}
-            floodOpacity={SHADOW_OPACITY}
-          />
-        </filter>
       </defs>
-      {/* Shadow group: draw the bar silhouette filtered to drop-shadow only.
-          The fill is fully transparent so only the dropped shadow renders. */}
-      <g filter={`url(#${id}-shadow)`}>
-        <path d={front} fill="rgba(0,0,0,0.001)" />
-      </g>
-      <path d={side} fill={BLUE_DARK} opacity="0.82" />
-      <path d={top} fill={BLUE_LITE} opacity="0.85" />
+      <path d={front} transform={`translate(${shDx} ${shDy})`} style={SHADOW} />
+      <path d={side} opacity="0.82" style={{ fill: pal.dark }} />
+      <path d={top} opacity="0.85" style={{ fill: pal.lite }} />
       <path d={front} fill={`url(#${id})`} />
-      {/* Specular highlight along top-front edge */}
-      <path d={`M ${x + 1.5},${y + 0.5} L ${x + width - 1.5},${y + 0.5}`} stroke="rgba(255,255,255,0.5)" strokeWidth="1" strokeLinecap="round" />
+      {/* Specular highlight along the top-front edge */}
+      <path d={`M ${x + 1.5},${y + 0.5} L ${x + width - 1.5},${y + 0.5}`} strokeWidth="1" strokeLinecap="round" style={HIGHLIGHT} />
     </g>
   );
 }
@@ -126,83 +92,161 @@ export function ArrowBar3DHorizontal(props: ShapeProps) {
   const { x = 0, y = 0, width = 0, height = 0, index = 0, colored = false } = props;
   if (height <= 0 || width <= 0) return null;
 
-  // Pick gradient colors: per-index palette when `colored`, otherwise the
-  // shared blue gradient.
-  const pal = colored ? paletteForIndex(index) : { lite: BLUE_LITE, mid: BLUE_MID, dark: BLUE_DARK };
-
+  const pal = paletteForIndex(colored ? index : 0);
   const depth = Math.min(height * 0.42, 9);
   const id = `harr-${Math.round(x)}-${Math.round(y)}-${Math.round(width)}-${index}`;
 
   // Shadow offset: push down by roughly one bar-height so it lands in the
-  // next aircraft-type's row band; same horizontal grey as vertical chart.
+  // next row's band.
   const shDx = 6;
   const shDy = Math.round(height * 0.85);
 
-  // Front face: plain rectangle (no arrow tip)
-  const front = [
-    `M ${x},${y}`,
-    `L ${x + width},${y}`,
-    `L ${x + width},${y + height}`,
-    `L ${x},${y + height}`,
-    "Z",
-  ].join(" ");
-
-  // Top face — extruded back-up at an isometric angle.
-  const top = [
-    `M ${x},${y}`,
-    `L ${x + width},${y}`,
-    `L ${x + width + depth},${y - depth}`,
-    `L ${x + depth},${y - depth}`,
-    "Z",
-  ].join(" ");
+  const front = [`M ${x},${y}`, `L ${x + width},${y}`, `L ${x + width},${y + height}`, `L ${x},${y + height}`, "Z"].join(" ");
+  const top = [`M ${x},${y}`, `L ${x + width},${y}`, `L ${x + width + depth},${y - depth}`, `L ${x + depth},${y - depth}`, "Z"].join(" ");
   // Right side face — fills the wedge between the bar's right edge and its
   // extruded back-right corner. Without this the bar end looks hollow.
-  const side = [
-    `M ${x + width},${y}`,
-    `L ${x + width + depth},${y - depth}`,
-    `L ${x + width + depth},${y + height - depth}`,
-    `L ${x + width},${y + height}`,
-    "Z",
-  ].join(" ");
+  const side = [`M ${x + width},${y}`, `L ${x + width + depth},${y - depth}`, `L ${x + width + depth},${y + height - depth}`, `L ${x + width},${y + height}`, "Z"].join(" ");
 
   return (
     <g>
       <defs>
         <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={pal.lite} />
-          <stop offset="50%" stopColor={pal.mid} />
-          <stop offset="100%" stopColor={pal.dark} />
+          <stop offset="0%" style={{ stopColor: pal.lite }} />
+          <stop offset="50%" style={{ stopColor: pal.mid }} />
+          <stop offset="100%" style={{ stopColor: pal.dark }} />
         </linearGradient>
-        <filter id={`${id}-shadow`} x="-20%" y="-20%" width="200%" height="200%">
-          <feDropShadow
-            dx={shDx}
-            dy={shDy}
-            stdDeviation="1.2"
-            floodColor={SHADOW_COLOR}
-            floodOpacity={SHADOW_OPACITY}
-          />
-        </filter>
       </defs>
-      <g filter={`url(#${id}-shadow)`}>
-        <path d={front} fill="rgba(0,0,0,0.001)" />
-      </g>
-      <path d={side} fill={pal.dark} opacity="0.82" />
-      <path d={top} fill={pal.lite} opacity="0.85" />
+      <path d={front} transform={`translate(${shDx} ${shDy})`} style={SHADOW} />
+      <path d={side} opacity="0.82" style={{ fill: pal.dark }} />
+      <path d={top} opacity="0.85" style={{ fill: pal.lite }} />
       <path d={front} fill={`url(#${id})`} />
-      {/* Specular highlight along top edge */}
-      <path d={`M ${x + 0.5},${y + 0.5} L ${x + width - 1},${y + 0.5}`} stroke="rgba(255,255,255,0.5)" strokeWidth="1" strokeLinecap="round" />
+      {/* Specular highlight along the top edge */}
+      <path d={`M ${x + 0.5},${y + 0.5} L ${x + width - 1},${y + 0.5}`} strokeWidth="1" strokeLinecap="round" style={HIGHLIGHT} />
     </g>
   );
 }
 
-/**
- * Recharts-compatible wrapper: same as ArrowBar3DHorizontal but cycles a
- * multi-colour palette by index. Used by "Hours per aircraft type" so each
- * aircraft gets its own hue while sharing the 3D arrow design.
- */
+/** Same as ArrowBar3DHorizontal but cycles the chart palette by index. */
 export function ArrowBar3DHorizontalColored(props: ShapeProps) {
   return <ArrowBar3DHorizontal {...props} colored />;
 }
 
 /** @deprecated — kept for backward compat. Use ArrowBar3DHorizontal instead. */
 export const CylinderBar = ArrowBar3DHorizontal;
+
+// ---------------------------------------------------------------------------
+
+export type TypeHoursRow = { name: string; hours: number };
+
+export type TypeHoursStrings = {
+  viewAsTable: string;
+  viewAsChart: string;
+  colType: string;
+  colHours: string;
+  colShare: string;
+};
+
+const TOOLTIP_STYLE = {
+  borderRadius: "var(--r-control)",
+  border: "1px solid rgb(var(--border))",
+  boxShadow: "var(--shadow-pop)",
+  background: "rgb(var(--surface))",
+  padding: "8px 12px",
+  fontSize: 12,
+} as const;
+
+const ellipsis = (v: unknown) => {
+  const s = String(v ?? "");
+  return s.length > 18 ? `${s.slice(0, 17)}…` : s;
+};
+
+/**
+ * "Hours per aircraft type" card. The chart is decorative for assistive tech:
+ * the same numbers are always rendered as a table — visually hidden while the
+ * chart is shown, and swapped in for everyone via the "View as table" toggle.
+ */
+export default function TypeHoursChart({
+  rows, title, eyebrow, meta, strings, hoursUnit, locale,
+}: {
+  rows: TypeHoursRow[];
+  title: string;
+  eyebrow?: string;
+  meta?: string;
+  strings: TypeHoursStrings;
+  hoursUnit: string;
+  locale: string;
+}) {
+  const [mode, setMode] = useState<"chart" | "table">("chart");
+  const reduceMotion = useReducedMotion();
+  const tableId = useId();
+  const total = rows.reduce((s, r) => s + r.hours, 0) || 1;
+  const height = Math.max(200, rows.length * 34 + 30);
+  const nf = (n: number) => n.toLocaleString(locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  const showTable = mode === "table";
+
+  return (
+    <Card padding="md" className="chart-card chart-bars min-w-0 overflow-hidden">
+      <CardHeader
+        eyebrow={eyebrow}
+        title={title}
+        meta={meta}
+        actions={
+          <button
+            type="button"
+            className={buttonClass("ghost", "sm", "min-h-11 sm:min-h-0")}
+            aria-pressed={showTable}
+            aria-controls={tableId}
+            onClick={() => setMode((m) => (m === "chart" ? "table" : "chart"))}
+          >
+            {showTable
+              ? <><ChartBar size={14} strokeWidth={2} aria-hidden />{strings.viewAsChart}</>
+              : <><Table2 size={14} strokeWidth={2} aria-hidden />{strings.viewAsTable}</>}
+          </button>
+        }
+      />
+
+      {!showTable && (
+        <div className="min-w-0" style={{ height }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={rows} layout="vertical" margin={{ top: 8, right: 56, bottom: 4, left: 0 }} barCategoryGap="28%">
+              <CartesianGrid horizontal={false} strokeDasharray="2 4" />
+              <XAxis type="number" axisLine={false} tickLine={false} />
+              <YAxis type="category" dataKey="name" width={132} interval={0} axisLine={false} tickLine={false} tickFormatter={ellipsis} />
+              <Tooltip
+                contentStyle={TOOLTIP_STYLE}
+                labelStyle={{ color: "rgb(var(--ink-3))" }}
+                itemStyle={{ color: "rgb(var(--ink-1))", fontWeight: 600 }}
+                formatter={(v: unknown) => [`${nf(Number(v))} ${hoursUnit}`, strings.colHours]}
+              />
+              <Bar dataKey="hours" shape={<ArrowBar3DHorizontalColored />} isAnimationActive={!reduceMotion}>
+                <LabelList dataKey="hours" position="right" offset={14} className="num" formatter={(v: unknown) => nf(Number(v))} />
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      <div className={showTable ? "overflow-x-auto -mx-1" : "sr-only"}>
+        <table id={tableId} className="w-full text-sm">
+          <caption className="sr-only">{title}</caption>
+          <thead>
+            <tr className="border-b border-border">
+              <th scope="col" className="px-1 py-1.5 text-left text-2xs font-semibold uppercase tracking-[0.08em] text-ink-2">{strings.colType}</th>
+              <th scope="col" className="px-1 py-1.5 text-right text-2xs font-semibold uppercase tracking-[0.08em] text-ink-2">{strings.colHours}</th>
+              <th scope="col" className="px-1 py-1.5 text-right text-2xs font-semibold uppercase tracking-[0.08em] text-ink-2">{strings.colShare}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.name} className="border-b border-border/60 last:border-0">
+                <th scope="row" className="px-1 py-1.5 text-left font-medium text-ink-1">{r.name}</th>
+                <td className="px-1 py-1.5 text-right num text-ink-1">{nf(r.hours)}</td>
+                <td className="px-1 py-1.5 text-right num text-ink-2">{Math.round((r.hours / total) * 100)}%</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+  );
+}
