@@ -358,6 +358,36 @@ test("Excel durations: an epoch-day Date is still 1.5 h / \"1:30\" and is not di
   assert.equal(g.dateCols, undefined);
 });
 
+test("R2c: a blank-header data column inside a merged group inherits the group (native Numbers export)", () => {
+  const csv = [
+    "Date,Aircraft,,Single Engine,",
+    ",Make/Model,,Day,Night",
+    "2024-03-05,C172,G-ABCD,1.5,",
+    "2024-03-06,C172,G-ABCD,1.2,0.4",
+  ].join("\n");
+  const wb = readWorkbook(new TextEncoder().encode(csv), "numbers-like.csv");
+  const band = detectHeaderBand(wb.sheets[0]);
+  const paths = band.paths.map((p) => p.path.join(" › "));
+  assert.deepEqual(paths, ["Date", "Aircraft › Make/Model", "Aircraft", "Single Engine › Day", "Single Engine › Night"]);
+  // Native Numbers layout: blank-ish top row (groups only further right), group label on the middle row.
+  const csv3 = [
+    ",,,Single Engine,,Multi Engine,",
+    ",Aircraft,,Day,Night,Day,Night",
+    "Date,Make/Model,,,,,",
+    "2024-03-05,C172,G-ABCD,1.5,,,",
+    "2024-03-06,PA44,G-TWIN,,,1.2,0.4",
+  ].join("\n");
+  const band3 = detectHeaderBand(readWorkbook(new TextEncoder().encode(csv3), "native-like.csv").sheets[0]);
+  assert.deepEqual(band3.paths.map((p) => p.path.join(" › ")), [
+    "Date", "Aircraft › Make/Model", "Aircraft",
+    "Single Engine › Day", "Single Engine › Night", "Multi Engine › Day", "Multi Engine › Night",
+  ]);
+  // A column that is blank all the way down still ends the span.
+  const wb2 = readWorkbook(new TextEncoder().encode(["Date,Aircraft,,PIC", ",Make/Model,,Hours", "2024-03-05,C172,,1.5"].join("\n")), "gap.csv");
+  const band2 = detectHeaderBand(wb2.sheets[0]);
+  assert.deepEqual(band2.paths[2].path, []);
+});
+
 // ---------------------------------------------------------------------------
 // Summary
 // ---------------------------------------------------------------------------
