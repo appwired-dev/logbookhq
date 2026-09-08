@@ -76,6 +76,22 @@ export default function LandingPage() {
           </div>
         </section>
 
+        {/* ---- career-flow showcase (the beauty shot) ---- */}
+        <section className="mx-auto max-w-6xl px-5 pt-6 pb-4">
+          <div className="lp-panel lp-panel-glow p-6 sm:p-8">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <div className="lp-eyebrow" style={{ color: "var(--lp-amber)" }}>See the whole career</div>
+                <h2 className="lp-h2 mt-2" style={{ fontSize: "clamp(24px,3.4vw,34px)" }}>Every year, into every type, into every seat.</h2>
+              </div>
+              <p className="lp-mono text-xs" style={{ color: "var(--lp-ink-3)" }}>drawn from your flights · hover for hours</p>
+            </div>
+            <div className="mt-6 overflow-x-auto">
+              <CareerFlow />
+            </div>
+          </div>
+        </section>
+
         {/* ---- the switch ---- */}
         <section className="mx-auto max-w-6xl px-5 py-16">
           <div className="lp-panel p-7 sm:p-9 lp-panel-glow">
@@ -289,6 +305,102 @@ function GaugeMotif() {
         </div>
       ))}
     </div>
+  );
+}
+
+/**
+ * The career-flow beauty shot: a real three-column Sankey (Year → Aircraft →
+ * Seat) with proper stacked-ribbon attachment, hand-set to a believable
+ * balanced flow. Pure SVG, no data, no library — it's a marketing motif that
+ * mirrors the app's own career Sankey.
+ */
+function CareerFlow() {
+  const W = 920, H = 300, PAD_TOP = 30, GAP = 16, UNIT = 1.9, BAR = 9;
+  type N = { key: string; label: string; val: number };
+  const years: N[] = [
+    { key: "2024", label: "2024", val: 52 },
+    { key: "2023", label: "2023", val: 44 },
+    { key: "2022", label: "2022", val: 30 },
+  ];
+  const acft: N[] = [
+    { key: "A320", label: "A320", val: 64 },
+    { key: "B787", label: "B787", val: 34 },
+    { key: "C172", label: "C172", val: 28 },
+  ];
+  const seats: N[] = [
+    { key: "PIC", label: "PIC", val: 70 },
+    { key: "FO", label: "FO", val: 38 },
+    { key: "DUAL", label: "DUAL", val: 18 },
+  ];
+  // links carry value; attach in list order so ribbons stack within each node.
+  const l1: [string, string, number][] = [
+    ["2024", "A320", 32], ["2024", "B787", 14], ["2024", "C172", 6],
+    ["2023", "A320", 24], ["2023", "B787", 14], ["2023", "C172", 6],
+    ["2022", "A320", 8], ["2022", "B787", 6], ["2022", "C172", 16],
+  ];
+  const l2: [string, string, number][] = [
+    ["A320", "PIC", 40], ["A320", "FO", 24],
+    ["B787", "PIC", 22], ["B787", "FO", 12],
+    ["C172", "PIC", 8], ["C172", "FO", 2], ["C172", "DUAL", 18],
+  ];
+
+  const layout = (nodes: N[]) => {
+    const m = new Map<string, { y: number; h: number; out: number; in: number }>();
+    let y = PAD_TOP;
+    for (const n of nodes) { const h = n.val * UNIT; m.set(n.key, { y, h, out: 0, in: 0 }); y += h + GAP; }
+    return m;
+  };
+  const yc = layout(years), ac = layout(acft), sc = layout(seats);
+  const X = { year: 150, acftL: 455, acftR: 464, seat: 766 };
+
+  const ribbon = (x0: number, y0: number, w0: number, x1: number, y1: number, w1: number) => {
+    const mx = (x0 + x1) / 2;
+    return `M${x0},${y0} C${mx},${y0} ${mx},${y1} ${x1},${y1} L${x1},${y1 + w1} C${mx},${y1 + w1} ${mx},${y0 + w0} ${x0},${y0 + w0} Z`;
+  };
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ minWidth: 640, height: "auto" }} role="img" aria-label="A Sankey flow of flight hours from year to aircraft type to crew seat.">
+      <defs>
+        <linearGradient id="cf" x1="0" x2="1">
+          <stop offset="0" stopColor="var(--lp-cyan)" />
+          <stop offset="1" stopColor="var(--lp-amber)" />
+        </linearGradient>
+      </defs>
+      {/* column headers */}
+      {[["YEAR", 150], ["AIRCRAFT", 460], ["SEAT", 770]].map(([t, x]) => (
+        <text key={t as string} x={x as number} y={16} textAnchor="middle" className="lp-mono" style={{ fill: "var(--lp-ink-3)", fontSize: 11, letterSpacing: "0.12em" }}>{t}</text>
+      ))}
+      {/* ribbons: year → aircraft */}
+      {l1.map(([s, t, v], i) => {
+        const S = yc.get(s)!, T = ac.get(t)!;
+        const sy = S.y + S.out; S.out += v * UNIT;
+        const ty = T.y + T.in; T.in += v * UNIT;
+        return <path key={`a${i}`} d={ribbon(X.year + BAR, sy, v * UNIT, X.acftL, ty, v * UNIT)} fill="url(#cf)" fillOpacity={0.4} />;
+      })}
+      {/* ribbons: aircraft → seat */}
+      {l2.map(([s, t, v], i) => {
+        const S = ac.get(s)!, T = sc.get(t)!;
+        const sy = S.y + S.out; S.out += v * UNIT;
+        const ty = T.y + T.in; T.in += v * UNIT;
+        return <path key={`b${i}`} d={ribbon(X.acftR, sy, v * UNIT, X.seat, ty, v * UNIT)} fill="url(#cf)" fillOpacity={0.4} />;
+      })}
+      {/* node bars + labels */}
+      {years.map((n) => { const g = yc.get(n.key)!; return (
+        <g key={n.key}>
+          <rect x={X.year} y={g.y} width={BAR} height={g.h} rx={2} fill="var(--lp-cyan)" />
+          <text x={X.year - 8} y={g.y + g.h / 2 + 4} textAnchor="end" className="lp-mono" style={{ fill: "var(--lp-ink-2)", fontSize: 13 }}>{n.label}</text>
+        </g>); })}
+      {acft.map((n) => { const g = ac.get(n.key)!; return (
+        <g key={n.key}>
+          <rect x={X.acftL} y={g.y} width={BAR} height={g.h} rx={2} fill="var(--lp-ink-2)" />
+          <text x={X.acftR + 8} y={g.y + g.h / 2 + 4} className="lp-mono" style={{ fill: "var(--lp-ink)", fontSize: 13, fontWeight: 600 }}>{n.label}</text>
+        </g>); })}
+      {seats.map((n) => { const g = sc.get(n.key)!; return (
+        <g key={n.key}>
+          <rect x={X.seat} y={g.y} width={BAR} height={g.h} rx={2} fill="var(--lp-amber)" />
+          <text x={X.seat + BAR + 8} y={g.y + g.h / 2 + 4} className="lp-mono" style={{ fill: "var(--lp-ink-2)", fontSize: 13 }}>{n.label}</text>
+        </g>); })}
+    </svg>
   );
 }
 
