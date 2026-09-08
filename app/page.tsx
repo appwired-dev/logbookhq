@@ -1,4 +1,10 @@
 import Link from "next/link";
+import Image, { type StaticImageData } from "next/image";
+import dashboardShot from "@/public/marketing/dashboard.png";
+import limitsShot from "@/public/marketing/limits.png";
+import sankeyShot from "@/public/marketing/sankey.png";
+import globeShot from "@/public/marketing/globe.png";
+import transferShot from "@/public/marketing/transfer.png";
 
 /**
  * Marketing landing page — instrument-panel dark.
@@ -76,68 +82,56 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* ---- career-flow showcase (the beauty shot) ---- */}
-        <section className="mx-auto max-w-6xl px-5 pt-6 pb-4">
-          <div className="lp-panel lp-panel-glow p-6 sm:p-8">
-            <div className="flex flex-wrap items-end justify-between gap-3">
-              <div>
-                <div className="lp-eyebrow" style={{ color: "var(--lp-amber)" }}>See the whole career</div>
-                <h2 className="lp-h2 mt-2" style={{ fontSize: "clamp(24px,3.4vw,34px)" }}>Every year, into every type, into every seat.</h2>
-              </div>
-              <p className="lp-mono text-xs" style={{ color: "var(--lp-ink-3)" }}>drawn from your flights · hover for hours</p>
-            </div>
-            <div className="mt-6 overflow-x-auto">
-              <CareerFlow />
-            </div>
-          </div>
-        </section>
+        {/* ---- product showcase: real captures from the app ---- */}
+        <Showcase
+          eyebrow="The switch"
+          title="Changing logbooks shouldn't mean re-typing your career."
+          lede="Every other app assumes you start from zero, or that you fly for the FAA. Drop in the logbook you kept for years — CSV, Excel, ForeFlight, LogTen, a Numbers file — and the wizard detects your columns, then reconciles the import against the totals you already trust before it saves a thing."
+        >
+          <Shot src={transferShot} alt="The import and export screen: a drag-and-drop wizard that reads ForeFlight, LogTen, MyFlightbook, Apple Numbers and CSV, plus PDF and CSV export." />
+        </Showcase>
 
-        {/* ---- the switch ---- */}
-        <section className="mx-auto max-w-6xl px-5 py-16">
-          <div className="lp-panel p-7 sm:p-9 lp-panel-glow">
-            <div className="lp-eyebrow">The switch</div>
-            <h2 className="lp-h2 mt-3 max-w-3xl">
-              Changing logbooks shouldn&apos;t mean re-typing your career.
-            </h2>
-            <p className="lp-lede mt-4 max-w-2xl">
-              Every other app assumes you start from zero, or that you fly for the FAA. Pilot Logbook HQ
-              reads the logbook you kept for years, whatever shape it&apos;s in, reconciles it against the
-              totals you already trust, and tells you exactly what it found before it saves a thing.
-            </p>
-          </div>
-        </section>
+        <Showcase
+          eyebrow="Your logbook, totalled"
+          title="Every hour, added up the way you keep them."
+          lede="Total time, PIC, night, cross-country, instrument, multi-engine — each credited to your own convention, augmenting time at 50% if that's how you count. Here: 8,484 hours across 5,334 flights, live."
+        >
+          <Shot src={dashboardShot} alt="The dashboard: stat tiles showing 8,484 total hours, PIC, FO, cross-country and instrument time, each with a 30-day trend." />
+        </Showcase>
 
-        {/* ---- feature narrative ---- */}
-        <section className="mx-auto max-w-6xl px-5 pb-10">
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <Feature
-              eyebrow="Every authority"
-              title="Your limits follow you"
-              body="Fly for a Canadian, US, European or Gulf operator and your rolling flight-time limits and currency track the right rules — CAR 700.28, FAR 117, ORO.FTL.210, and more."
-            >
-              <GaugeMotif />
-            </Feature>
+        <Showcase
+          eyebrow="See the whole career"
+          title="Every year, into every type, into every seat."
+          lede="One flow of your entire logbook — each year into each aircraft into each crew seat, ribbon width in hours. Twenty-five years of flying, read in a single glance."
+        >
+          <Shot src={sankeyShot} alt="A Sankey diagram flowing from year (1999 to 2026) to aircraft type to crew role — PIC, FO, dual, SIC — with ribbon width scaled to hours." />
+        </Showcase>
 
-            <Feature
-              eyebrow="See the career"
-              title="Where the hours went"
-              body="A single flow of every year into every aircraft into every seat. Ten thousand rows become one picture you can read in a glance."
-            >
-              <SankeyMotif />
-            </Feature>
+        <Showcase
+          eyebrow="The map"
+          title="Every route you've flown, on a living globe."
+          lede="Spun up from the airports in your own logbook — 147 routes across 97 airports here — with your busiest legs ranked beside it. Drag to spin, scroll to zoom."
+        >
+          <Shot src={globeShot} alt="An interactive 3D globe of flown routes over North America, arcs weighted by number of flights, with a top-routes panel." dark />
+        </Showcase>
 
-            <Feature
-              eyebrow="The map"
-              title="Every route you've flown"
-              body="A living globe of your network — every airport, every leg, spun up from the flights you already logged."
-            >
-              <GlobeMotif />
-            </Feature>
+        <Showcase
+          eyebrow="Every authority"
+          title="Your limits and currency follow you."
+          lede="Rolling flight-time limits and recency under the rules you actually fly — CAR 700.28 here, or FAR 117, ORO.FTL and more — each window green until it isn't."
+        >
+          <Shot src={limitsShot} alt="Flight-time-limit bars for the last 365, 90 and 28 days, a calendar heatmap of flying days, and IFR and passenger recency cards, all showing current." />
+        </Showcase>
 
+        {/* ---- feature narrative (the rest of the panel) ---- */}
+        <section className="mx-auto max-w-6xl px-5 pt-8 pb-10">
+          <div className="lp-eyebrow" style={{ color: "var(--lp-amber)" }}>And the rest of the panel</div>
+          <h2 className="lp-h2 mt-2" style={{ fontSize: "clamp(24px,3.4vw,34px)" }}>The details that keep you legal and fast.</h2>
+          <div className="mt-7 grid md:grid-cols-2 lg:grid-cols-3 gap-4">
             <Feature
               eyebrow="Find it fast"
               title="Search thousands of flights"
-              body="Type a tail number, an airport, a name. Three thousand flights narrow to the ones you meant, on the keystroke."
+              body="Type a tail number, an airport, a name. Thousands of flights narrow to the ones you meant, on the keystroke."
             >
               <SearchMotif />
             </Feature>
@@ -191,7 +185,7 @@ export default function LandingPage() {
             <p className="lp-lede sm:border-l sm:pl-6" style={{ borderColor: "var(--lp-line)" }}>
               I fly the line out of Vancouver. I built this because the logbooks I could buy treated
               Canadian and international pilots as an afterthought, and the free ones looked a decade old.
-              It&apos;s the same tool I use to track my own hours — 2,600 flights and counting.
+              It&apos;s the same tool I use to track my own hours — 5,200 flights and counting.
             </p>
           </div>
         </section>
@@ -228,14 +222,14 @@ export default function LandingPage() {
    --------------------------------------------------------------------------- */
 function ReconcileCard() {
   const checks: [string, string][] = [
-    ["Total time", "4,242.0 h"],
-    ["Multi-engine", "3,140.6 h"],
-    ["Night", "1,147.2 h"],
+    ["Total time", "8,484.0 h"],
+    ["Multi-engine", "6,281.2 h"],
+    ["Night", "2,294.4 h"],
     ["Cross-country", "verified"],
-    ["IFR approaches", "732"],
+    ["IFR approaches", "1,464"],
   ];
   return (
-    <div className="lp-panel lp-panel-glow p-5 sm:p-6" role="img" aria-label="An imported logbook reconciled: every check green, 2,672 flights.">
+    <div className="lp-panel lp-panel-glow p-5 sm:p-6" role="img" aria-label="An imported logbook reconciled: every check green, 5,334 flights.">
       {/* file chip */}
       <div className="flex items-center gap-3">
         <div className="grid place-items-center rounded-lg shrink-0" style={{ width: 38, height: 38, background: "rgba(86,199,222,.10)", border: "1px solid var(--lp-line-2)" }}>
@@ -269,7 +263,7 @@ function ReconcileCard() {
 
       {/* footer stat */}
       <div className="mt-4 flex items-baseline gap-2">
-        <span className="lp-num" style={{ fontSize: 30, fontFamily: "var(--lp-display)", fontWeight: 700, color: "var(--lp-ink)" }}>2,672</span>
+        <span className="lp-num" style={{ fontSize: 30, fontFamily: "var(--lp-display)", fontWeight: 700, color: "var(--lp-ink)" }}>5,334</span>
         <span className="text-sm" style={{ color: "var(--lp-ink-2)" }}>flights ready to import</span>
         <span className="lp-mono ml-auto text-xs" style={{ color: "var(--lp-good)" }}>every check green</span>
       </div>
@@ -291,153 +285,36 @@ function Feature({ eyebrow, title, body, children }: { eyebrow: string; title: s
   );
 }
 
-function GaugeMotif() {
-  const rows: [string, number][] = [["365 d", 0.62], ["90 d", 0.44], ["28 d", 0.8]];
+/* ---------------------------------------------------------------------------
+   Product showcase — real app captures, framed as a browser window
+   --------------------------------------------------------------------------- */
+function Showcase({ eyebrow, title, lede, children }: { eyebrow: string; title: string; lede: string; children: React.ReactNode }) {
   return (
-    <div className="space-y-2.5">
-      {rows.map(([label, pct]) => (
-        <div key={label} className="flex items-center gap-3">
-          <span className="lp-mono text-xs w-10 shrink-0" style={{ color: "var(--lp-ink-3)" }}>{label}</span>
-          <div className="lp-gauge lp-sweep flex-1">
-            <i style={{ width: `${pct * 100}%` }} />
-            <span className="lp-gauge-ceiling" style={{ right: "8%" }} />
-          </div>
-        </div>
-      ))}
-    </div>
+    <section className="mx-auto max-w-6xl px-5 py-9">
+      <div className="max-w-2xl">
+        <div className="lp-eyebrow" style={{ color: "var(--lp-amber)" }}>{eyebrow}</div>
+        <h2 className="lp-h2 mt-2" style={{ fontSize: "clamp(24px,3.4vw,34px)" }}>{title}</h2>
+        <p className="lp-lede mt-3">{lede}</p>
+      </div>
+      <div className="mt-7">{children}</div>
+    </section>
   );
 }
 
-/**
- * The career-flow beauty shot: a real three-column Sankey (Year → Aircraft →
- * Seat) with proper stacked-ribbon attachment, hand-set to a believable
- * balanced flow. Pure SVG, no data, no library — it's a marketing motif that
- * mirrors the app's own career Sankey.
- */
-function CareerFlow() {
-  const W = 920, H = 300, PAD_TOP = 30, GAP = 16, UNIT = 1.9, BAR = 9;
-  type N = { key: string; label: string; val: number };
-  const years: N[] = [
-    { key: "2024", label: "2024", val: 52 },
-    { key: "2023", label: "2023", val: 44 },
-    { key: "2022", label: "2022", val: 30 },
-  ];
-  const acft: N[] = [
-    { key: "A320", label: "A320", val: 64 },
-    { key: "B787", label: "B787", val: 34 },
-    { key: "C172", label: "C172", val: 28 },
-  ];
-  const seats: N[] = [
-    { key: "PIC", label: "PIC", val: 70 },
-    { key: "FO", label: "FO", val: 38 },
-    { key: "DUAL", label: "DUAL", val: 18 },
-  ];
-  // links carry value; attach in list order so ribbons stack within each node.
-  const l1: [string, string, number][] = [
-    ["2024", "A320", 32], ["2024", "B787", 14], ["2024", "C172", 6],
-    ["2023", "A320", 24], ["2023", "B787", 14], ["2023", "C172", 6],
-    ["2022", "A320", 8], ["2022", "B787", 6], ["2022", "C172", 16],
-  ];
-  const l2: [string, string, number][] = [
-    ["A320", "PIC", 40], ["A320", "FO", 24],
-    ["B787", "PIC", 22], ["B787", "FO", 12],
-    ["C172", "PIC", 8], ["C172", "FO", 2], ["C172", "DUAL", 18],
-  ];
-
-  const layout = (nodes: N[]) => {
-    const m = new Map<string, { y: number; h: number; out: number; in: number }>();
-    let y = PAD_TOP;
-    for (const n of nodes) { const h = n.val * UNIT; m.set(n.key, { y, h, out: 0, in: 0 }); y += h + GAP; }
-    return m;
-  };
-  const yc = layout(years), ac = layout(acft), sc = layout(seats);
-  const X = { year: 150, acftL: 455, acftR: 464, seat: 766 };
-
-  const ribbon = (x0: number, y0: number, w0: number, x1: number, y1: number, w1: number) => {
-    const mx = (x0 + x1) / 2;
-    return `M${x0},${y0} C${mx},${y0} ${mx},${y1} ${x1},${y1} L${x1},${y1 + w1} C${mx},${y1 + w1} ${mx},${y0 + w0} ${x0},${y0 + w0} Z`;
-  };
-
+function Shot({ src, alt, dark = false }: { src: StaticImageData; alt: string; dark?: boolean }) {
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ minWidth: 640, height: "auto" }} role="img" aria-label="A Sankey flow of flight hours from year to aircraft type to crew seat.">
-      <defs>
-        <linearGradient id="cf" x1="0" x2="1">
-          <stop offset="0" stopColor="var(--lp-cyan)" />
-          <stop offset="1" stopColor="var(--lp-amber)" />
-        </linearGradient>
-      </defs>
-      {/* column headers */}
-      {[["YEAR", 150], ["AIRCRAFT", 460], ["SEAT", 770]].map(([t, x]) => (
-        <text key={t as string} x={x as number} y={16} textAnchor="middle" className="lp-mono" style={{ fill: "var(--lp-ink-3)", fontSize: 11, letterSpacing: "0.12em" }}>{t}</text>
-      ))}
-      {/* ribbons: year → aircraft */}
-      {l1.map(([s, t, v], i) => {
-        const S = yc.get(s)!, T = ac.get(t)!;
-        const sy = S.y + S.out; S.out += v * UNIT;
-        const ty = T.y + T.in; T.in += v * UNIT;
-        return <path key={`a${i}`} d={ribbon(X.year + BAR, sy, v * UNIT, X.acftL, ty, v * UNIT)} fill="url(#cf)" fillOpacity={0.4} />;
-      })}
-      {/* ribbons: aircraft → seat */}
-      {l2.map(([s, t, v], i) => {
-        const S = ac.get(s)!, T = sc.get(t)!;
-        const sy = S.y + S.out; S.out += v * UNIT;
-        const ty = T.y + T.in; T.in += v * UNIT;
-        return <path key={`b${i}`} d={ribbon(X.acftR, sy, v * UNIT, X.seat, ty, v * UNIT)} fill="url(#cf)" fillOpacity={0.4} />;
-      })}
-      {/* node bars + labels */}
-      {years.map((n) => { const g = yc.get(n.key)!; return (
-        <g key={n.key}>
-          <rect x={X.year} y={g.y} width={BAR} height={g.h} rx={2} fill="var(--lp-cyan)" />
-          <text x={X.year - 8} y={g.y + g.h / 2 + 4} textAnchor="end" className="lp-mono" style={{ fill: "var(--lp-ink-2)", fontSize: 13 }}>{n.label}</text>
-        </g>); })}
-      {acft.map((n) => { const g = ac.get(n.key)!; return (
-        <g key={n.key}>
-          <rect x={X.acftL} y={g.y} width={BAR} height={g.h} rx={2} fill="var(--lp-ink-2)" />
-          <text x={X.acftR + 8} y={g.y + g.h / 2 + 4} className="lp-mono" style={{ fill: "var(--lp-ink)", fontSize: 13, fontWeight: 600 }}>{n.label}</text>
-        </g>); })}
-      {seats.map((n) => { const g = sc.get(n.key)!; return (
-        <g key={n.key}>
-          <rect x={X.seat} y={g.y} width={BAR} height={g.h} rx={2} fill="var(--lp-amber)" />
-          <text x={X.seat + BAR + 8} y={g.y + g.h / 2 + 4} className="lp-mono" style={{ fill: "var(--lp-ink-2)", fontSize: 13 }}>{n.label}</text>
-        </g>); })}
-    </svg>
-  );
-}
-
-function SankeyMotif() {
-  return (
-    <svg viewBox="0 0 240 72" className="w-full" style={{ height: 72 }} aria-hidden>
-      <defs>
-        <linearGradient id="sk" x1="0" x2="1">
-          <stop offset="0" stopColor="var(--lp-cyan)" />
-          <stop offset="1" stopColor="var(--lp-amber)" />
-        </linearGradient>
-      </defs>
-      {[
-        "M8 14 C 90 14 120 20 232 20",
-        "M8 30 C 90 30 120 36 232 40",
-        "M8 46 C 90 46 120 50 232 30",
-        "M8 60 C 90 60 120 56 232 56",
-      ].map((d, i) => (
-        <path key={i} d={d} fill="none" stroke="url(#sk)" strokeWidth={[9, 6, 5, 4][i]} strokeOpacity={0.55} strokeLinecap="round" />
-      ))}
-    </svg>
-  );
-}
-
-function GlobeMotif() {
-  return (
-    <svg viewBox="0 0 120 72" className="w-full" style={{ height: 72 }} aria-hidden>
-      <circle cx="60" cy="40" r="30" fill="none" stroke="var(--lp-line-2)" strokeWidth="1" />
-      <ellipse cx="60" cy="40" rx="30" ry="11" fill="none" stroke="var(--lp-line-2)" strokeWidth="1" strokeOpacity="0.6" />
-      <ellipse cx="60" cy="40" rx="12" ry="30" fill="none" stroke="var(--lp-line-2)" strokeWidth="1" strokeOpacity="0.6" />
-      {["M34 30 Q 60 2 86 34", "M30 46 Q 62 20 90 44", "M40 22 Q 78 30 78 56"].map((d, i) => (
-        <path key={i} d={d} fill="none" stroke="var(--lp-cyan)" strokeWidth="1.5" strokeOpacity="0.85" />
-      ))}
-      {[[34, 30], [86, 34], [30, 46], [90, 44], [78, 56], [40, 22]].map(([x, y], i) => (
-        <circle key={i} cx={x} cy={y} r="1.8" fill="var(--lp-amber)" />
-      ))}
-    </svg>
+    <figure className={`lp-shot${dark ? " lp-shot-frame-dark" : ""}`}>
+      <div className="lp-shot-bar">
+        <span className="lp-shot-tl" />
+        <span className="lp-shot-tl" />
+        <span className="lp-shot-tl" />
+        <span className="lp-shot-url">
+          <span className="lp-dot" style={{ background: "var(--lp-cyan)", boxShadow: "none" }} />
+          app.pilotlogbookhq.com
+        </span>
+      </div>
+      <Image src={src} alt={alt} sizes="(max-width: 1024px) 100vw, 1040px" placeholder="blur" className="lp-shot-img" />
+    </figure>
   );
 }
 

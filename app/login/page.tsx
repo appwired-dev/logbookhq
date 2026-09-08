@@ -6,7 +6,6 @@ import { useSearchParams } from "next/navigation";
 import { login } from "./actions";
 import { AuthShell } from "@/components/AuthShell";
 import { LoginFormSkeleton } from "./loading";
-import { Turnstile } from "@/components/ui/Turnstile";
 
 export default function LoginPage() {
   return (
@@ -23,9 +22,6 @@ function LoginForm() {
   const next = sp.get("next") ?? "/app";
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  // Turnstile tokens are single-use; a rejected attempt remounts the widget
-  // (bump the key) so the next submit carries a fresh one.
-  const [attempt, setAttempt] = useState(0);
 
   return (
     <form
@@ -36,7 +32,6 @@ function LoginForm() {
           const r = await login(fd);
           if (r?.error) {
             setError(r.error);
-            setAttempt((n) => n + 1);
           }
         });
       }}
@@ -58,7 +53,6 @@ function LoginForm() {
         </div>
         <input id="login-password" className="input" type="password" name="password" autoComplete="current-password" required />
       </div>
-      <Turnstile key={attempt} />
       {error && <p className="text-sm text-bad-ink" role="alert">{error}</p>}
       <button className="btn btn-primary w-full" type="submit" disabled={pending}>
         {pending ? "Signing in…" : "Sign in"}

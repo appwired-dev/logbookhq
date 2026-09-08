@@ -4,13 +4,11 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { signup } from "../login/actions";
 import { AuthShell } from "@/components/AuthShell";
-import { Turnstile } from "@/components/ui/Turnstile";
 
 export default function SignupPage() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  const [attempt, setAttempt] = useState(0);
 
   return (
     <AuthShell title="Create your account" subtitle="$30/yr or $119 lifetime — start free.">
@@ -22,7 +20,6 @@ export default function SignupPage() {
             const r = await signup(fd);
             if (r?.error) {
               setError(r.error);
-              setAttempt((n) => n + 1);
             } else if (r?.message) {
               setMessage(r.message);
             }
@@ -43,7 +40,6 @@ export default function SignupPage() {
           <input id="signup-password" className="input" type="password" name="password" autoComplete="new-password" minLength={8} required />
           <p className="text-xs text-ink-3 mt-1">At least 8 characters.</p>
         </div>
-        <Turnstile key={attempt} />
         {error && <p className="text-sm text-bad-ink" role="alert">{error}</p>}
         {message && <p className="text-sm text-good-ink" role="status">{message}</p>}
         <button className="btn btn-primary w-full" type="submit" disabled={pending}>
