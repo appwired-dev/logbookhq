@@ -19,6 +19,9 @@
  *   FAA   — 14 CFR §117.23(b) (Part 121 passenger flightcrew). §121.471(a)
  *           (domestic, non-117 e.g. all-cargo) is offered as a second set.
  *   EASA  — ORO.FTL.210(a) (CAT operators).
+ *   CN    — CCAR-121-R7 第121.487条(b) (第P章), verified against the CAAC text:
+ *           100 h / calendar month, 900 h / calendar year. The (c) figures are
+ *           flight DUTY period, not flight time, and are not listed.
  *   UKCAA — Retained Regulation (EU) No 965/2012, ORO.FTL.210 — same numbers.
  *   GCAA  — UAE CAR-OPS 1 Subpart Q.
  *
@@ -258,14 +261,23 @@ const HKCAD_371: FlightTimeWindow[] = [
 ];
 
 /**
- * China CAAC. CCAR-121 Subpart Q sets the flight-time limits. UNVERIFIED —
- * the exact CCAR-121 figures could not be confirmed, so the ICAO-typical
- * 1,000 h / 365 d and 100 h / 28 d are shown as a placeholder. The old
- * "30 h / 7 days" row was inherited from the FAA set and is removed.
+ * China CAAC. CCAR-121-R7 (交通运输部令 2021 年第 5 号, seventh revision,
+ * in force 15 Mar 2021), 第121.487条(b) — verified against the CAAC's own
+ * published text. Two corrections to what used to sit here: the limits are
+ * CALENDAR month / CALENDAR year, not rolling windows, and they live in
+ * 第P章 (Subpart P), not Subpart Q.
+ *
+ *   (b)(1) 任一日历月，100 小时的飞行时间   — 100 h in any calendar month
+ *   (b)(2) 任一日历年，900 小时的飞行时间   — 900 h in any calendar year
+ *
+ * 121.487(c) adds 60 h / 7 consecutive calendar days and 210 h / calendar
+ * month, but those are 飞行值勤期 (flight DUTY period), not flight time, so
+ * they are deliberately not listed here — the same distinction that removed
+ * the bogus EASA 60 h/7 d row.
  */
 const CAAC_121: FlightTimeWindow[] = [
-  { label: "Last 365 Days", days: 365, max: 1000, citation: "CCAR-121 Subpart Q (unverified)" },
-  { label: "Last 28 Days",  days: 28,  max: 100,  citation: "CCAR-121 Subpart Q (unverified)" },
+  { label: "Calendar Month", days: 30,  max: 100, basis: "calendar-months", months: 1, citation: "CCAR-121-R7 §121.487(b)(1)" },
+  { label: "Calendar Year",  days: 365, max: 900, basis: "calendar-year",              citation: "CCAR-121-R7 §121.487(b)(2)" },
 ];
 
 // ============================================================
@@ -357,7 +369,7 @@ export const REGIME_RULES: Record<Regime, RegimeRules> = {
     code: "CAAC",
     name: "China",
     authority: "CAAC",
-    reference: "CCAR-121 Subpart Q",
+    reference: "CCAR-121-R7 §121.487(b)",
     flightTimeWindows: CAAC_121,
     recency: ICAO_RECENCY, // CCAR-61 currency aligns with ICAO baseline.
   },

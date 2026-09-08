@@ -115,7 +115,7 @@ const EXPECTED: Record<Regime, { rows: Row[]; cite: string }> = {
   GACA:  { rows: [[28, 100, "rolling-days", undefined], [365, 1000, "rolling-days", undefined]], cite: "GACAR" },
   QCAA:  { rows: [[28, 100, "rolling-days", undefined], [365, 900, "calendar-year", undefined], [365, 1000, "calendar-months", 12]], cite: "QCAR" },
   HKCAD: { rows: [[28, 100, "rolling-days", undefined], [365, 900, "calendar-months", 12]], cite: "CAD 371" },
-  CAAC:  { rows: [[365, 1000, "rolling-days", undefined], [28, 100, "rolling-days", undefined]], cite: "CCAR-121" },
+  CAAC:  { rows: [[30, 100, "calendar-months", 1], [365, 900, "calendar-year", undefined]], cite: "CCAR-121-R7 \u00a7121.487(b)" },
 };
 
 const REGIMES = Object.keys(REGIME_RULES) as Regime[];
@@ -201,6 +201,24 @@ test("resolveRuleSet falls back to the default for unknown/absent ids", () => {
   // CA has a single set, so it resolves through the synthesized default like every other single-set regime.
   assert.equal(resolveRuleSet("CA", "cars-700-15").reference, "CAR 700.28", "a stale id resolves to the current set");
   assert.equal(resolveRuleSet("EASA", "cars-700-15").id, ruleSetsFor("EASA")[0].id);
+});
+
+test("China: CCAR-121-R7 121.487(b) — calendar month/year, and nothing is left unverified", () => {
+  const cn = REGIME_RULES.CAAC.flightTimeWindows;
+  assert.deepEqual(
+    cn.map((w) => [w.max, w.basis, w.months ?? null]),
+    [[100, "calendar-months", 1], [900, "calendar-year", null]],
+    "100 h per calendar month, 900 h per calendar year — not rolling windows",
+  );
+  for (const w of cn as FlightTimeWindow[]) assert.match(w.citation ?? "", /121\.487\(b\)/);
+  assert.equal(yearlyCeiling("CAAC").max, 900);
+  // Duty-period limits (121.487(c): 60 h/7 d, 210 h/month) are not flight time.
+  assert.ok(!cn.some((w: FlightTimeWindow) => w.max === 60 || w.max === 210), "no duty-period figures");
+  // No rule anywhere may ship an unverified or superseded citation.
+  const every = (Object.keys(REGIME_RULES) as Regime[]).flatMap((r) =>
+    ruleSetsFor(r).flatMap((set) => set.flightTimeWindows));
+  const bad = every.filter((w) => /unverified|superseded/i.test(w.citation ?? ""));
+  assert.deepEqual(bad, [], "every shipped window cites a rule in force");
 });
 
 test("FAA keeps the 30 h / 7 days figure only in the Part 121 domestic set", () => {
