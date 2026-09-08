@@ -3,16 +3,17 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { safeNext } from "@/app/auth/recovery";
 
 /**
- * Accept only same-origin relative paths. Rejects protocol-relative (`//evil`),
- * absolute URLs, and anything that doesn't start with a single `/`. Falls back
- * to `/app` so a malformed `next` lands the user on the dashboard.
+ * Accept only same-origin relative paths.
+ *
+ * The URL parser strips ASCII tab/LF/CR before parsing, so a raw
+ * `startsWith("//")` test is bypassable with `/\t/evil.com` — which resolved
+ * to https://evil.com and made `?next=` on this page an open redirect. Strip
+ * those characters, then parse and keep the result only if it stayed on the
+ * throwaway base. Shared implementation lives in `app/auth/recovery.ts`.
  */
-function safeNext(next: string): string {
-  if (!next.startsWith("/") || next.startsWith("//") || next.startsWith("/\\")) return "/app";
-  return next;
-}
 
 export async function login(formData: FormData) {
   const email = String(formData.get("email") ?? "");
