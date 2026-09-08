@@ -3,6 +3,7 @@
 import { cookies, headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { looksLikeEmail } from "@/app/auth/recovery";
+import { bucketKey, clientIp, underLimit } from "@/lib/rate-limit";
 
 /**
  * Ask Supabase to email a recovery link.
@@ -109,25 +110,47 @@ export async function requestPasswordReset(formData: FormData): Promise<ForgotPa
     maxAge: Math.ceil(COOLDOWN_MS / 1000),
   });
 
+  // Mailbomb defense, BEFORE the send. Two dimensions: per-IP and per-email.
+  // The email-keyed limit is the real defense — it counts ATTEMPTS, not sends,
+  // so it stops an attacker hammering one victim WHETHER OR NOT that address
+  // is registered. CRITICAL for non-enumeration: a block here must be
+  // indistinguishable from a successful send, or it becomes an oracle for
+  // "this address is real". So a blocked request falls through to the SAME
+  // `{ status: "sent" }` the happy path returns, under the SAME settle()
+  // timing pad, and simply skips the actual send. Both counters increment on
+  // every attempt. Fails open (see lib/rate-limit), so a DB hiccup never
+  // blocks a genuine reset.
+  const ip = await clientIp();
+  const [ipUnderLimit, emailUnderLimit] = await Promise.all([
+    underLimit(bucketKey("pwreset", "ip", ip), 10, 3600),
+    underLimit(bucketKey("pwreset", "email", email), 5, 3600),
+  ]);
+  const rateLimited = !ipUnderLimit || !emailUnderLimit;
+
   const origin = appOrigin();
   if (!origin) {
     await settle(startedAt);
     return { status: "error" };
   }
-  const supabase = await createClient();
-  const captchaToken = String(formData.get("cf-turnstile-response") ?? "") || undefined;
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${origin}/auth/callback?next=/reset-password`,
-    captchaToken,
-  });
 
-  if (error && !isRateLimited(error)) {
-    console.error("[forgot-password] resetPasswordForEmail failed:", error.message);
-    await settle(startedAt);
-    return { status: "error" };
+  if (!rateLimited) {
+    const supabase = await createClient();
+    const captchaToken = String(formData.get("cf-turnstile-response") ?? "") || undefined;
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${origin}/auth/callback?next=/reset-password`,
+      captchaToken,
+    });
+
+    if (error && !isRateLimited(error)) {
+      console.error("[forgot-password] resetPasswordForEmail failed:", error.message);
+      await settle(startedAt);
+      return { status: "error" };
+    }
+    // A Supabase rate-limit error falls through to `sent` on purpose: see the
+    // note at the top of this function.
   }
 
-  // A rate-limit error falls through to `sent` on purpose: see the note above.
+  // Blocked or sent, the caller sees exactly the same thing.
   await settle(startedAt);
   return { status: "sent" };
 }

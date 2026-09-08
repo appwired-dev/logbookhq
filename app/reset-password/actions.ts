@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import { MIN_PASSWORD_LENGTH, RECOVERY_COOKIE } from "@/app/auth/recovery";
+import { bucketKey, clientIp, underLimit } from "@/lib/rate-limit";
 
 /**
  * Set a new password for the session created by the recovery link.
@@ -44,6 +45,14 @@ export async function updatePassword(formData: FormData): Promise<ResetPasswordR
 
   if (password.length < MIN_PASSWORD_LENGTH) return { status: "short" };
   if (password !== confirm) return { status: "mismatch" };
+
+  // Cap password-update attempts per source IP before the Supabase call.
+  // Fails open (see lib/rate-limit) so a DB hiccup never blocks a genuine
+  // reset that has a valid recovery session.
+  const ip = await clientIp();
+  if (!(await underLimit(bucketKey("pwupdate", "ip", ip), 15, 3600))) {
+    return { status: "error" };
+  }
 
   const jar = await cookies();
   // Same check the page makes, re-done here: the page render is not the

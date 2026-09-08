@@ -4,6 +4,14 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { safeNext } from "@/app/auth/recovery";
+import { bucketKey, clientIp, underLimit } from "@/lib/rate-limit";
+
+/**
+ * Shown when a rate-limit bucket trips. Deliberately vague and identical
+ * across dimensions (IP vs email) and endpoints — it must not become an
+ * oracle for which limit fired or whether an address is registered.
+ */
+const RATE_LIMITED_MESSAGE = "Too many attempts. Please wait a few minutes and try again.";
 
 /**
  * Turn a Supabase auth error into something a user can act on. The captcha
@@ -36,6 +44,17 @@ export async function login(formData: FormData) {
   const next = safeNext(String(formData.get("next") ?? "/app"));
   const captchaToken = String(formData.get("cf-turnstile-response") ?? "") || undefined;
 
+  // Brute-force defense, BEFORE touching Supabase. Two independent dimensions:
+  // Per-IP ONLY, deliberately. A per-EMAIL login limit keyed on an
+  // attacker-supplied address is a targeted account-lockout weapon — the same
+  // deny-the-real-user failure that got CAPTCHA pulled — so it is not used.
+  // Brute force from one host is caught here; GoTrue keeps its own per-account
+  // backoff. Fails open (see lib/rate-limit) so a DB hiccup never blocks login.
+  const ip = await clientIp();
+  if (!(await underLimit(bucketKey("login", "ip", ip), 20, 900))) {
+    return { error: RATE_LIMITED_MESSAGE };
+  }
+
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword({
     email,
@@ -54,6 +73,13 @@ export async function signup(formData: FormData) {
   const fullName = String(formData.get("full_name") ?? "");
 
   const captchaToken = String(formData.get("cf-turnstile-response") ?? "") || undefined;
+
+  // Abuse defense: cap new-account creation per source IP. Fails open.
+  const ip = await clientIp();
+  if (!(await underLimit(bucketKey("signup", "ip", ip), 10, 3600))) {
+    return { error: RATE_LIMITED_MESSAGE };
+  }
+
   const supabase = await createClient();
   const { error, data } = await supabase.auth.signUp({
     email,
