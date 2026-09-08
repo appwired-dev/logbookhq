@@ -296,17 +296,26 @@ function Feature({ eyebrow, title, body, children }: { eyebrow: string; title: s
 function Showcase({ eyebrow, title, lede, src, alt, dark = false, flip = false }: {
   eyebrow: string; title: string; lede: string; src: StaticImageData; alt: string; dark?: boolean; flip?: boolean;
 }) {
+  const text = (
+    <div key="t">
+      <div className="lp-eyebrow" style={{ color: "var(--lp-amber)" }}>{eyebrow}</div>
+      <h2 className="lp-h2 mt-2" style={{ fontSize: "clamp(20px,2.6vw,27px)" }}>{title}</h2>
+      <p className="lp-lede mt-3" style={{ fontSize: 14 }}>{lede}</p>
+    </div>
+  );
+  const shot = (
+    <figure key="s" className={`lp-shot${dark ? " lp-shot-frame-dark" : ""}`}>
+      <Image src={src} alt={alt} sizes="(max-width: 1024px) 100vw, 880px" placeholder="blur" className="lp-shot-img" />
+    </figure>
+  );
+  // The tile always takes the wider column (~62%); copy the narrower.
+  const cols = flip
+    ? "lg:grid-cols-[minmax(0,1.25fr)_minmax(0,0.75fr)]"
+    : "lg:grid-cols-[minmax(0,0.75fr)_minmax(0,1.25fr)]";
   return (
     <section className="mx-auto max-w-6xl px-5 py-8">
-      <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
-        <div className={flip ? "lg:order-2" : ""}>
-          <div className="lp-eyebrow" style={{ color: "var(--lp-amber)" }}>{eyebrow}</div>
-          <h2 className="lp-h2 mt-2" style={{ fontSize: "clamp(22px,3vw,30px)" }}>{title}</h2>
-          <p className="lp-lede mt-3" style={{ fontSize: 15 }}>{lede}</p>
-        </div>
-        <figure className={`lp-shot${dark ? " lp-shot-frame-dark" : ""}${flip ? " lg:order-1" : ""}`}>
-          <Image src={src} alt={alt} sizes="(max-width: 1024px) 100vw, 760px" placeholder="blur" className="lp-shot-img" />
-        </figure>
+      <div className={`grid gap-8 lg:gap-12 items-center ${cols}`}>
+        {flip ? [shot, text] : [text, shot]}
       </div>
     </section>
   );
