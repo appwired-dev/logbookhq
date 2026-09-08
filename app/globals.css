@@ -588,7 +588,31 @@ tr.row-focus:focus-visible > .col-pin {
   color: var(--lp-ink);
   font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
   min-height: 100vh;
+  /* own stacking context so the cursor light (z-index:-1) sits above the ground
+     but behind every tile and block of copy */
+  position: relative;
+  isolation: isolate;
 }
+
+/* ── cursor light — a soft glow that eases toward the pointer, behind content ── */
+.lp-cursor-glow {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 620px;
+  height: 620px;
+  margin: -310px 0 0 -310px;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: -1;
+  background: radial-gradient(circle, rgba(86,199,222,.13) 0%, rgba(86,199,222,.06) 34%, rgba(86,199,222,0) 68%);
+  opacity: 0;
+  transition: opacity .6s ease;
+  will-change: transform;
+}
+.lp-cursor-glow.is-on { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .lp-cursor-glow { display: none; } }
+@media (hover: none) { .lp-cursor-glow { display: none; } }
 .lp ::selection { background: rgba(240, 166, 46, 0.28); color: #fff; }
 
 /* type */
@@ -673,20 +697,16 @@ tr.row-focus:focus-visible > .col-pin {
   overflow: hidden;
   background: var(--lp-surface);
   box-shadow: 0 26px 60px -40px rgba(0,0,0,.95), 0 0 0 1px rgba(255,255,255,.02) inset;
-  /* Crisp expand-on-hover: the tile's LAYOUT size is the expanded size, and it
-     sits slightly shrunk at rest (scale .95). Hover grows it back to scale(1) —
-     its native rendered resolution — so the transform only ever downscales the
-     bitmap (always sharp) and never upscales it (which is what blurred it). */
-  transform: scale(0.95);
-  transition: transform .3s cubic-bezier(.2,.7,.2,1), box-shadow .3s cubic-bezier(.2,.7,.2,1), border-color .3s ease;
+  /* Tiles hold their full size — no float, no scale (so they never blur).
+     Hover only warms the border and glow, without moving the tile. */
+  transition: box-shadow .3s cubic-bezier(.2,.7,.2,1), border-color .3s ease;
 }
 .lp-shot:hover {
-  transform: translateY(-10px) scale(1);
   border-color: var(--lp-line-2);
   box-shadow:
-    0 54px 120px -38px rgba(0,0,0,.98),
-    0 0 0 1px rgba(86,199,222,.22) inset,
-    0 0 52px -12px rgba(86,199,222,.3);
+    0 40px 92px -42px rgba(0,0,0,.98),
+    0 0 0 1px rgba(86,199,222,.18) inset,
+    0 0 44px -14px rgba(86,199,222,.22);
 }
 .lp-shot-img { display: block; width: 100%; height: auto; }
 .lp-shot-frame-dark { background: var(--lp-ground); }

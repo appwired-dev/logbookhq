@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Image, { type StaticImageData } from "next/image";
+import CursorGlow from "./CursorGlow";
 import dashboardShot from "@/public/marketing/dashboard.png";
 import limitsShot from "@/public/marketing/limits.png";
 import sankeyShot from "@/public/marketing/sankey.png";
@@ -26,6 +27,7 @@ const FORMATS = ["Apple Numbers", "Excel", "ForeFlight", "LogTen", "MyFlightbook
 export default function LandingPage() {
   return (
     <div className="lp">
+      <CursorGlow />
       {/* ---- top bar ---- */}
       <header className="sticky top-0 z-30 backdrop-blur-md" style={{ background: "rgba(10,15,22,0.72)", borderBottom: "1px solid var(--lp-line)" }}>
         <div className="mx-auto max-w-6xl px-5 h-16 flex items-center justify-between">
