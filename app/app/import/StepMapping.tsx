@@ -6,6 +6,7 @@ import type { Analysis, CanonicalTarget, ColumnAssignment, ColumnMapping, Header
 // Pure module — keeps SheetJS/Anthropic (reachable via the "@/lib/import" barrel) out of the client bundle.
 import { CANONICAL_OPTIONS, describeTarget, parseTargetKey, targetKey } from "@/lib/import/mapping";
 import { targetGroupLabel, targetLabel, type ImportStrings } from "./import-strings";
+import { reasonText } from "./check-messages";
 import type { AiNotice } from "./ImportWizard";
 
 /** The slice of a CANONICAL_OPTIONS group this table reads. */
@@ -252,7 +253,9 @@ function MappingRow({
   const currentKey = targetKey(assignment.target);
   const pill = confidencePill(assignment, s);
   const letter = colLetter(path.col);
-  const confidenceTitle = `${Math.round(assignment.confidence * 100)}%${assignment.reason ? ` · ${assignment.reason}` : ""}`;
+  // The library hands us the reason in English with no id — see reasonText().
+  const reason = reasonText(s, assignment.reason);
+  const confidenceTitle = `${Math.round(assignment.confidence * 100)}%${reason ? ` · ${reason}` : ""}`;
 
   return (
     <tr data-review={review || undefined}>
@@ -261,8 +264,8 @@ function MappingRow({
           <span className="mono text-2xs text-ink-3 w-6 shrink-0 pt-0.5">{letter}</span>
           <div className="min-w-0">
             <Breadcrumbs path={path.path} />
-            {assignment.reason && (
-              <div className="text-2xs text-ink-3 mt-0.5 truncate max-w-[18rem]" title={assignment.reason}>{assignment.reason}</div>
+            {reason && (
+              <div className="text-2xs text-ink-3 mt-0.5 truncate max-w-[18rem]" title={reason}>{reason}</div>
             )}
           </div>
         </div>
