@@ -48,7 +48,7 @@ export default function LandingPage() {
               </h1>
               <p className="lp-lede mt-5 max-w-xl lp-rise" style={{ animationDelay: "90ms" }}>
                 Drop in your spreadsheet, your ForeFlight export, a Numbers file, even columns
-                in <span style={{ color: "var(--lp-ink)" }}>Korean</span>. It maps your columns,
+                in <span style={{ color: "var(--lp-ink)" }}>a different language</span>. It maps your columns,
                 checks the totals against your own, and files thousands of flights in seconds.
                 Then your limits and currency follow you across every authority you fly under.
               </p>
