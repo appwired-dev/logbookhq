@@ -7,6 +7,7 @@ import { Card, CardHeader, Icon, Pill, buttonClass } from "@/components/ui";
 import type { Locale } from "@/lib/i18n";
 import SettingsForm from "./SettingsForm";
 import BackupCard from "./BackupCard";
+import SupportCard from "./SupportCard";
 import { settingsStrings } from "./settings-strings";
 
 /** Tier → pill tone (same map as SettingsForm and the admin table). */
@@ -38,6 +39,7 @@ export default async function SettingsPage() {
           locale={locale}
         />
       }
+      support={<SupportCard locale={locale} email={profile?.email ?? user!.email ?? ""} />}
     />
   );
 }
