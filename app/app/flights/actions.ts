@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { lookupTailRegistry } from "@/lib/aircraft-registry";
+import { FREE_FLIGHT_LIMIT, freeCapApplies } from "@/lib/limits";
 import type { FlightInput, Category, Role } from "@/lib/types";
 
 const CATEGORIES: Category[] = ["SE", "ME", "SES", "MES", "HELI", "SIM"];
@@ -95,6 +96,20 @@ export async function createFlight(input: FlightInput): Promise<FlightActionResu
   if (!user) return { error: "Not signed in." };
   const v = validateFlight(input);
   if (!v.ok) return { error: v.error };
+
+  // Free-tier cap — enforced here, not just in the UI copy. Grandfathered for
+  // accounts created before enforcement shipped (see lib/limits).
+  const { data: profile } = await supabase.from("profiles").select("tier, created_at").eq("id", user.id).single();
+  if (freeCapApplies(profile?.tier, profile?.created_at)) {
+    const { count } = await supabase
+      .from("flights")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id);
+    if ((count ?? 0) >= FREE_FLIGHT_LIMIT) {
+      return { error: `The free plan holds up to ${FREE_FLIGHT_LIMIT} flights. Upgrade to add more.` };
+    }
+  }
+
   let savedId: number | null = null;
   try {
     const { data, error } = await supabase
