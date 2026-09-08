@@ -60,7 +60,7 @@ export function isActionError<T>(r: ActionResult<T>): r is ActionError {
  * accepted is never rejected by the framework with an opaque 413.
  */
 export const MAX_FILE_BYTES = 23 * 1024 * 1024;
-export const ALLOWED_EXTENSIONS = ["csv", "tsv", "txt", "xlsx", "xls"] as const;
+export const ALLOWED_EXTENSIONS = ["csv", "tsv", "txt", "xlsx", "xls", "numbers"] as const;
 
 export function fileExtension(name: string): string {
   const m = /\.([a-z0-9]+)$/i.exec(name.trim());

@@ -121,6 +121,10 @@ export function buildPaths(grid: Grid, band: number[]): HeaderPath[] {
   const width = grid.width;
   if (band.length === 0) return emptyPaths(width);
   const text: string[][] = band.map((r) => Array.from({ length: width }, (_, c) => cellHeaderText(grid.rows[r]?.[c])));
+  // A header row with no text at all (Numbers exports often carry one above
+  // the group row) says nothing about the columns; drop it so the group row
+  // is the top row the spread rules look at.
+  while (text.length > 1 && text[0].every((t) => t === "")) text.shift();
   const H = text.length;
 
   // Which columns carry any header text at all (blank columns never get filled).
@@ -131,10 +135,23 @@ export function buildPaths(grid: Grid, band: number[]): HeaderPath[] {
   // cell really is a group (it has a sub-header below it — a vertically
   // merged single header like "Total" never spreads) and (b) this column
   // has its own sub-header. A fully blank column ends the span.
+  // A column with no header cell at all but data below it (Numbers writes a
+  // merged group cell once, so the group's second column arrives blank) also
+  // continues the group; a column that is blank all the way down ends it.
+  const hasData: boolean[] = Array.from({ length: width }, (_, c) => {
+    const from = (band[band.length - 1] ?? -1) + 1;
+    const to = Math.min(grid.rows.length, from + 200);
+    for (let r = from; r < to; r++) { const cell = grid.rows[r]?.[c]; if (cell && cell.kind !== "empty") return true; }
+    return false;
+  });
   if (H > 1) {
     let anchor: number | null = null;
     for (let c = 0; c < width; c++) {
-      if (!hasAnyHeader[c]) { anchor = null; continue; }
+      if (!hasAnyHeader[c]) {
+        if (anchor != null && hasHeaderBelowTop[anchor] && hasData[c]) text[0][c] = text[0][anchor];
+        else anchor = null;
+        continue;
+      }
       if (text[0][c] !== "") { anchor = c; continue; }
       if (anchor != null && hasHeaderBelowTop[anchor] && hasHeaderBelowTop[c]) text[0][c] = text[0][anchor];
     }
@@ -142,13 +159,19 @@ export function buildPaths(grid: Grid, band: number[]): HeaderPath[] {
   // Lower rows: a blank group cell continues to the right only while every
   // row above agrees with the left neighbour and a deeper sub-header exists
   // (a leaf is never copied into the next column).
+  // A column with no header cell at all but data below it is the group's
+  // continuation cell (Numbers writes a merged label once): it takes the
+  // group from its left neighbour even when the rows above are blank.
   for (let i = 1; i < H - 1; i++) {
     for (let c = 1; c < width; c++) {
-      if (text[i][c] !== "" || text[i][c - 1] === "" || !hasAnyHeader[c]) continue;
+      const headerless = !hasAnyHeader[c] && hasData[c];
+      if (text[i][c] !== "" || text[i][c - 1] === "" || (!hasAnyHeader[c] && !headerless)) continue;
       let sameParent = true;
-      for (let k = 0; k < i; k++) if (text[k][c] !== text[k][c - 1] || text[k][c] === "") { sameParent = false; break; }
+      for (let k = 0; k < i; k++) {
+        if (text[k][c] !== text[k][c - 1] || (text[k][c] === "" && !headerless)) { sameParent = false; break; }
+      }
       const hasDeeper = text.slice(i + 1).some((row) => row[c] !== "");
-      if (sameParent && hasDeeper) text[i][c] = text[i][c - 1];
+      if (sameParent && (hasDeeper || headerless)) text[i][c] = text[i][c - 1];
     }
   }
 

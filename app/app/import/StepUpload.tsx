@@ -5,9 +5,9 @@ import { Alert, Button, CardFooter, Icon, Pill, Skeleton } from "@/components/ui
 import type { ImportStrings } from "./import-strings";
 
 const ACCEPT = [
-  ".csv", ".tsv", ".txt", ".xlsx", ".xls",
+  ".csv", ".tsv", ".txt", ".xlsx", ".xls", ".numbers",
   "text/csv", "text/tab-separated-values", "text/plain",
-  "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.apple.numbers",
 ].join(",");
 
 const SUPPORTED = ["ForeFlight", "LogTen", "MyFlightbook", "LogbookHQ", "Apple Numbers"];

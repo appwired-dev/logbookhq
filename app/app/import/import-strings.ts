@@ -34,7 +34,7 @@ export const IMPORT_STRINGS = {
   // ---- step 1 · upload ----
   dropTitle:      { en: "Drop your logbook here", ko: "로그북 파일을 여기에 놓으세요", zh: "将日志本文件拖到这里", es: "Suelta tu bitácora aquí" },
   dropBody:       { en: "or click to choose a file", ko: "또는 클릭하여 파일 선택", zh: "或点击选择文件", es: "o haz clic para elegir un archivo" },
-  dropHint:       { en: "CSV, TSV, TXT, XLSX or XLS · up to 23 MB", ko: "CSV, TSV, TXT, XLSX 또는 XLS · 최대 23 MB", zh: "CSV、TSV、TXT、XLSX 或 XLS · 最大 23 MB", es: "CSV, TSV, TXT, XLSX o XLS · hasta 23 MB" },
+  dropHint:       { en: "CSV, TSV, TXT, XLSX, XLS or NUMBERS · up to 23 MB", ko: "CSV, TSV, TXT, XLSX, XLS 또는 NUMBERS · 최대 23 MB", zh: "CSV、TSV、TXT、XLSX、XLS 或 NUMBERS · 最大 23 MB", es: "CSV, TSV, TXT, XLSX, XLS o NUMBERS · hasta 23 MB" },
   fileInputLabel: { en: "Logbook file", ko: "로그북 파일", zh: "日志本文件", es: "Archivo de bitácora" },
   removeFile:     { en: "Remove file", ko: "파일 제거", zh: "移除文件", es: "Quitar archivo" },
   supported:      { en: "Supported out of the box", ko: "기본 지원 형식", zh: "开箱即用支持", es: "Compatibles de serie" },
