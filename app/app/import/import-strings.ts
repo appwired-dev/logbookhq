@@ -42,6 +42,8 @@ export const IMPORT_STRINGS = {
   analyzing:      { en: "Analyzing…", ko: "분석 중…", zh: "正在分析…", es: "Analizando…" },
   readingColumns: { en: "Reading columns…", ko: "열을 읽는 중…", zh: "正在读取列…", es: "Leyendo columnas…" },
   errNoFile:      { en: "Pick a file first.", ko: "먼저 파일을 선택하세요.", zh: "请先选择文件。", es: "Elige un archivo primero." },
+  errTooLargeUpload: { en: "Even after compressing, this file is over the 4 MB upload limit. Export the flights sheet as CSV or XLSX and try again.", ko: "압축 후에도 이 파일은 업로드 한도 4 MB를 초과합니다. 비행 시트를 CSV 또는 XLSX로 내보낸 뒤 다시 시도하세요.", zh: "即使压缩后，此文件仍超过 4 MB 的上传上限。请将航班表导出为 CSV 或 XLSX 后重试。", es: "Incluso comprimido, este archivo supera el límite de subida de 4 MB. Exporta la hoja de vuelos como CSV o XLSX e inténtalo de nuevo." },
+  errUnreadable:  { en: "This file could not be read as a spreadsheet.", ko: "이 파일을 스프레드시트로 읽을 수 없습니다.", zh: "无法将此文件读取为电子表格。", es: "No se pudo leer este archivo como hoja de cálculo." },
   errTooLarge:    { en: "This file is {size} MB — the limit is 23 MB.", ko: "이 파일은 {size} MB입니다 — 최대 23 MB까지 가능합니다.", zh: "此文件为 {size} MB——上限为 23 MB。", es: "Este archivo pesa {size} MB — el límite es 23 MB." },
   errType:        { en: "That file type isn't supported. Use CSV, TSV, TXT, XLSX or XLS.", ko: "지원하지 않는 파일 형식입니다. CSV, TSV, TXT, XLSX 또는 XLS를 사용하세요.", zh: "不支持该文件类型。请使用 CSV、TSV、TXT、XLSX 或 XLS。", es: "Ese tipo de archivo no es compatible. Usa CSV, TSV, TXT, XLSX o XLS." },
   whereToExport:  { en: "Where to export from", ko: "각 앱에서 내보내는 방법", zh: "从各应用导出的方法", es: "Desde dónde exportar" },
