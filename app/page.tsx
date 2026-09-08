@@ -59,7 +59,7 @@ export default function LandingPage() {
                 Then your limits and currency follow you across every authority you fly under.
               </p>
               <div className="mt-8 flex flex-wrap items-center gap-3 lp-rise" style={{ animationDelay: "140ms" }}>
-                <Link className="lp-btn lp-btn-primary" href="/signup">Import your logbook free</Link>
+                <Link className="lp-btn lp-btn-primary lp-btn-sheen" href="/signup">Import your logbook free</Link>
                 <Link className="lp-btn lp-btn-ghost" href="/pricing">See pricing</Link>
               </div>
               <p className="lp-mono mt-4 text-xs lp-rise" style={{ color: "var(--lp-ink-3)", animationDelay: "180ms" }}>
@@ -243,17 +243,18 @@ function ReconcileCard() {
           <div className="lp-mono text-xs" style={{ color: "var(--lp-ink-3)" }}>Apple Numbers · 3-header layout</div>
         </div>
         <span className="lp-chip ml-auto shrink-0" style={{ borderColor: "rgba(58,210,154,.4)", color: "var(--lp-good)" }}>
-          <span className="lp-dot" /> Recognised
+          <span className="lp-dot lp-dot-live" /> Recognised
         </span>
       </div>
 
-      {/* checks */}
-      <div className="mt-5 rounded-xl p-4" style={{ background: "rgba(0,0,0,.25)", border: "1px solid var(--lp-line)" }}>
+      {/* checks — reconcile runs live on load: a scan sweep, then each row lands */}
+      <div className="mt-5 rounded-xl p-4 relative overflow-hidden" style={{ background: "rgba(0,0,0,.25)", border: "1px solid var(--lp-line)" }}>
+        <span className="lp-scan" aria-hidden />
         <div className="flex items-center justify-between">
           <span className="lp-mono text-xs" style={{ color: "var(--lp-ink-3)" }}>RECONCILE</span>
           <span className="lp-mono text-xs" style={{ color: "var(--lp-ink-3)" }}>vs. your sheet</span>
         </div>
-        <div className="mt-2">
+        <div className="mt-2 lp-reconcile">
           {checks.map(([label, val]) => (
             <div className="lp-check-row" key={label}>
               <CheckGlyph />
@@ -304,7 +305,7 @@ function Showcase({ eyebrow, title, lede, src, alt, dark = false, flip = false }
           <p className="lp-lede mt-3" style={{ fontSize: 15 }}>{lede}</p>
         </div>
         <figure className={`lp-shot${dark ? " lp-shot-frame-dark" : ""}${flip ? " lg:order-1" : ""}`}>
-          <Image src={src} alt={alt} sizes="(max-width: 1024px) 100vw, 560px" placeholder="blur" className="lp-shot-img" />
+          <Image src={src} alt={alt} sizes="(max-width: 1024px) 100vw, 760px" placeholder="blur" className="lp-shot-img" />
         </figure>
       </div>
     </section>

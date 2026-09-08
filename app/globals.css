@@ -673,16 +673,18 @@ tr.row-focus:focus-visible > .col-pin {
   overflow: hidden;
   background: var(--lp-surface);
   box-shadow: 0 26px 60px -40px rgba(0,0,0,.95), 0 0 0 1px rgba(255,255,255,.02) inset;
-  transition: transform .28s cubic-bezier(.2,.7,.2,1), box-shadow .28s cubic-bezier(.2,.7,.2,1), border-color .28s ease;
-  will-change: transform;
+  /* No will-change: transform — pinning a composited layer scales its cached
+     bitmap and softens the screenshot. Without it the browser re-rasterizes at
+     the hovered scale, so the high-res capture stays crisp. */
+  transition: transform .3s cubic-bezier(.2,.7,.2,1), box-shadow .3s cubic-bezier(.2,.7,.2,1), border-color .3s ease;
 }
 .lp-shot:hover {
-  transform: translateY(-6px) scale(1.02);
+  transform: translateY(-10px) scale(1.06);
   border-color: var(--lp-line-2);
   box-shadow:
-    0 44px 100px -40px rgba(0,0,0,.98),
-    0 0 0 1px rgba(86,199,222,.18) inset,
-    0 0 40px -12px rgba(86,199,222,.25);
+    0 54px 120px -38px rgba(0,0,0,.98),
+    0 0 0 1px rgba(86,199,222,.22) inset,
+    0 0 52px -12px rgba(86,199,222,.3);
 }
 .lp-shot-img { display: block; width: 100%; height: auto; }
 .lp-shot-frame-dark { background: var(--lp-ground); }
@@ -691,4 +693,42 @@ tr.row-focus:focus-visible > .col-pin {
 @media (prefers-reduced-motion: reduce) {
   .lp-shot { transition: none; }
   .lp-shot:hover { transform: none; }
+}
+
+/* ── hero comes alive: the reconcile card runs a live pass on load ── */
+.lp-scan { position: absolute; inset: 0; overflow: hidden; pointer-events: none; border-radius: inherit; }
+.lp-scan::before {
+  content: ""; position: absolute; left: 0; right: 0; height: 45%; top: -45%;
+  background: linear-gradient(180deg, transparent, rgba(86,199,222,.14), transparent);
+  animation: lp-scan-move 1.9s cubic-bezier(.4,0,.2,1) .15s 1 both;
+}
+@keyframes lp-scan-move { from { top: -45%; } to { top: 130%; } }
+
+.lp-reconcile .lp-check-row { animation: lp-reveal .5s cubic-bezier(.2,.7,.2,1) both; }
+.lp-reconcile .lp-check-row:nth-child(1) { animation-delay: .30s; }
+.lp-reconcile .lp-check-row:nth-child(2) { animation-delay: .46s; }
+.lp-reconcile .lp-check-row:nth-child(3) { animation-delay: .62s; }
+.lp-reconcile .lp-check-row:nth-child(4) { animation-delay: .78s; }
+.lp-reconcile .lp-check-row:nth-child(5) { animation-delay: .94s; }
+@keyframes lp-reveal { from { opacity: 0; transform: translateX(-10px); } }
+
+.lp-dot-live { animation: lp-dot-pulse 2.4s ease-in-out infinite; }
+@keyframes lp-dot-pulse {
+  0%, 100% { box-shadow: 0 0 6px var(--lp-good); opacity: .85; }
+  50%      { box-shadow: 0 0 15px var(--lp-good); opacity: 1; }
+}
+
+/* one recurring sheen across the hero's primary CTA */
+.lp-btn-sheen { position: relative; overflow: hidden; }
+.lp-btn-sheen::after {
+  content: ""; position: absolute; top: 0; bottom: 0; width: 45%; left: -70%;
+  background: linear-gradient(105deg, transparent, rgba(255,255,255,.4), transparent);
+  transform: skewX(-18deg); pointer-events: none;
+  animation: lp-sheen 6s ease-in-out 1.8s infinite;
+}
+@keyframes lp-sheen { 0% { left: -70%; } 16% { left: 140%; } 100% { left: 140%; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-scan::before, .lp-reconcile .lp-check-row, .lp-dot-live, .lp-btn-sheen::after { animation: none !important; }
+  .lp-scan::before { display: none; }
 }
