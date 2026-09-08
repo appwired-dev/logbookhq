@@ -673,7 +673,22 @@ tr.row-focus:focus-visible > .col-pin {
   overflow: hidden;
   background: var(--lp-surface);
   box-shadow: 0 26px 60px -40px rgba(0,0,0,.95), 0 0 0 1px rgba(255,255,255,.02) inset;
+  transition: transform .28s cubic-bezier(.2,.7,.2,1), box-shadow .28s cubic-bezier(.2,.7,.2,1), border-color .28s ease;
+  will-change: transform;
+}
+.lp-shot:hover {
+  transform: translateY(-6px) scale(1.02);
+  border-color: var(--lp-line-2);
+  box-shadow:
+    0 44px 100px -40px rgba(0,0,0,.98),
+    0 0 0 1px rgba(86,199,222,.18) inset,
+    0 0 40px -12px rgba(86,199,222,.25);
 }
 .lp-shot-img { display: block; width: 100%; height: auto; }
 .lp-shot-frame-dark { background: var(--lp-ground); }
 .lp-cap { margin-top: 12px; font-family: var(--lp-mono); font-size: 12px; color: var(--lp-ink-3); }
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-shot { transition: none; }
+  .lp-shot:hover { transform: none; }
+}
