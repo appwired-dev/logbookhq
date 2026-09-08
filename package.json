@@ -16,6 +16,7 @@
     "test:import": "tsx scripts/run-import-tests.ts",
     "test:limits": "tsx scripts/limits.test.ts",
     "test:auth": "tsx scripts/auth.test.ts",
+    "test:rate": "tsx scripts/rate-limit.test.ts",
     "check:client-graph": "tsx scripts/check-client-graph.ts app/app/import/ImportWizard.tsx app/app/import/StepMapping.tsx app/app/import/StepReconcile.tsx app/app/flights/FlightsClient.tsx app/app/flights/FlightForm.tsx"
   },
   "dependencies": {
