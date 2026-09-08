@@ -1,10 +1,17 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import {
+  useEffect, useId, useRef, useState, useSyncExternalStore, useTransition,
+  type ChangeEvent, type FormEvent, type ReactNode,
+} from "react";
 import { updateProfile, uploadAvatar } from "./actions";
 import { generateShareToken, revokeShareToken } from "./share-actions";
 import { REGIME_RULES, type Regime } from "@/lib/currency-rules";
 import { makeT, type Locale } from "@/lib/i18n";
+import { Alert, Button, Card, CardHeader, Field, Icon, PageHeader, Pill, buttonClass } from "@/components/ui";
+import { useToast } from "@/components/ui/toast";
+import { ConfirmDialog } from "@/components/ui/modal";
+import { settingsStrings } from "./settings-strings";
 
 interface Profile {
   full_name: string | null;
@@ -18,204 +25,456 @@ interface Profile {
   aug_half_credit: boolean;
 }
 
-export default function SettingsForm({ profile, locale }: { profile: Profile; locale: Locale }) {
+/** The editable subset of the profile; compared against `initial` for dirty tracking. */
+type Values = {
+  full_name: string;
+  license_number: string;
+  primary_regime: Regime;
+  aug_half_credit: boolean;
+};
+
+const TIER_PILL: Record<string, string> = { free: "neutral", pro: "pic", lifetime: "sic" };
+
+/** `.input` is h-10; phones get the 44px touch target. */
+const INPUT = "input h-11 sm:h-10";
+const FOCUS_RING =
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:ring-offset-2 focus-visible:ring-offset-surface";
+
+const valuesOf = (p: Profile): Values => ({
+  full_name: p.full_name ?? "",
+  license_number: p.license_number ?? "",
+  primary_regime: p.primary_regime,
+  aug_half_credit: Boolean(p.aug_half_credit),
+});
+
+/* ---- window.location.origin without a hydration mismatch ---- */
+const subscribeNoop = () => () => {};
+const emptyString = () => "";
+const readOrigin = () => window.location.origin;
+/** "" during SSR/hydration, the real origin afterwards. */
+const useOrigin = () => useSyncExternalStore(subscribeNoop, readOrigin, emptyString);
+
+export default function SettingsForm({
+  profile, locale, billing, backup,
+}: {
+  profile: Profile;
+  locale: Locale;
+  /** Server-rendered billing card (holds the Stripe portal form action). */
+  billing?: ReactNode;
+  /** Backup card — a sibling client component the page composes. */
+  backup?: ReactNode;
+}) {
   const t = makeT(locale);
-  const [msg, setMsg] = useState<string | null>(null);
-  const [err, setErr] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
+  const s = settingsStrings(locale);
+  const toast = useToast();
+  const formId = useId();
+
+  /* ---- profile + preferences ---- */
+  const [initial, setInitial] = useState<Values>(() => valuesOf(profile));
+  const [values, setValues] = useState<Values>(initial);
+  const [serverError, setServerError] = useState<string | null>(null);
+  const [saving, startSaving] = useTransition();
+  const errorRef = useRef<HTMLDivElement>(null);
+  const dirty = JSON.stringify(values) !== JSON.stringify(initial);
+  const set = <K extends keyof Values>(k: K, v: Values[K]) => setValues((prev) => ({ ...prev, [k]: v }));
+
+  useEffect(() => {
+    if (serverError) errorRef.current?.focus();
+  }, [serverError]);
+
+  // Hard navigations / tab close while edits are pending: the browser's own prompt.
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
+
+  function onSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (saving || !dirty) return;
+    setServerError(null);
+    // Same FormData shape updateProfile has always read.
+    const fd = new FormData();
+    fd.set("full_name", values.full_name);
+    fd.set("license_number", values.license_number);
+    fd.set("primary_regime", values.primary_regime);
+    if (values.aug_half_credit) fd.set("aug_half_credit", "on");
+    const snapshot = values;
+    startSaving(async () => {
+      try {
+        const r = await updateProfile(fd);
+        if (r?.error) {
+          setServerError(r.error);
+          return;
+        }
+        setInitial(snapshot);
+        toast.push({ tone: "good", title: s("savedToast"), description: s("savedToastBody") });
+      } catch {
+        setServerError(s("errUnexpected"));
+      }
+    });
+  }
+
+  function discard() {
+    setValues(initial);
+    setServerError(null);
+  }
+
+  /* ---- avatar ---- */
   const [avatarUrl, setAvatarUrl] = useState(profile.avatar_url);
   const [uploading, setUploading] = useState(false);
-  const [shareToken, setShareToken] = useState(profile.share_token);
-  const [shareBusy, setShareBusy] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const avatarInputId = `${formId}-avatar`;
 
-  const shareUrl = shareToken
-    ? (typeof window !== "undefined" ? `${window.location.origin}/share/${shareToken}` : `/share/${shareToken}`)
-    : null;
-
-  async function onGenerate() {
-    setShareBusy(true);
-    try {
-      const r = await generateShareToken();
-      if (r.token) setShareToken(r.token);
-    } finally {
-      setShareBusy(false);
-    }
-  }
-
-  async function onRevoke() {
-    if (!confirm(locale === "ko" ? "공유 링크를 해지하시겠습니까?" : locale === "zh" ? "撤销共享链接?" : locale === "es" ? "¿Revocar el enlace de compartir?" : "Revoke the share link?")) return;
-    setShareBusy(true);
-    try {
-      await revokeShareToken();
-      setShareToken(null);
-    } finally {
-      setShareBusy(false);
-    }
-  }
-
-  async function copyShareUrl() {
-    if (!shareUrl) return;
-    await navigator.clipboard.writeText(shareUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  }
-
-  async function onAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
+  async function onAvatarChange(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-picking the same file
     if (!file) return;
     setUploading(true);
-    setErr(null);
     try {
       const fd = new FormData();
       fd.set("file", file);
       const r = await uploadAvatar(fd);
-      if (r.error) setErr(r.error);
-      else if (r.url) setAvatarUrl(r.url);
+      if (r.error) toast.push({ tone: "bad", title: s("avatarFailed"), description: r.error });
+      else {
+        if (r.url) setAvatarUrl(r.url);
+        toast.push({ tone: "good", title: s("avatarUploaded") });
+      }
+    } catch {
+      toast.push({ tone: "bad", title: s("avatarFailed"), description: s("errUnexpected") });
     } finally {
       setUploading(false);
     }
   }
 
+  /* ---- sharing ---- */
+  const origin = useOrigin();
+  const [shareToken, setShareToken] = useState(profile.share_token);
+  const [shareBusy, setShareBusy] = useState(false);
+  const [shareConfirm, setShareConfirm] = useState<null | "regenerate" | "revoke">(null);
+  const shareUrl = shareToken ? `${origin}/share/${shareToken}` : null;
+
+  async function createOrRotate(rotating: boolean) {
+    setShareBusy(true);
+    try {
+      const r = await generateShareToken();
+      if (r.error || !r.token) {
+        toast.push({ tone: "bad", title: s("shareFailed"), description: r.error });
+        return;
+      }
+      setShareToken(r.token);
+      toast.push({ tone: "good", title: s(rotating ? "regenerated" : "linkCreated") });
+    } catch {
+      toast.push({ tone: "bad", title: s("shareFailed"), description: s("errUnexpected") });
+    } finally {
+      setShareBusy(false);
+      setShareConfirm(null);
+    }
+  }
+
+  async function revoke() {
+    setShareBusy(true);
+    try {
+      const r = await revokeShareToken();
+      if (r.error) {
+        toast.push({ tone: "bad", title: s("shareFailed"), description: r.error });
+        return;
+      }
+      setShareToken(null);
+      toast.push({ tone: "info", title: s("revoked") });
+    } catch {
+      toast.push({ tone: "bad", title: s("shareFailed"), description: s("errUnexpected") });
+    } finally {
+      setShareBusy(false);
+      setShareConfirm(null);
+    }
+  }
+
+  async function copyShareUrl() {
+    if (!shareUrl) return;
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      toast.push({ tone: "good", title: s("copied"), description: s("copiedBody") });
+    } catch {
+      toast.push({ tone: "warn", title: s("copyFailed") });
+    }
+  }
+
+  /* ---- derived ---- */
+  const regime = REGIME_RULES[values.primary_regime];
+  const initialLetter = (profile.full_name ?? profile.email).slice(0, 1).toUpperCase();
+  const statusLine = (
+    <p role="status" className={`flex items-center gap-1.5 text-xs font-medium ${dirty ? "text-warn-ink" : "text-good-ink"}`}>
+      {dirty
+        ? <Icon.TriangleAlert size={14} strokeWidth={2} aria-hidden className="shrink-0" />
+        : <Icon.Check size={14} strokeWidth={2} aria-hidden className="shrink-0" />}
+      <span>{dirty ? s("unsavedChanges") : s("noChanges")}</span>
+    </p>
+  );
+  const saveLabel = saving ? t("common.saving") : s("saveChanges");
+
   return (
-    <div className="max-w-2xl space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">{t("settings.title")}</h1>
-      </div>
+    <div className="space-y-4">
+      <PageHeader title={t("settings.title")} subtitle={s("subtitle")} />
 
-      <form
-        action={(fd) => {
-          setMsg(null); setErr(null);
-          startTransition(async () => {
-            const r = await updateProfile(fd);
-            if (r?.error) setErr(r.error);
-            else setMsg(t("settings.saved"));
-          });
-        }}
-        className="card overflow-hidden"
-      >
-        <div className="bg-gradient-to-br from-slate-50 to-sky-50/40 px-4 py-2.5 border-b border-slate-200/60">
-          <h2 className="text-sm font-bold text-slate-800">{t("settings.profile")}</h2>
-        </div>
+      <div className="grid gap-4 lg:grid-cols-2 items-start [&>*]:min-w-0">
+        {/* ------------------------------------------------------------ */}
+        {/* Left: profile + preferences (one form)                        */}
+        {/* ------------------------------------------------------------ */}
+        <form id={formId} onSubmit={onSubmit} noValidate aria-busy={saving || undefined} className="space-y-4">
+          {serverError && (
+            <div
+              ref={errorRef}
+              tabIndex={-1}
+              className="rounded-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bad/50 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+            >
+              <Alert variant="bad" title={s("saveFailed")}>{serverError}</Alert>
+            </div>
+          )}
 
-        {/* Avatar */}
-        <div className="px-4 pt-4 flex items-center gap-4">
-          <div className="relative w-20 h-20 rounded-full overflow-hidden bg-slate-200 ring-2 ring-white shadow-md flex items-center justify-center text-slate-500 text-xl font-bold">
-            {avatarUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={avatarUrl} alt="avatar" className="w-full h-full object-cover" />
+          <Card padding="md">
+            <CardHeader title={t("settings.profile")} meta={s("profileDesc")} />
+
+            {/* Avatar */}
+            <div className="flex items-center gap-4 mb-4">
+              <div className="relative w-16 h-16 rounded-full overflow-hidden bg-surface-2 ring-2 ring-surface shadow-card grid place-items-center text-ink-2 text-lg font-semibold shrink-0">
+                {avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={avatarUrl} alt={s("avatarAlt")} className="w-full h-full object-cover" />
+                ) : (
+                  <span aria-hidden>{initialLetter}</span>
+                )}
+              </div>
+              <div className="min-w-0">
+                <span className="label">{t("settings.avatar")}</span>
+                <label
+                  htmlFor={avatarInputId}
+                  aria-busy={uploading || undefined}
+                  className={buttonClass("default", "sm", `h-11 sm:h-8 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand/60 has-[:focus-visible]:ring-offset-2 ${uploading ? "opacity-80 cursor-progress" : ""}`)}
+                >
+                  <Icon.Upload size={14} strokeWidth={2} aria-hidden />
+                  {uploading ? t("docs.uploading") : avatarUrl ? t("settings.replacePhoto") : t("settings.uploadPhoto")}
+                  <input
+                    id={avatarInputId}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    className="sr-only"
+                    disabled={uploading}
+                    onChange={onAvatarChange}
+                  />
+                </label>
+                <p className="mt-1 text-xs text-ink-3">{s("avatarHint")}</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Field label={t("settings.fullName")}>
+                <input
+                  className={INPUT}
+                  value={values.full_name}
+                  autoComplete="name"
+                  onChange={(e) => set("full_name", e.target.value)}
+                />
+              </Field>
+              <Field label={t("settings.licenseNum")}>
+                <input
+                  className={`${INPUT} mono`}
+                  value={values.license_number}
+                  placeholder={t("export.licensePh")}
+                  autoComplete="off"
+                  onChange={(e) => set("license_number", e.target.value)}
+                />
+              </Field>
+              <Field
+                label={t("settings.primaryRegime")}
+                className="sm:col-span-2"
+                hint={<>
+                  <span className="font-medium text-ink-2">{s("regimeHint", { authority: regime.authority, reference: regime.reference })}</span>
+                  {" · "}{s("regimeMeta")}
+                </>}
+              >
+                <select
+                  className={INPUT}
+                  value={values.primary_regime}
+                  onChange={(e) => set("primary_regime", e.target.value as Regime)}
+                >
+                  {(Object.keys(REGIME_RULES) as Regime[]).map((r) => (
+                    <option key={r} value={r}>{r} — {REGIME_RULES[r].name}</option>
+                  ))}
+                </select>
+              </Field>
+            </div>
+          </Card>
+
+          <Card padding="md">
+            <CardHeader title={s("preferences")} meta={s("preferencesDesc")} />
+            <Field label={<span className="sr-only">{t("settings.augCredit")}</span>} hint={t("settings.augCreditHint")}>
+              <Switch checked={values.aug_half_credit} onChange={(v) => set("aug_half_credit", v)}>
+                {t("settings.augCredit")}
+              </Switch>
+            </Field>
+          </Card>
+
+          {/* lg+: footer row; below lg the sticky bar takes over */}
+          <div className="hidden lg:flex items-center justify-between gap-3">
+            {statusLine}
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" onClick={discard} disabled={!dirty || saving}>{s("discard")}</Button>
+              <Button type="submit" variant="primary" loading={saving} disabled={!dirty}>{saveLabel}</Button>
+            </div>
+          </div>
+        </form>
+
+        {/* ------------------------------------------------------------ */}
+        {/* Right: sharing · account · billing · backup                   */}
+        {/* ------------------------------------------------------------ */}
+        <div className="space-y-4">
+          <Card padding="md">
+            <CardHeader title={s("sharing")} meta={s("sharingDesc")} />
+            {shareUrl ? (
+              <div className="space-y-3">
+                <Field label={s("shareLinkLabel")}>
+                  <input
+                    readOnly
+                    value={shareUrl}
+                    className={`${INPUT} mono text-xs`}
+                    onFocus={(e) => e.currentTarget.select()}
+                  />
+                </Field>
+                <div className="flex flex-wrap gap-2">
+                  <Button className="h-11 sm:h-10" onClick={copyShareUrl}>
+                    <Icon.Copy size={16} strokeWidth={1.75} aria-hidden />{s("copyLink")}
+                  </Button>
+                  <a
+                    href={shareUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={buttonClass("ghost", "md", "h-11 sm:h-10")}
+                  >
+                    {s("openLink")}<Icon.ArrowUpRight size={16} strokeWidth={2} aria-hidden />
+                  </a>
+                  <span className="flex-1" />
+                  <Button variant="ghost" className="h-11 sm:h-10" disabled={shareBusy} onClick={() => setShareConfirm("regenerate")}>
+                    <Icon.RotateCcw size={16} strokeWidth={1.75} aria-hidden />{s("regenerate")}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="h-11 sm:h-10 text-bad-ink hover:bg-bad/10 hover:text-bad-ink"
+                    disabled={shareBusy}
+                    onClick={() => setShareConfirm("revoke")}
+                  >
+                    <Icon.X size={16} strokeWidth={2} aria-hidden />{s("revoke")}
+                  </Button>
+                </div>
+              </div>
             ) : (
-              (profile.full_name ?? profile.email).slice(0, 1).toUpperCase()
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-sm text-ink-2">{s("noLink")}</p>
+                <Button variant="primary" className="h-11 sm:h-10" loading={shareBusy} onClick={() => createOrRotate(false)}>
+                  {shareBusy ? s("creating") : <><Icon.Plus size={16} strokeWidth={2} aria-hidden />{s("createLink")}</>}
+                </Button>
+              </div>
             )}
-          </div>
-          <div className="flex-1">
-            <label className="label">{t("settings.avatar")}</label>
-            <input
-              type="file"
-              accept="image/png,image/jpeg,image/webp"
-              onChange={onAvatarChange}
-              disabled={uploading}
-              className="block text-sm text-slate-700"
-            />
-            {uploading && <span className="ml-2 text-sky-600 text-xs">{t("docs.uploading")}</span>}
-          </div>
-        </div>
+          </Card>
 
-        <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <label className="label">{t("settings.fullName")}</label>
-            <input className="input" name="full_name" defaultValue={profile.full_name ?? ""} placeholder="Terrence Lin" />
-          </div>
-          <div>
-            <label className="label">{t("settings.licenseNum")}</label>
-            <input className="input" name="license_number" defaultValue={profile.license_number ?? ""} placeholder={t("export.licensePh")} />
-          </div>
-          <div className="sm:col-span-2">
-            <label className="label">{t("settings.primaryRegime")}</label>
-            <select className="input" name="primary_regime" defaultValue={profile.primary_regime}>
-              {(Object.keys(REGIME_RULES) as Regime[]).map((r) => (
-                <option key={r} value={r}>
-                  {r} — {REGIME_RULES[r].name} ({REGIME_RULES[r].reference})
-                </option>
-              ))}
-            </select>
-          </div>
-          <label className="sm:col-span-2 flex items-start gap-2 text-sm text-slate-700 pt-1">
-            <input type="checkbox" name="aug_half_credit" defaultChecked={profile.aug_half_credit} className="mt-0.5" />
-            <span>
-              <span className="font-medium">{t("settings.augCredit")}</span>
-              <span className="block text-xs text-slate-500">{t("settings.augCreditHint")}</span>
-            </span>
-          </label>
-        </div>
-        <div className="px-4 py-3 border-t border-slate-200/60 flex items-center gap-3">
-          <button className="btn btn-primary" type="submit" disabled={pending}>
-            {pending ? t("common.saving") : t("common.save")}
-          </button>
-          {msg && <span className="text-sm text-emerald-700">{msg}</span>}
-          {err && <span className="text-sm text-rose-600">{err}</span>}
-        </div>
-      </form>
+          <Card padding="md">
+            <CardHeader title={t("settings.account")} meta={s("accountDesc")} />
+            <dl className="divide-y divide-border text-sm">
+              <div className="flex items-center justify-between gap-3 py-2">
+                <dt className="text-ink-2">{t("settings.email")}</dt>
+                <dd className="text-ink-1 truncate">{profile.email}</dd>
+              </div>
+              <div className="flex items-center justify-between gap-3 py-2">
+                <dt className="text-ink-2">{t("settings.tier")}</dt>
+                <dd className="flex items-center gap-1.5">
+                  <Pill variant={TIER_PILL[profile.tier] ?? "neutral"}>{profile.tier}</Pill>
+                  {profile.is_admin && <Pill variant="warn">{t("nav.admin")}</Pill>}
+                </dd>
+              </div>
+            </dl>
+          </Card>
 
-      {/* Public read-only share link */}
-      <div className="card p-4 space-y-3">
-        <div>
-          <h2 className="text-sm font-bold text-slate-800">
-            {locale === "ko" ? "공유 링크" : locale === "zh" ? "共享链接" : locale === "es" ? "Enlace para Compartir" : "Public Share Link"}
-          </h2>
-          <p className="text-xs text-slate-500 mt-0.5">
-            {locale === "ko"
-              ? "검사관, 고용주, 보험사에 보낼 수 있는 읽기 전용 로그북 스냅샷 URL."
-              : locale === "zh"
-                ? "可发给检查员、雇主或保险公司的只读飞行日志快照 URL。"
-                : locale === "es"
-                  ? "URL de instantánea de solo lectura para examinadores, empleadores o seguros."
-                  : "Read-only logbook snapshot URL you can hand to an examiner, employer, or insurer. Rotate to invalidate."}
-          </p>
+          {billing}
+          {backup}
         </div>
-        {shareUrl ? (
-          <div className="space-y-2">
-            <div className="flex gap-2">
-              <input
-                readOnly
-                value={shareUrl}
-                className="input flex-1 font-mono text-xs"
-                onClick={(e) => (e.target as HTMLInputElement).select()}
-              />
-              <button type="button" className="btn whitespace-nowrap" onClick={copyShareUrl}>
-                {copied ? "✓" : (locale === "ko" ? "복사" : locale === "zh" ? "复制" : locale === "es" ? "Copiar" : "Copy")}
-              </button>
-            </div>
-            <div className="flex gap-2">
-              <button type="button" className="btn text-xs" disabled={shareBusy} onClick={onGenerate}>
-                {locale === "ko" ? "새 토큰 발급 (기존 무효화)" : locale === "zh" ? "重新生成 (使旧链接失效)" : locale === "es" ? "Regenerar (invalida el anterior)" : "Regenerate (invalidates current)"}
-              </button>
-              <button type="button" className="btn btn-danger text-xs" disabled={shareBusy} onClick={onRevoke}>
-                {locale === "ko" ? "해지" : locale === "zh" ? "撤销" : locale === "es" ? "Revocar" : "Revoke"}
-              </button>
-            </div>
-          </div>
-        ) : (
-          <button type="button" className="btn btn-primary" disabled={shareBusy} onClick={onGenerate}>
-            {locale === "ko" ? "공유 링크 생성" : locale === "zh" ? "创建共享链接" : locale === "es" ? "Crear enlace de compartir" : "Create share link"}
-          </button>
-        )}
       </div>
 
-      <div className="card p-4 space-y-2">
-        <h2 className="text-sm font-bold text-slate-800">{t("settings.account")}</h2>
-        <Row k={t("settings.email")} v={profile.email} />
-        <Row k={t("settings.tier")} v={<span className="font-bold uppercase">{profile.tier}</span>} />
+      {/* Below lg: sticky save bar, only while there is something to save. */}
+      <div className="save-bar lg:hidden" hidden={!dirty && !saving}>
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">{statusLine}</div>
+          <div className="flex items-center gap-2 shrink-0">
+            <Button variant="ghost" className="h-11" onClick={discard} disabled={!dirty || saving}>{s("discard")}</Button>
+            <Button type="submit" form={formId} variant="primary" className="h-11" loading={saving} disabled={!dirty}>{saveLabel}</Button>
+          </div>
+        </div>
       </div>
+
+      <ConfirmDialog
+        open={shareConfirm === "regenerate"}
+        title={s("regenerateTitle")}
+        body={s("regenerateBody")}
+        confirmLabel={s("regenerateConfirm")}
+        tone="danger"
+        pending={shareBusy}
+        locale={locale}
+        onConfirm={() => createOrRotate(true)}
+        onCancel={() => { if (!shareBusy) setShareConfirm(null); }}
+      />
+      <ConfirmDialog
+        open={shareConfirm === "revoke"}
+        title={s("revokeTitle")}
+        body={s("revokeBody")}
+        confirmLabel={s("revokeConfirm")}
+        tone="danger"
+        pending={shareBusy}
+        locale={locale}
+        onConfirm={revoke}
+        onCancel={() => { if (!shareBusy) setShareConfirm(null); }}
+      />
     </div>
   );
 }
 
-function Row({ k, v }: { k: string; v: React.ReactNode }) {
+/* ------------------------------------------------------------------------ */
+/* Switch — same control as the flight form's cross-country toggle           */
+/* ------------------------------------------------------------------------ */
+
+function Switch({
+  id, checked, onChange, children, "aria-describedby": describedBy,
+}: {
+  id?: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  children: ReactNode;
+  "aria-describedby"?: string;
+}) {
   return (
-    <div className="flex justify-between text-sm border-b border-slate-100 pb-1.5 last:border-0">
-      <span className="text-slate-500">{k}</span>
-      <span className="text-slate-800">{v}</span>
-    </div>
+    <button
+      type="button"
+      role="switch"
+      id={id}
+      aria-checked={checked}
+      aria-describedby={describedBy}
+      onClick={() => onChange(!checked)}
+      className={`inline-flex min-h-11 sm:min-h-10 max-w-full items-start gap-3 rounded-control -mx-1 px-1 py-1 text-left text-sm text-ink-1 cursor-pointer select-none ${FOCUS_RING}`}
+    >
+      <span
+        aria-hidden
+        className={`relative mt-0.5 inline-flex h-6 w-10 shrink-0 items-center rounded-full border transition-colors duration-fast ease-out motion-reduce:transition-none ${
+          checked ? "bg-brand border-brand" : "bg-surface-2 border-border-strong"
+        }`}
+      >
+        <span
+          className={`absolute left-0.5 h-5 w-5 rounded-full bg-surface shadow-sm transition-transform duration-fast ease-out motion-reduce:transition-none ${
+            checked ? "translate-x-3.5" : ""
+          }`}
+        />
+      </span>
+      <span className="min-w-0 font-medium">{children}</span>
+    </button>
   );
 }

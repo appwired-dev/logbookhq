@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import FlowSankey, { ROLE_COLORS, type FlowLink, type FlowNode } from "./FlowSankey";
+import FlowSankey, { NODE_NEUTRAL, ROLE_COLORS, type FlowLink, type FlowNode } from "./FlowSankey";
 import type { Role } from "@/lib/types";
 
 const ROLE_ORDER: Role[] = ["PIC", "FO", "DUAL", "SIC", "CHECK"];
@@ -36,7 +36,7 @@ export default function AircraftRoleSankey({
 
     const roles = ROLE_ORDER.filter((r) => rowsOut.some(([, v]) => v[r] > 0.05));
     const nodes: FlowNode[] = [
-      ...rowsOut.map(([name]) => ({ name, color: "#64748b", kind: "aircraft" })),
+      ...rowsOut.map(([name]) => ({ name, color: NODE_NEUTRAL, kind: "aircraft" })),
       ...roles.map((r) => ({ name: roleLabels[r] ?? r, color: ROLE_COLORS[r], kind: "role" })),
     ];
     const links: FlowLink[] = [];

@@ -1,7 +1,12 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition, type FormEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { updateUserTier, updateUserName, toggleUserAdmin, createUserAccount, resetUserPassword, deleteUserAccount } from "./actions";
+import type { Locale } from "@/lib/i18n";
+import { Alert, Button, Card, CardFooter, CardHeader, Field, Icon, PageHeader, Pill, StatTile } from "@/components/ui";
+import { useToast } from "@/components/ui/toast";
+import { ConfirmDialog } from "@/components/ui/modal";
+import { adminStrings, type AdminStringKey, type AdminT } from "./admin-strings";
 
 export type AdminUser = {
   id: string;
@@ -13,14 +18,24 @@ export type AdminUser = {
   has_stripe: boolean;
   created_at: string;
 };
+type Tier = AdminUser["tier"];
 
-const TIER_PILL: Record<AdminUser["tier"], string> = {
-  free:     "bg-slate-100 text-slate-700 border-slate-200",
-  pro:      "bg-sky-50 text-sky-700 border-sky-200",
-  lifetime: "bg-violet-50 text-violet-700 border-violet-200",
-};
+const TIERS: Tier[] = ["free", "pro", "lifetime"];
+const TIER_KEY: Record<Tier, AdminStringKey> = { free: "tierFree", pro: "tierPro", lifetime: "tierLifetime" };
+/** Full class strings so Tailwind's purge keeps every variant. */
+const TIER_SELECT: Record<Tier, string> = { free: "pill-neutral", pro: "pill-pic", lifetime: "pill-sic-role" };
 
-/** Sign-in URL used in the credential-copy strings. Prefers the configured
+/** `.input` is h-10; phones get the 44px touch target. */
+const INPUT = "input h-11 sm:h-10";
+const FOCUS_RING =
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:ring-offset-2 focus-visible:ring-offset-surface";
+const DANGER_GHOST = "text-bad-ink hover:bg-bad/10 hover:text-bad-ink";
+
+type Credentials = { kind: "created" | "reset"; email: string; password: string };
+type ConfirmKind = "admin" | "reset" | "delete";
+type Confirm = { kind: ConfirmKind; user: AdminUser } | null;
+
+/** Sign-in URL used in the credential-copy text. Prefers the configured
  *  NEXT_PUBLIC_APP_URL so a staging/preview admin doesn't paste a prod URL
  *  into the new user's onboarding message. */
 function loginUrl(): string {
@@ -29,15 +44,31 @@ function loginUrl(): string {
   return `${base.replace(/\/$/, "")}/login`;
 }
 
-export default function AdminClient({ users }: { users: AdminUser[] }) {
+/** Server-action calls go over fetch; Safari on a flaky network throws `Load failed`. */
+function netErr(e: unknown, s: AdminT): string {
+  if (e instanceof Error) {
+    if (e.message === "Load failed" || e.message.startsWith("Failed to fetch")) return s("errNetwork");
+    return e.message || s("errUnexpected");
+  }
+  return s("errUnexpected");
+}
+
+export default function AdminClient({ users, locale }: { users: AdminUser[]; locale: Locale }) {
+  const s = adminStrings(locale);
+  const toast = useToast();
   const [q, setQ] = useState("");
+  const [createOpen, setCreateOpen] = useState(false);
+  const [credentials, setCredentials] = useState<Credentials | null>(null);
+  // `confirm` outlives `confirmOpen` so the dialog keeps its copy while it animates closed.
+  const [confirm, setConfirm] = useState<Confirm>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirming, startConfirming] = useTransition();
+  const createRef = useRef<HTMLButtonElement>(null);
+
   const filtered = useMemo(() => {
-    if (!q.trim()) return users;
-    const needle = q.toLowerCase();
-    return users.filter((u) =>
-      u.email.toLowerCase().includes(needle) ||
-      (u.full_name ?? "").toLowerCase().includes(needle)
-    );
+    const needle = q.trim().toLowerCase();
+    if (!needle) return users;
+    return users.filter((u) => u.email.toLowerCase().includes(needle) || (u.full_name ?? "").toLowerCase().includes(needle));
   }, [users, q]);
 
   const counts = useMemo(() => ({
@@ -47,387 +78,519 @@ export default function AdminClient({ users }: { users: AdminUser[] }) {
     lifetime: users.filter((u) => u.tier === "lifetime").length,
   }), [users]);
 
+  const fail = (message: string) => toast.push({ tone: "bad", title: message });
+
+  function runConfirm() {
+    if (!confirm) return;
+    const { kind, user } = confirm;
+    startConfirming(async () => {
+      try {
+        if (kind === "admin") {
+          const r = await toggleUserAdmin(user.id, !user.is_admin);
+          if (r?.error) fail(r.error);
+          else toast.push({ tone: "good", title: s(user.is_admin ? "adminRevoked" : "adminGranted"), description: user.email });
+        } else if (kind === "reset") {
+          const r = await resetUserPassword(user.id);
+          if ("tempPassword" in r) {
+            setCredentials({ kind: "reset", email: user.email, password: r.tempPassword });
+            toast.push({ tone: "good", title: s("resetDone"), description: user.email });
+          } else fail(r.error);
+        } else {
+          const r = await deleteUserAccount(user.id);
+          if ("error" in r) fail(r.error);
+          else toast.push({ tone: "good", title: s("deleted"), description: s("deletedBody", { email: user.email }) });
+        }
+      } catch (e) {
+        fail(netErr(e, s));
+      } finally {
+        setConfirmOpen(false);
+      }
+    });
+  }
+
+  function askConfirm(kind: ConfirmKind, user: AdminUser) {
+    setConfirm({ kind, user });
+    setConfirmOpen(true);
+  }
+
+  async function copyCredentials(c: Credentials) {
+    try {
+      await navigator.clipboard.writeText(`${s("email")}: ${c.email}\n${s("password")}: ${c.password}\n${s("signIn")}: ${loginUrl()}`);
+      toast.push({ tone: "good", title: s("credentialsCopied") });
+    } catch {
+      toast.push({ tone: "warn", title: s("copyFailed") });
+    }
+  }
+
+  const confirmCopy = confirm ? CONFIRM_COPY[confirm.kind](confirm.user, s) : null;
+
   return (
     <div className="space-y-4">
-      <div className="flex items-baseline justify-between flex-wrap gap-2">
-        <h1 className="text-2xl font-bold text-slate-900">Admin · Users</h1>
-        <div className="text-xs text-slate-500 tabular-nums">
-          {counts.total} total ·{" "}
-          <span className="text-slate-600">{counts.free} free</span> ·{" "}
-          <span className="text-sky-700">{counts.pro} pro</span> ·{" "}
-          <span className="text-violet-700">{counts.lifetime} lifetime</span>
-        </div>
-      </div>
+      <PageHeader
+        title={s("title")}
+        subtitle={s("subtitle")}
+        actions={
+          // Plain <button>: it takes focus back when the create form closes.
+          <button
+            ref={createRef}
+            type="button"
+            className={`btn ${createOpen ? "" : "btn-primary"} h-11 sm:h-10`}
+            aria-expanded={createOpen}
+            onClick={() => setCreateOpen((v) => !v)}
+          >
+            {createOpen
+              ? <><Icon.X size={16} strokeWidth={2} aria-hidden />{s("cancel")}</>
+              : <><Icon.Plus size={16} strokeWidth={2} aria-hidden />{s("createUser")}</>}
+          </button>
+        }
+      />
 
-      <div className="flex gap-2 items-center">
+      <section className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <StatTile variant="compact" accent="brand" label={s("statTotal")} value={counts.total} decimals={0} />
+        <StatTile variant="compact" accent="neutral" label={s("statFree")} value={counts.free} decimals={0} />
+        <StatTile variant="compact" accent="pic" label={s("statPro")} value={counts.pro} decimals={0} />
+        <StatTile variant="compact" accent="sic" label={s("statLifetime")} value={counts.lifetime} decimals={0} />
+      </section>
+
+      {createOpen && (
+        <CreateUserForm
+          s={s}
+          onCreated={(c) => {
+            setCredentials(c);
+            setCreateOpen(false);
+            toast.push({ tone: "good", title: s("created"), description: c.email });
+            requestAnimationFrame(() => createRef.current?.focus());
+          }}
+          onCancel={() => {
+            setCreateOpen(false);
+            requestAnimationFrame(() => createRef.current?.focus());
+          }}
+        />
+      )}
+
+      {credentials && (
+        <CredentialsPanel
+          c={credentials}
+          s={s}
+          onCopy={() => copyCredentials(credentials)}
+          onDismiss={() => setCredentials(null)}
+        />
+      )}
+
+      <div className="relative max-w-md">
+        <Icon.Search size={16} strokeWidth={2} aria-hidden className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-3 pointer-events-none" />
         <input
-          className="input max-w-md flex-1"
-          placeholder="Search by email or name…"
+          type="search"
+          aria-label={s("search")}
+          placeholder={s("searchPh")}
+          className={`${INPUT} pl-9`}
           value={q}
           onChange={(e) => setQ(e.target.value)}
         />
-        <CreateUserButton />
       </div>
 
-      <div className="card overflow-x-auto scrollbar-always">
-        <table className="min-w-max w-full text-sm">
-          <thead className="bg-gradient-to-b from-slate-100 to-slate-50 text-[10px] uppercase tracking-wider text-slate-600">
+      <Card padding="none" className="overflow-x-auto scrollbar-always">
+        <table className="data-table w-full min-w-[960px] text-sm">
+          <thead>
             <tr>
-              <th className="px-3 py-2 text-left">Email</th>
-              <th className="px-3 py-2 text-left">Name</th>
-              <th className="px-3 py-2 text-left">Tier</th>
-              <th className="px-3 py-2 text-left">Regime</th>
-              <th className="px-3 py-2 text-center">Stripe</th>
-              <th className="px-3 py-2 text-center">Admin</th>
-              <th className="px-3 py-2 text-left">Signed up</th>
-              <th className="px-3 py-2 text-right">Actions</th>
+              <th scope="col">{s("colEmail")}</th>
+              <th scope="col">{s("colName")}</th>
+              <th scope="col">{s("colTier")}</th>
+              <th scope="col">{s("colRegime")}</th>
+              <th scope="col" className="!text-center">{s("colStripe")}</th>
+              <th scope="col" className="!text-center">{s("colAdmin")}</th>
+              <th scope="col">{s("colSignedUp")}</th>
+              <th scope="col" className="!text-right">{s("colActions")}</th>
             </tr>
           </thead>
           <tbody>
-            {filtered.map((u, idx) => (
-              <UserRow key={u.id} u={u} striped={idx % 2 === 1} />
+            {filtered.map((u) => (
+              <UserRow
+                key={u.id}
+                u={u}
+                s={s}
+                busy={confirming && confirm?.user.id === u.id}
+                onConfirm={(kind) => askConfirm(kind, u)}
+              />
             ))}
             {filtered.length === 0 && (
-              <tr><td colSpan={8} className="px-3 py-12 text-center text-slate-400">
-                No users match &ldquo;{q}&rdquo;.
-              </td></tr>
+              <tr>
+                <td colSpan={8} className="!px-3 !py-12 text-center text-ink-3">
+                  {q.trim() ? s("noMatch", { q: q.trim() }) : s("noUsers")}
+                </td>
+              </tr>
             )}
           </tbody>
         </table>
-      </div>
+      </Card>
+
+      <ConfirmDialog
+        open={confirmOpen}
+        title={confirmCopy?.title ?? ""}
+        body={confirmCopy?.body ?? ""}
+        confirmLabel={confirmCopy?.confirm ?? ""}
+        tone="danger"
+        pending={confirming}
+        locale={locale}
+        onConfirm={runConfirm}
+        onCancel={() => { if (!confirming) setConfirmOpen(false); }}
+      />
     </div>
   );
 }
 
-function CreateUserButton() {
-  const [open, setOpen] = useState(false);
+/** Title / body / button copy for each destructive confirmation. */
+const CONFIRM_COPY: Record<ConfirmKind, (u: AdminUser, s: AdminT) => { title: string; body: string; confirm: string }> = {
+  admin: (u, s) => u.is_admin
+    ? { title: s("revokeTitle", { email: u.email }), body: s("revokeBody"), confirm: s("revokeConfirm") }
+    : { title: s("grantTitle", { email: u.email }), body: s("grantBody"), confirm: s("grantConfirm") },
+  reset: (u, s) => ({ title: s("resetTitle", { email: u.email }), body: s("resetBody"), confirm: s("resetConfirm") }),
+  delete: (u, s) => ({ title: s("deleteTitle", { email: u.email }), body: s("deleteBody"), confirm: s("deleteConfirm") }),
+};
+
+/* ------------------------------------------------------------------------ */
+/* Create user                                                               */
+/* ------------------------------------------------------------------------ */
+
+function CreateUserForm({ s, onCreated, onCancel }: {
+  s: AdminT;
+  onCreated: (c: Credentials) => void;
+  onCancel: () => void;
+}) {
   const [email, setEmail] = useState("");
   const [fullName, setFullName] = useState("");
-  const [tier, setTier] = useState<AdminUser["tier"]>("lifetime");
+  const [tier, setTier] = useState<Tier>("lifetime");
+  const [attempted, setAttempted] = useState(false);
+  const [serverError, setServerError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  const [err, setErr] = useState<string | null>(null);
-  const [result, setResult] = useState<{ tempPassword: string } | null>(null);
+  const emailRef = useRef<HTMLInputElement>(null);
+  const errorRef = useRef<HTMLDivElement>(null);
 
-  function reset() {
-    setEmail(""); setFullName(""); setTier("lifetime"); setErr(null); setResult(null);
-  }
+  const emailError = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim()) ? undefined : s("errEmail");
 
-  function submit() {
-    setErr(null);
+  useEffect(() => { emailRef.current?.focus(); }, []);
+  useEffect(() => { if (serverError) errorRef.current?.focus(); }, [serverError]);
+
+  function onSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (pending) return;
+    setAttempted(true);
+    setServerError(null);
+    if (emailError) {
+      emailRef.current?.focus();
+      return;
+    }
     startTransition(async () => {
       try {
-        const r = await createUserAccount({ email, fullName, tier });
-        if (r?.error) { setErr(r.error); return; }
-        if (r?.ok) setResult({ tempPassword: r.tempPassword });
-      } catch (e) {
-        const msg = e instanceof Error
-          ? (e.message === "Load failed" ? "Network error — try again." : e.message)
-          : String(e);
-        setErr(msg);
+        const r = await createUserAccount({ email: email.trim(), fullName: fullName.trim(), tier });
+        if (r && "error" in r && r.error) {
+          setServerError(r.error);
+          return;
+        }
+        if (r && "ok" in r && r.ok) onCreated({ kind: "created", email: email.trim().toLowerCase(), password: r.tempPassword });
+      } catch (err) {
+        setServerError(netErr(err, s));
       }
     });
   }
 
   return (
-    <>
-      <button className="btn btn-primary whitespace-nowrap" onClick={() => setOpen(true)}>
-        + Create user
-      </button>
-
-      {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4"
-             onClick={() => { setOpen(false); reset(); }}>
-          <div className="card max-w-md w-full p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
-            {result ? (
-              <>
-                <h2 className="text-lg font-bold text-slate-900">Account created ✓</h2>
-                <p className="text-sm text-slate-700">
-                  Share these credentials with <strong>{email}</strong> securely (e.g. password manager,
-                  encrypted message). They should change the password on first login.
-                </p>
-                <div className="space-y-2">
-                  <div>
-                    <div className="text-xs uppercase tracking-wider text-slate-500">Email</div>
-                    <div className="font-mono text-sm bg-slate-100 px-2 py-1 rounded">{email}</div>
-                  </div>
-                  <div>
-                    <div className="text-xs uppercase tracking-wider text-slate-500">Temporary password</div>
-                    <div className="font-mono text-sm bg-amber-50 border border-amber-200 px-2 py-1 rounded">
-                      {result.tempPassword}
-                    </div>
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    className="btn"
-                    onClick={() => {
-                      navigator.clipboard.writeText(
-                        `Email: ${email}\nPassword: ${result.tempPassword}\nSign in: ${loginUrl()}`
-                      );
-                    }}
-                  >
-                    Copy credentials
-                  </button>
-                  <button className="btn btn-primary ml-auto" onClick={() => { setOpen(false); reset(); }}>
-                    Done
-                  </button>
-                </div>
-              </>
-            ) : (
-              <>
-                <h2 className="text-lg font-bold text-slate-900">Create new user</h2>
-                <p className="text-xs text-slate-500">
-                  Account is auto-confirmed — the user can sign in immediately with the temp password
-                  we&rsquo;ll generate.
-                </p>
-                {err && <p className="text-sm text-rose-600">{err}</p>}
-                <div className="space-y-3">
-                  <div>
-                    <label className="label">Email</label>
-                    <input className="input" type="email" value={email}
-                           onChange={(e) => setEmail(e.target.value)}
-                           placeholder="pilot@example.com" />
-                  </div>
-                  <div>
-                    <label className="label">Full name</label>
-                    <input className="input" value={fullName}
-                           onChange={(e) => setFullName(e.target.value)}
-                           placeholder="Jane Pilot" />
-                  </div>
-                  <div>
-                    <label className="label">Tier</label>
-                    <select className="input" value={tier}
-                            onChange={(e) => setTier(e.target.value as AdminUser["tier"])}>
-                      <option value="free">Free</option>
-                      <option value="pro">Pro</option>
-                      <option value="lifetime">Lifetime</option>
-                    </select>
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <button className="btn" onClick={() => { setOpen(false); reset(); }}>Cancel</button>
-                  <button className="btn btn-primary ml-auto" onClick={submit} disabled={pending || !email}>
-                    {pending ? "Creating…" : "Create user"}
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
+    <form onSubmit={onSubmit} noValidate aria-busy={pending || undefined} className="card p-4 animate-fade-up motion-reduce:animate-none">
+      <CardHeader title={s("createTitle")} meta={s("createDesc")} />
+      {serverError && (
+        <div
+          ref={errorRef}
+          tabIndex={-1}
+          className="mb-3 rounded-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bad/50 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+        >
+          <Alert variant="bad">{serverError}</Alert>
         </div>
       )}
-    </>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <Field label={s("email")} required error={attempted ? emailError : undefined}>
+          <input
+            ref={emailRef}
+            type="email"
+            className={`${INPUT} mono`}
+            value={email}
+            placeholder="pilot@example.com"
+            autoComplete="off"
+            spellCheck={false}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+        </Field>
+        <Field label={s("fullName")}>
+          <input className={INPUT} value={fullName} placeholder="Jane Pilot" autoComplete="off" onChange={(e) => setFullName(e.target.value)} />
+        </Field>
+        <Field label={s("tier")}>
+          <select className={INPUT} value={tier} onChange={(e) => setTier(e.target.value as Tier)}>
+            {TIERS.map((v) => <option key={v} value={v}>{s(TIER_KEY[v])}</option>)}
+          </select>
+        </Field>
+      </div>
+      <CardFooter className="justify-end">
+        <Button variant="ghost" className="h-11 sm:h-10" onClick={onCancel} disabled={pending}>{s("cancel")}</Button>
+        <Button type="submit" variant="primary" className="h-11 sm:h-10" loading={pending}>
+          {pending ? s("creating") : <><Icon.Plus size={16} strokeWidth={2} aria-hidden />{s("createUser")}</>}
+        </Button>
+      </CardFooter>
+    </form>
   );
 }
 
-function UserRow({ u, striped }: { u: AdminUser; striped: boolean }) {
+/* ------------------------------------------------------------------------ */
+/* Credentials panel (after create / reset)                                  */
+/* ------------------------------------------------------------------------ */
+
+function CredentialsPanel({ c, s, onCopy, onDismiss }: { c: Credentials; s: AdminT; onCopy: () => void; onDismiss: () => void }) {
+  const headingRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { headingRef.current?.focus(); }, [c]);
+  return (
+    <Card padding="md" role="status" className="border-good/30 bg-good/5">
+      <div ref={headingRef} tabIndex={-1} className="rounded-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60">
+        <CardHeader
+          title={
+            <span className="inline-flex items-center gap-1.5">
+              <Icon.CircleCheck size={16} strokeWidth={2} aria-hidden className="text-good-ink" />
+              {s(c.kind === "created" ? "created" : "resetDone")}
+            </span>
+          }
+          meta={s(c.kind === "created" ? "createdBody" : "resetDoneBody", { email: c.email })}
+          actions={
+            <Button variant="ghost" icon className="h-11 w-11 sm:h-9 sm:w-9" aria-label={s("dismiss")} onClick={onDismiss}>
+              <Icon.X size={16} strokeWidth={2} aria-hidden />
+            </Button>
+          }
+        />
+      </div>
+      <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+        <div>
+          <dt className="label">{s("email")}</dt>
+          <dd className="mono text-sm text-ink-1 rounded-control bg-surface border border-border px-2.5 py-1.5 break-all">{c.email}</dd>
+        </div>
+        <div>
+          <dt className="label">{s("tempPassword")}</dt>
+          <dd className="mono text-sm font-semibold text-ink-1 rounded-control bg-warn/10 border border-warn/30 px-2.5 py-1.5 break-all">{c.password}</dd>
+        </div>
+      </dl>
+      <CardFooter>
+        <Button className="h-11 sm:h-10" onClick={onCopy}>
+          <Icon.Copy size={16} strokeWidth={1.75} aria-hidden />{s("copyCredentials")}
+        </Button>
+        <Button variant="primary" className="h-11 sm:h-10 ml-auto" onClick={onDismiss}>{s("dismiss")}</Button>
+      </CardFooter>
+    </Card>
+  );
+}
+
+/* ------------------------------------------------------------------------ */
+/* Row                                                                       */
+/* ------------------------------------------------------------------------ */
+
+function UserRow({ u, s, busy, onConfirm }: {
+  u: AdminUser;
+  s: AdminT;
+  /** A confirmation for this user is in flight (dims the row). */
+  busy: boolean;
+  onConfirm: (kind: ConfirmKind) => void;
+}) {
+  const toast = useToast();
   const [pending, startTransition] = useTransition();
-  const [err, setErr] = useState<string | null>(null);
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState(u.full_name);
-  const [resetResult, setResetResult] = useState<{ tempPassword: string } | null>(null);
+  const [arming, setArming] = useState(false);
+  const [typed, setTyped] = useState("");
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const editNameRef = useRef<HTMLButtonElement>(null);
+  const armInputRef = useRef<HTMLInputElement>(null);
+  const deleteRef = useRef<HTMLButtonElement>(null);
+  const dim = pending || busy;
 
-  // Server-action calls happen via fetch under the hood; on Safari + flaky
-  // networks they throw `TypeError: Load failed`. We catch in every handler
-  // so the error becomes a user-facing message instead of an unhandled
-  // rejection that Sentry captures as noise.
-  function netErr(e: unknown): string {
-    if (e instanceof Error) {
-      if (e.message === "Load failed" || e.message.startsWith("Failed to fetch")) {
-        return "Network error — try again. (Your connection may be flaky.)";
-      }
-      return e.message;
-    }
-    return String(e);
-  }
+  useEffect(() => { if (editingName) nameInputRef.current?.focus(); }, [editingName]);
+  useEffect(() => {
+    if (arming) armInputRef.current?.focus();
+    else setTyped("");
+  }, [arming]);
 
-  function setTier(tier: AdminUser["tier"]) {
-    setErr(null);
+  function setTier(tier: Tier) {
     startTransition(async () => {
       try {
         const r = await updateUserTier(u.id, tier);
-        if (r?.error) setErr(r.error);
+        if (r?.error) toast.push({ tone: "bad", title: r.error });
+        else toast.push({ tone: "good", title: s("tierUpdated", { tier: s(TIER_KEY[tier]) }), description: u.email });
       } catch (e) {
-        setErr(netErr(e));
+        toast.push({ tone: "bad", title: netErr(e, s) });
       }
     });
   }
 
   function saveName() {
-    setErr(null);
     startTransition(async () => {
       try {
         const r = await updateUserName(u.id, nameDraft);
-        if (r?.error) setErr(r.error);
-        else setEditingName(false);
+        if (r?.error) toast.push({ tone: "bad", title: r.error });
+        else {
+          setEditingName(false);
+          toast.push({ tone: "good", title: s("nameSaved"), description: u.email });
+          requestAnimationFrame(() => editNameRef.current?.focus());
+        }
       } catch (e) {
-        setErr(netErr(e));
+        toast.push({ tone: "bad", title: netErr(e, s) });
       }
     });
   }
 
-  function flipAdmin() {
-    if (!confirm(
-      u.is_admin
-        ? `Remove admin from ${u.email}?`
-        : `Grant admin to ${u.email}? Admins can edit every user.`
-    )) return;
-    setErr(null);
-    startTransition(async () => {
-      try {
-        const r = await toggleUserAdmin(u.id, !u.is_admin);
-        if (r?.error) setErr(r.error);
-      } catch (e) {
-        setErr(netErr(e));
-      }
-    });
+  function cancelName() {
+    setEditingName(false);
+    setNameDraft(u.full_name);
+    requestAnimationFrame(() => editNameRef.current?.focus());
   }
 
-  function resetPw() {
-    if (!confirm(`Generate a NEW temporary password for ${u.email}? Their current password will stop working immediately.`)) return;
-    setErr(null);
-    startTransition(async () => {
-      try {
-        const r = await resetUserPassword(u.id);
-        if ("tempPassword" in r) setResetResult({ tempPassword: r.tempPassword });
-        else if (r.error) setErr(r.error);
-      } catch (e) {
-        setErr(netErr(e));
-      }
-    });
+  function closeArm() {
+    setArming(false);
+    requestAnimationFrame(() => deleteRef.current?.focus());
   }
 
-  function deleteUser() {
-    if (!confirm(`DELETE ${u.email} permanently? This wipes their account, flights, documents, everything. No undo.`)) return;
-    if (!confirm(`Are you absolutely sure? Type the email in the next prompt to confirm.`)) return;
-    const typed = prompt(`Type "${u.email}" exactly to confirm deletion:`);
-    if (typed !== u.email) { alert("Email didn't match. Cancelled."); return; }
-    setErr(null);
-    startTransition(async () => {
-      try {
-        const r = await deleteUserAccount(u.id);
-        if ("error" in r && typeof r.error === "string") setErr(r.error);
-        // Row disappears on next render after revalidatePath
-      } catch (e) {
-        setErr(netErr(e));
-      }
-    });
+  function onNameKeyDown(e: ReactKeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter") { e.preventDefault(); saveName(); }
+    if (e.key === "Escape") { e.preventDefault(); cancelName(); }
   }
+
+  const armed = typed.trim().toLowerCase() === u.email.toLowerCase();
 
   return (
-    <tr className={`border-t border-slate-100/70 ${striped ? "bg-slate-50/40" : ""} ${pending ? "opacity-60" : ""}`}>
-      <td className="px-3 py-2 whitespace-nowrap font-mono text-xs text-slate-700">
-        {u.email}
-        {err && <div className="text-[10px] text-rose-600 mt-0.5">{err}</div>}
-      </td>
-      <td className="px-3 py-2 whitespace-nowrap">
-        {editingName ? (
-          <div className="flex gap-1">
-            <input
-              className="input h-7 text-xs py-0.5"
-              value={nameDraft}
-              onChange={(e) => setNameDraft(e.target.value)}
-              autoFocus
-              onKeyDown={(e) => { if (e.key === "Enter") saveName(); if (e.key === "Escape") setEditingName(false); }}
-            />
-            <button className="text-xs text-sky-700 hover:text-sky-900 font-medium" onClick={saveName}>Save</button>
-            <button className="text-xs text-slate-500 hover:text-slate-700" onClick={() => { setEditingName(false); setNameDraft(u.full_name); }}>Cancel</button>
-          </div>
-        ) : (
-          <button
-            className="text-left text-slate-800 hover:text-sky-700"
-            onClick={() => setEditingName(true)}
-            title="Click to edit"
-          >
-            {u.full_name || <span className="text-slate-400 italic">—</span>}
-          </button>
-        )}
-      </td>
-      <td className="px-3 py-2 whitespace-nowrap">
-        <select
-          className={`text-[11px] font-bold uppercase tracking-wider px-2 py-1 rounded-md border ${TIER_PILL[u.tier]} cursor-pointer`}
-          value={u.tier}
-          onChange={(e) => setTier(e.target.value as AdminUser["tier"])}
-          disabled={pending}
-        >
-          <option value="free">Free</option>
-          <option value="pro">Pro</option>
-          <option value="lifetime">Lifetime</option>
-        </select>
-      </td>
-      <td className="px-3 py-2 whitespace-nowrap font-mono text-xs text-slate-600">
-        {u.primary_regime ?? "—"}
-      </td>
-      <td className="px-3 py-2 text-center">
-        {u.has_stripe ? <span className="text-emerald-600 text-sm" title="Stripe customer linked">✓</span> : <span className="text-slate-300">—</span>}
-      </td>
-      <td className="px-3 py-2 text-center">
-        <button
-          className={u.is_admin ? "text-amber-600 hover:text-amber-700" : "text-slate-300 hover:text-amber-600"}
-          onClick={flipAdmin}
-          title={u.is_admin ? "Click to revoke admin" : "Click to grant admin"}
-          disabled={pending}
-        >
-          {u.is_admin ? "★" : "☆"}
-        </button>
-      </td>
-      <td className="px-3 py-2 whitespace-nowrap font-mono text-xs text-slate-500">
-        {u.created_at ? u.created_at.slice(0, 10) : "—"}
-      </td>
-      <td className="px-3 py-2 text-right whitespace-nowrap">
-        <button
-          className="text-xs text-sky-700 hover:text-sky-900 font-medium mr-3 disabled:opacity-40"
-          onClick={resetPw}
-          disabled={pending}
-          title="Generate a new temporary password"
-        >
-          Reset PW
-        </button>
-        <button
-          className="text-xs text-rose-600 hover:text-rose-800 font-medium disabled:opacity-40"
-          onClick={deleteUser}
-          disabled={pending}
-          title="Delete this account permanently"
-        >
-          Delete
-        </button>
-      </td>
-
-      {/* Floating modal showing the new temp password after a reset. */}
-      {resetResult && (
-        <td colSpan={0}>
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4"
-               onClick={() => setResetResult(null)}>
-            <div className="card max-w-md w-full p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
-              <h2 className="text-lg font-bold text-slate-900">New password for {u.email}</h2>
-              <p className="text-sm text-slate-700">
-                Their old password is now invalid. Share this with them securely.
-                They should change it on first login.
-              </p>
-              <div>
-                <div className="text-xs uppercase tracking-wider text-slate-500">Temporary password</div>
-                <div className="font-mono text-sm bg-amber-50 border border-amber-200 px-2 py-1 rounded">
-                  {resetResult.tempPassword}
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  className="btn"
-                  onClick={() => {
-                    navigator.clipboard.writeText(
-                      `Email: ${u.email}\nPassword: ${resetResult.tempPassword}\nSign in: ${loginUrl()}`
-                    );
-                  }}
-                >
-                  Copy credentials
-                </button>
-                <button className="btn btn-primary ml-auto" onClick={() => setResetResult(null)}>
-                  Done
-                </button>
-              </div>
+    <>
+      <tr data-pending={dim || undefined} className="hover:bg-surface-2/40 transition-colors duration-fast motion-reduce:transition-none">
+        <td className="mono text-xs text-ink-1 whitespace-nowrap">{u.email}</td>
+        <td className="whitespace-nowrap">
+          {editingName ? (
+            <div className="flex items-center gap-1.5">
+              <input
+                ref={nameInputRef}
+                className="input input-sm h-11 sm:h-8 w-44"
+                aria-label={s("nameLabel")}
+                value={nameDraft}
+                disabled={pending}
+                onChange={(e) => setNameDraft(e.target.value)}
+                onKeyDown={onNameKeyDown}
+              />
+              <Button size="sm" variant="primary" className="h-11 sm:h-8" loading={pending} onClick={saveName}>{s("save")}</Button>
+              <Button size="sm" variant="ghost" className="h-11 sm:h-8" disabled={pending} onClick={cancelName}>{s("cancel")}</Button>
             </div>
+          ) : (
+            <div className="flex items-center gap-1">
+              <span className={u.full_name ? "text-ink-1" : "text-ink-3"}>{u.full_name || "—"}</span>
+              <button
+                ref={editNameRef}
+                type="button"
+                className={`btn btn-ghost btn-icon h-11 w-11 sm:h-8 sm:w-8 text-ink-3 hover:text-ink-1 ${FOCUS_RING}`}
+                aria-label={s("editName", { email: u.email })}
+                disabled={dim}
+                onClick={() => setEditingName(true)}
+              >
+                <Icon.Pencil size={14} strokeWidth={2} aria-hidden />
+              </button>
+            </div>
+          )}
+        </td>
+        <td className="whitespace-nowrap">
+          {/* Pill-styled select: the pill IS the control, with a chevron so it reads as one. */}
+          <span className="relative inline-flex items-center">
+            <select
+              aria-label={s("tierLabel", { email: u.email })}
+              className={`${TIER_SELECT[u.tier]} appearance-none h-11 sm:h-7 pl-2 pr-6 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${FOCUS_RING}`}
+              value={u.tier}
+              disabled={dim}
+              onChange={(e) => setTier(e.target.value as Tier)}
+            >
+              {TIERS.map((v) => <option key={v} value={v}>{s(TIER_KEY[v])}</option>)}
+            </select>
+            <Icon.ChevronDown size={12} strokeWidth={2.5} aria-hidden className="pointer-events-none absolute right-1.5 text-ink-3" />
+          </span>
+        </td>
+        <td className="whitespace-nowrap">
+          {u.primary_regime ? <Pill variant="neutral" className="mono">{u.primary_regime}</Pill> : <span className="text-ink-3">—</span>}
+        </td>
+        <td className="text-center">
+          {u.has_stripe ? (
+            <span className="inline-flex text-good-ink" title={s("stripeLinked")}>
+              <Icon.Check size={16} strokeWidth={2.5} aria-hidden /><span className="sr-only">{s("stripeLinked")}</span>
+            </span>
+          ) : (
+            <span className="text-ink-3" title={s("stripeNone")}>—<span className="sr-only"> {s("stripeNone")}</span></span>
+          )}
+        </td>
+        <td className="text-center">
+          <button
+            type="button"
+            className={`btn btn-ghost btn-icon h-11 w-11 sm:h-8 sm:w-8 ${u.is_admin ? "text-warn-ink hover:text-warn-ink" : "text-ink-3 hover:text-ink-1"} ${FOCUS_RING}`}
+            aria-pressed={u.is_admin}
+            aria-label={s(u.is_admin ? "revokeAdmin" : "grantAdmin", { email: u.email })}
+            title={s(u.is_admin ? "isAdmin" : "notAdmin")}
+            disabled={dim}
+            onClick={() => onConfirm("admin")}
+          >
+            <Icon.ShieldCheck size={16} strokeWidth={u.is_admin ? 2.25 : 1.75} aria-hidden />
+          </button>
+        </td>
+        <td className="mono text-xs text-ink-2 whitespace-nowrap">{u.created_at ? u.created_at.slice(0, 10) : "—"}</td>
+        <td className="whitespace-nowrap">
+          <div className="flex items-center justify-end gap-1">
+            <Button size="sm" variant="ghost" className="h-11 sm:h-8" disabled={dim} onClick={() => onConfirm("reset")}>
+              <Icon.RotateCcw size={14} strokeWidth={2} aria-hidden />{s("resetPw")}
+            </Button>
+            <button
+              ref={deleteRef}
+              type="button"
+              className={`btn btn-ghost btn-sm h-11 sm:h-8 ${DANGER_GHOST}`}
+              aria-expanded={arming}
+              disabled={dim}
+              onClick={() => (arming ? closeArm() : setArming(true))}
+            >
+              <Icon.X size={14} strokeWidth={2} aria-hidden />{s("deleteUser")}
+            </button>
           </div>
         </td>
+      </tr>
+
+      {arming && (
+        <tr className="bg-bad/5">
+          <td colSpan={8} className="!py-3">
+            <div
+              role="group"
+              aria-label={s("deleteArmTitle", { email: u.email })}
+              onKeyDown={(e) => {
+                if (e.key === "Escape" && !dim) { e.preventDefault(); e.stopPropagation(); closeArm(); }
+              }}
+              className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"
+            >
+              <div className="min-w-0 max-w-prose">
+                <p className="text-sm font-semibold text-ink-1">{s("deleteArmTitle", { email: u.email })}</p>
+                <p className="mt-0.5 text-xs text-ink-2 whitespace-normal">{s("deleteArmBody")}</p>
+              </div>
+              <div className="flex flex-col sm:flex-row sm:items-end gap-2">
+                <Field label={s("deleteTypeLabel")}>
+                  <input
+                    ref={armInputRef}
+                    className="input h-11 sm:h-10 mono w-64"
+                    value={typed}
+                    autoComplete="off"
+                    spellCheck={false}
+                    onChange={(e) => setTyped(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter" && armed) { e.preventDefault(); onConfirm("delete"); } }}
+                  />
+                </Field>
+                <div className="flex items-center gap-2">
+                  <Button variant="ghost" className="h-11 sm:h-10" disabled={dim} onClick={closeArm}>{s("cancel")}</Button>
+                  <Button variant="danger" className="h-11 sm:h-10" disabled={!armed || dim} onClick={() => onConfirm("delete")}>
+                    {s("deleteContinue")}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </td>
+        </tr>
       )}
-    </tr>
+    </>
   );
 }

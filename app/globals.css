@@ -360,3 +360,125 @@ tr.row-focus:focus-visible > .col-pin {
     background-image: linear-gradient(rgb(var(--brand) / 0.12), rgb(var(--brand) / 0.12));
   }
 }
+
+/* Phase 3 — charts */
+:root {
+  /* Globe stage backdrop ("space"). The WebGL scene itself (ocean, land,
+     arcs) is coloured by three.js materials and cannot read CSS variables,
+     so those literals stay in app/app/charts/Globe.tsx. */
+  --globe-space-1: 28 41 66;
+  --globe-space-2: 15 23 42;
+  --globe-space-3: 11 17 32;
+}
+.globe-stage {
+  background: radial-gradient(ellipse at 50% 42%,
+    rgb(var(--globe-space-1)) 0%, rgb(var(--globe-space-2)) 62%, rgb(var(--globe-space-3)) 100%);
+}
+/* Recharts paints its internals with presentation attributes; stylesheet
+   rules win over those, which is how the design tokens reach the axis ticks,
+   grid, tooltip cursor and reference line without hard-coded colours. */
+.chart-card .recharts-cartesian-axis-tick-value { fill: rgb(var(--ink-3)); font-size: 11px; }
+.chart-card .recharts-cartesian-grid line { stroke: rgb(var(--chart-grid)); stroke-opacity: 0.45; }
+.chart-card .recharts-label, .chart-card .recharts-label-list text { fill: rgb(var(--ink-2)); font-size: 11px; }
+.chart-card .recharts-reference-line line { stroke: rgb(var(--bad)); }
+.chart-card .recharts-reference-line text { fill: rgb(var(--bad-ink)); font-size: 11px; font-weight: 600; }
+.chart-area .recharts-tooltip-cursor { stroke: rgb(var(--chart-grid)); fill: none; }
+.chart-area .recharts-active-dot circle { fill: rgb(var(--chart-area)); stroke: rgb(var(--surface)); }
+.chart-bars .recharts-tooltip-cursor { fill: rgb(var(--surface-2)); fill-opacity: 0.7; stroke: none; }
+
+/* Phase 3 — secondary pages */
+@layer components {
+  /* Dense data table (admin users). Always inside a `card overflow-x-auto`. */
+  .data-table th {
+    @apply px-3 py-2 text-left text-2xs font-semibold uppercase tracking-[0.08em] text-ink-2
+           bg-surface-2/60 border-b border-border whitespace-nowrap;
+  }
+  .data-table td { @apply px-3 py-2 align-middle; }
+  .data-table tbody tr + tr { @apply border-t border-border; }
+  .data-table tbody tr[data-pending="true"] { @apply opacity-60; }
+
+  /* Native file input whose button matches `.btn`; the picked filename stays visible beside it. */
+  .input-file {
+    @apply block w-full max-w-full text-sm text-ink-2 rounded-control cursor-pointer
+           file:mr-3 file:h-11 sm:file:h-10 file:px-4 file:rounded-control file:border file:border-solid file:border-border-strong/70
+           file:bg-surface file:text-sm file:font-medium file:text-ink-1 file:cursor-pointer file:shadow-sm
+           hover:file:bg-surface-2
+           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:ring-offset-2 focus-visible:ring-offset-surface;
+  }
+  .input-file[aria-invalid="true"] { @apply file:border-bad; }
+
+  /* Sticky save bar for long settings forms (below lg). Mirrors the flight
+     form's action bar: sits above the phone bottom nav, flush from md up. */
+  .save-bar {
+    @apply sticky z-20 -mx-4 sm:-mx-6 px-4 sm:px-6 py-2.5 bg-canvas/85 backdrop-blur border-t border-border;
+    bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom));
+  }
+  @screen md { .save-bar { bottom: 0; } }
+}
+
+/* Phase 3 — overlays */
+/* Shared by components/ui/modal.tsx and components/ui/toast.tsx. Both portal
+   into <body> and carry data-overlay-root so a modal's inert sweep leaves the
+   other overlays alone. Enter/exit animate transform + opacity only;
+   `data-state` flips open → closed and the component unmounts on animationend
+   (JS fallback at 260 ms), so keep every exit here ≤ 200 ms. */
+@keyframes overlayIn  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes overlayOut { from { opacity: 1; } to { opacity: 0; } }
+@keyframes modalIn  { from { opacity: 0; transform: translateY(8px) scale(0.98); } to { opacity: 1; transform: none; } }
+@keyframes modalOut { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(8px) scale(0.98); } }
+@keyframes sheetIn  { from { transform: translateY(100%); } to { transform: none; } }
+@keyframes sheetOut { from { transform: none; } to { transform: translateY(100%); } }
+@keyframes toastInUp   { from { opacity: 0; transform: translateY(12px) scale(0.98); } to { opacity: 1; transform: none; } }
+@keyframes toastInDown { from { opacity: 0; transform: translateY(-12px) scale(0.98); } to { opacity: 1; transform: none; } }
+@keyframes toastOut    { from { opacity: 1; transform: none; } to { opacity: 0; transform: scale(0.96); } }
+
+.overlay-backdrop[data-state="open"]   { animation: overlayIn var(--dur-med) var(--ease-out) both; }
+.overlay-backdrop[data-state="closed"] { animation: overlayOut 160ms ease-in both; }
+/* Phones (< sm): a bottom sheet sliding up. sm+: a centred card. */
+.modal-panel[data-state="open"]   { animation: sheetIn var(--dur-med) var(--ease-out) both; }
+.modal-panel[data-state="closed"] { animation: sheetOut 180ms ease-in both; }
+@screen sm {
+  .modal-panel[data-state="open"]   { animation: modalIn 180ms var(--ease-out) both; }
+  .modal-panel[data-state="closed"] { animation: modalOut 150ms ease-in both; }
+}
+
+/* Toast viewport. Phones: top-centre under the 4rem header, newest on top,
+   capped so the stack never reaches the bottom nav. sm+: bottom-right, newest
+   at the bottom; the offset clears the tablet bottom nav until md, where the
+   nav disappears. Only the cards take pointer events. */
+.toast-viewport {
+  position: fixed;
+  z-index: 70;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: center;
+  gap: 0.5rem;
+  top: calc(4rem + 0.75rem);
+  left: 0.75rem;
+  right: 0.75rem;
+  max-height: calc(100dvh - 4rem - 0.75rem - var(--bottom-nav-h) - env(safe-area-inset-bottom));
+}
+@screen sm {
+  .toast-viewport {
+    flex-direction: column;
+    align-items: flex-end;
+    top: auto;
+    left: auto;
+    right: 1rem;
+    bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom) + 1rem);
+    max-height: calc(100dvh - 2rem);
+  }
+}
+@screen md { .toast-viewport { bottom: 1rem; } }
+.toast-card { pointer-events: auto; width: 100%; max-width: 24rem; }
+.toast-card[data-state="open"]   { animation: toastInDown var(--dur-med) var(--ease-out) both; }
+.toast-card[data-state="closed"] { animation: toastOut 150ms ease-in both; }
+@screen sm { .toast-card[data-state="open"] { animation-name: toastInUp; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .overlay-backdrop, .modal-panel, .toast-card { animation: none !important; }
+  /* The components unmount closed overlays immediately under reduced motion;
+     this covers the frame before that state update lands. */
+  .overlay-backdrop[data-state="closed"], .modal-panel[data-state="closed"], .toast-card[data-state="closed"] { visibility: hidden; }
+}
