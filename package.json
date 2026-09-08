@@ -12,7 +12,9 @@
     "import:bulk": "tsx scripts/bulk-import.ts",
     "build:airports": "tsx scripts/build-airports.ts",
     "build:world": "tsx scripts/build-world.ts",
-    "fix:route": "tsx scripts/fix-route.ts"
+    "fix:route": "tsx scripts/fix-route.ts",
+    "test:import": "tsx scripts/run-import-tests.ts",
+    "check:client-graph": "tsx scripts/check-client-graph.ts app/app/import/ImportWizard.tsx app/app/import/StepMapping.tsx app/app/import/StepReconcile.tsx app/app/flights/FlightsClient.tsx app/app/flights/FlightForm.tsx"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.98.0",
@@ -20,6 +22,7 @@
     "@sentry/nextjs": "^10.53.1",
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.47.10",
+    "@tanstack/react-virtual": "^3.14.10",
     "@types/react-calendar-heatmap": "^1.9.0",
     "@types/three": "^0.184.1",
     "@vercel/analytics": "^2.0.1",

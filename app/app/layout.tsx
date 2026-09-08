@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { logout } from "../login/actions";
 import Brand from "@/components/Brand";
 import LocaleSwitcher from "@/components/LocaleSwitcher";
-import NavTabs, { type NavItem } from "@/components/NavTabs";
+import NavTabs, { BottomNav, type NavItem } from "@/components/NavTabs";
 import UserMenu from "@/components/UserMenu";
 import { Pill } from "@/components/ui";
 import { getT, getLocale } from "@/lib/i18n-server";
@@ -53,11 +53,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               </span>
             }
           />
-          <NavTabs
-            items={items}
-            newFlight={{ href: "/app/flights/new", label: t("flights.new") }}
-            locale={locale}
-          />
+          <NavTabs items={items} locale={locale} />
           <div className="ml-auto flex items-center gap-2 shrink-0">
             <LocaleSwitcher current={locale} />
             <UserMenu
@@ -72,6 +68,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <main className="mx-auto w-full max-w-[1440px] px-4 sm:px-6 py-5 sm:py-6 pb-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom)+2.5rem)] md:pb-6 flex-1">
         {children}
       </main>
+      {/* Outside <header>: its backdrop-filter would otherwise become this fixed bar's containing block. */}
+      <BottomNav
+        items={items}
+        newFlight={{ href: "/app/flights/new", label: t("flights.new") }}
+        locale={locale}
+      />
     </div>
   );
 }

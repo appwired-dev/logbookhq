@@ -263,3 +263,100 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Phase 2 — import wizard */
+@layer components {
+  /* Drop zone: a <label> wrapping a visually-hidden file input, so click,
+     keyboard (focus-within ring) and drag/drop all share one surface. */
+  .dropzone {
+    @apply relative grid place-items-center gap-1 rounded-card border-2 border-dashed border-border-strong/80 bg-surface-2/40
+           px-6 py-10 text-center cursor-pointer select-none
+           transition-[border-color,background-color,box-shadow] duration-med ease-out;
+  }
+  .dropzone:hover { @apply border-brand/60 bg-brand/5; }
+  .dropzone:focus-within { @apply border-brand/60 ring-2 ring-brand/60 ring-offset-2 ring-offset-surface; }
+  .dropzone[data-active="true"] { @apply border-brand bg-brand/10 shadow-glow; }
+  .dropzone[data-disabled="true"] { @apply opacity-60 cursor-progress; }
+
+  /* Append / Replace radio cards. */
+  .mode-card {
+    @apply flex items-start gap-3 rounded-control border border-border bg-surface p-3 cursor-pointer
+           transition-[border-color,background-color,box-shadow] duration-fast ease-out;
+  }
+  .mode-card:hover { @apply border-border-strong bg-surface-2/60; }
+  .mode-card:has(input:checked) { @apply border-brand bg-brand/5 ring-1 ring-brand/40; }
+  .mode-card:has(input:focus-visible) { @apply ring-2 ring-brand/60 ring-offset-2 ring-offset-surface; }
+  .mode-card:has(input:disabled) { @apply opacity-60 cursor-not-allowed; }
+
+  /* Mapping / preview tables (always inside an overflow-x-auto wrapper). */
+  .import-table th {
+    @apply px-3 py-2 text-left text-2xs font-semibold uppercase tracking-[0.08em] text-ink-2
+           bg-surface-2/60 border-b border-border whitespace-nowrap;
+  }
+  .import-table td { @apply px-3 py-2 align-top; }
+  .import-table tbody tr + tr { @apply border-t border-border; }
+  .import-table tbody tr[data-review="true"] { @apply bg-warn/5; }
+}
+
+/* Phase 2 — flights table */
+/* One-shot "just saved" pulse for the row / card matching ?saved=<id>:
+   hold the tint, then fade out. The class is removed from React state after
+   SAVED_HIGHLIGHT_MS (use-flight-filters.ts), so under reduced motion the
+   tint is simply static until then. Table rows settle on transparent; cards
+   have an opaque surface, so theirs settles on it. */
+@keyframes flightSavedPulse {
+  0%, 45% { background-color: rgb(var(--brand) / 0.12); }
+  100% { background-color: transparent; }
+}
+@keyframes flightSavedPulseCard {
+  0%, 45% { background-color: rgb(var(--brand) / 0.12); }
+  100% { background-color: rgb(var(--surface)); }
+}
+.row-saved { animation: flightSavedPulse 1.6s var(--ease-out) both; }
+.card.row-saved { animation-name: flightSavedPulseCard; }
+@media (prefers-reduced-motion: reduce) {
+  .row-saved, .card.row-saved { animation: none; background-color: rgb(var(--brand) / 0.12); }
+}
+
+/* Keyboard focus rail for table rows. WebKit does not reliably paint
+   `outline` on a <tr>, so the ring is drawn as inset box-shadows on the row's
+   cells (top + bottom on every cell, plus the outer edge on the first / last).
+   The row itself keeps its `focus-visible:bg-brand/5` tint. */
+tr.row-focus:focus-visible > td {
+  box-shadow: inset 0 2px 0 0 rgb(var(--brand)), inset 0 -2px 0 0 rgb(var(--brand));
+}
+tr.row-focus:focus-visible > td:first-child {
+  box-shadow:
+    inset 2px 0 0 0 rgb(var(--brand)),
+    inset 0 2px 0 0 rgb(var(--brand)),
+    inset 0 -2px 0 0 rgb(var(--brand)),
+    inset -1px 0 0 0 rgb(var(--border));
+}
+tr.row-focus:focus-visible > td:last-child {
+  box-shadow: inset -2px 0 0 0 rgb(var(--brand)), inset 0 2px 0 0 rgb(var(--brand)), inset 0 -2px 0 0 rgb(var(--brand));
+}
+
+/* Pinned identity column (Date). Sticks to the left edge while the table
+   scrolls sideways; a right hairline separates it from the moving cells. It
+   must stay opaque, so the row's transparent states are mirrored here with an
+   opaque base: hover → canvas, keyboard focus → brand tint layered as a
+   background-image, saved pulse → the card variant that settles on surface.
+   z-index is set per element (Tailwind) so the header corner can sit above. */
+.col-pin {
+  position: sticky;
+  left: 0;
+  background-color: rgb(var(--surface));
+  box-shadow: inset -1px 0 0 0 rgb(var(--border));
+}
+tbody tr:hover > .col-pin { background-color: rgb(var(--canvas)); }
+tr.row-focus:focus-visible > .col-pin {
+  background-image: linear-gradient(rgb(var(--brand) / 0.05), rgb(var(--brand) / 0.05));
+}
+.row-saved > .col-pin { animation: flightSavedPulseCard 1.6s var(--ease-out) both; }
+@media (prefers-reduced-motion: reduce) {
+  .row-saved > .col-pin {
+    animation: none;
+    background-color: rgb(var(--surface));
+    background-image: linear-gradient(rgb(var(--brand) / 0.12), rgb(var(--brand) / 0.12));
+  }
+}

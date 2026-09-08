@@ -13,5 +13,7 @@ export {
   // sorting / misc
   ArrowUp, ArrowDown, ChevronsUpDown, ArrowRight, ArrowUpRight, ArrowDownRight, ChevronDown, Copy, Eye, EyeOff,
   LogOut, CreditCard, Languages, User, RotateCcw, Download, Upload, Clock, CalendarDays, Globe2, Search,
+  // phase 2 (flights table/form, import wizard)
+  Pencil, ArrowLeft, CircleCheck, CircleX, CloudUpload, FileSpreadsheet, Sparkles,
 } from "lucide-react";
 export type { LucideIcon } from "lucide-react";

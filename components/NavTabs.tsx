@@ -63,7 +63,31 @@ const stripPlus = (s: string) => s.replace(/^\+\s*/, "");
 const FOCUS_RING_INVERSE =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-inverse";
 
+/**
+ * Desktop/tablet tab strip. Lives inside the app header.
+ *
+ * The phone bar is a separate export (`BottomNav`) that the layout renders
+ * OUTSIDE the header on purpose: the header uses `backdrop-blur`, and a
+ * backdrop-filter makes an element the containing block for `position: fixed`
+ * descendants — a fixed bar rendered inside it would pin to the header's
+ * bottom edge (i.e. the top of the screen) instead of the viewport's.
+ */
 export default function NavTabs({
+  items, locale = "en",
+}: {
+  items: NavItem[];
+  /** Accepted for backwards compatibility; the bar is rendered by `BottomNav`. */
+  newFlight?: { href: string; label: string };
+  locale?: Locale;
+}) {
+  const pathname = usePathname() ?? "";
+  const reduce = useReducedMotion();
+  const s = (k: keyof typeof STR) => STR[k][locale] ?? STR[k].en;
+  return <DesktopStrip items={items} pathname={pathname} reduce={reduce} label={s("primaryNav")} />;
+}
+
+/** Phone bottom bar (below md). Render as a direct child of the page shell, never inside the blurred header. */
+export function BottomNav({
   items, newFlight, locale = "en",
 }: {
   items: NavItem[];
@@ -71,19 +95,14 @@ export default function NavTabs({
   locale?: Locale;
 }) {
   const pathname = usePathname() ?? "";
-  const reduce = useReducedMotion();
   const s = (k: keyof typeof STR) => STR[k][locale] ?? STR[k].en;
-
   return (
-    <>
-      <DesktopStrip items={items} pathname={pathname} reduce={reduce} label={s("primaryNav")} />
-      <BottomBar
-        items={items}
-        newFlight={newFlight}
-        pathname={pathname}
-        labels={{ nav: s("primaryNav"), more: s("more"), morePages: s("morePages") }}
-      />
-    </>
+    <BottomBar
+      items={items}
+      newFlight={newFlight}
+      pathname={pathname}
+      labels={{ nav: s("primaryNav"), more: s("more"), morePages: s("morePages") }}
+    />
   );
 }
 

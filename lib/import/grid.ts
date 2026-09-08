@@ -1,0 +1,425 @@
+/**
+ * File bytes → Workbook of typed Grids.
+ *
+ * CSV/TSV/TXT: own RFC-4180 parser (delimiter sniffed among , ; \t, quoted
+ * fields, BOM, UTF-16 BOMs). xlsx/xls/…: SheetJS with `cellDates`, merged
+ * header cells forward-filled (text anchors only — numbers are never
+ * duplicated).
+ *
+ * Every cell is typed once here so the rest of the pipeline never touches
+ * strings it does not understand:
+ *   - numbers: "1.5", "1,5" (decimal comma), "1,234.5", "1:30" / "1001:30" /
+ *     "1h30" / "90 min" (→ hours) — the raw text is kept so conventions can
+ *     be detected later and block times can still be read as clock times;
+ *     Excel duration cells (serial 0.0625 formatted "h:mm", which
+ *     `cellDates` hands over as a Date on the 1899-12-30 epoch) become the
+ *     same 1.5 h / "1:30" cell; a column of colon-less "0130" values is
+ *     read as HHMM (value 1.5, raw "01:30");
+ *   - dates: Date objects, ISO / dd/mm/yyyy / mm/dd/yyyy / yyyy.mm.dd /
+ *     dd-MMM-yy / 2024년 3월 5일 … Day-vs-month ambiguity is resolved per
+ *     column by which reading keeps every value valid and the column
+ *     roughly monotonic; a genuine tie is recorded in `Grid.dateCols` as
+ *     ambiguous (raw kept) for analyze.ts to settle with priors;
+ *   - "-", "—", "n/a" and friends are empty.
+ */
+import * as XLSX from "xlsx";
+import type { Cell, Grid, Workbook } from "./types";
+import {
+  collapse, dateObjectToISO, excelDurationHours, excelEpochFraction, isValidYMD, isoDate, looksLikeHHMM, parseDateText,
+  parseDurationText,
+  type DateReading,
+} from "./util";
+
+const EMPTY_TOKENS = new Set(["", "-", "—", "–", "--", "---", ".", "n/a", "na", "n.a.", "null", "nil", "none", "#n/a", "#value!", "#ref!"]);
+
+export const EMPTY: Cell = { kind: "empty" };
+
+// ---------------------------------------------------------------------------
+// Entry point
+// ---------------------------------------------------------------------------
+
+export function readWorkbook(bytes: Uint8Array | ArrayBuffer, filename: string): Workbook {
+  const u8 = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+  if (isBinarySpreadsheet(u8, filename)) return readSpreadsheet(u8, filename);
+  const text = decodeText(u8);
+  return { filename, sheets: [gridFromValues("csv", parseDelimited(text))] };
+}
+
+function extensionOf(filename: string): string {
+  return (/\.([a-z0-9]+)$/i.exec(filename.trim())?.[1] ?? "").toLowerCase();
+}
+
+function isBinarySpreadsheet(u8: Uint8Array, filename: string): boolean {
+  const ext = extensionOf(filename);
+  if (["xlsx", "xlsm", "xlsb", "xls", "ods", "numbers"].includes(ext)) return true;
+  // Zip (xlsx/ods/numbers) or OLE2 (legacy xls) magic, regardless of the name.
+  if (u8.length > 4 && u8[0] === 0x50 && u8[1] === 0x4b && (u8[2] === 0x03 || u8[2] === 0x05 || u8[2] === 0x07)) return true;
+  if (u8.length > 8 && u8[0] === 0xd0 && u8[1] === 0xcf && u8[2] === 0x11 && u8[3] === 0xe0) return true;
+  return false;
+}
+
+// ---------------------------------------------------------------------------
+// Text decoding + delimited parsing
+// ---------------------------------------------------------------------------
+
+/** Bytes → string. Honours UTF-8 / UTF-16 BOMs; falls back to UTF-8. */
+export function decodeText(u8: Uint8Array): string {
+  if (u8.length >= 2 && u8[0] === 0xff && u8[1] === 0xfe) return new TextDecoder("utf-16le").decode(u8.subarray(2));
+  if (u8.length >= 2 && u8[0] === 0xfe && u8[1] === 0xff) return new TextDecoder("utf-16be").decode(u8.subarray(2));
+  let text = new TextDecoder("utf-8").decode(u8);
+  if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
+  return text;
+}
+
+/** Pick the delimiter that yields the most consistent column count over the first lines. */
+export function sniffDelimiter(text: string): string {
+  const lines = text.split(/\r?\n/).filter((l) => l.trim()).slice(0, 25);
+  let best = ",";
+  let bestScore = -1;
+  for (const d of [",", ";", "\t", "|"]) {
+    const counts = lines.map((l) => countOutsideQuotes(l, d));
+    const total = counts.reduce((a, b) => a + b, 0);
+    if (total === 0) continue;
+    // Consistency: how many lines share the modal count.
+    const freq = new Map<number, number>();
+    for (const c of counts) freq.set(c, (freq.get(c) ?? 0) + 1);
+    const modal = Math.max(...freq.values());
+    const score = total + modal * 10;
+    if (score > bestScore) { bestScore = score; best = d; }
+  }
+  return best;
+}
+
+function countOutsideQuotes(line: string, d: string): number {
+  let n = 0, q = false;
+  for (const ch of line) {
+    if (ch === '"') q = !q;
+    else if (!q && ch === d) n++;
+  }
+  return n;
+}
+
+/** RFC-4180 parser with a sniffed delimiter. Returns raw strings (untrimmed). */
+export function parseDelimited(text: string, delimiter?: string): string[][] {
+  const d = delimiter ?? sniffDelimiter(text);
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = "";
+  let inQuotes = false;
+  let i = 0;
+  while (i < text.length) {
+    const c = text[i];
+    if (inQuotes) {
+      if (c === '"') {
+        if (text[i + 1] === '"') { field += '"'; i += 2; continue; }
+        inQuotes = false; i++; continue;
+      }
+      field += c; i++; continue;
+    }
+    if (c === '"') { inQuotes = true; i++; continue; }
+    if (c === d) { row.push(field); field = ""; i++; continue; }
+    if (c === "\n") { row.push(field); rows.push(row); row = []; field = ""; i++; continue; }
+    if (c === "\r") { i++; continue; }
+    field += c; i++;
+  }
+  if (field.length > 0 || row.length > 0) { row.push(field); rows.push(row); }
+  return rows;
+}
+
+// ---------------------------------------------------------------------------
+// SheetJS
+// ---------------------------------------------------------------------------
+
+/**
+ * A numeric cell with an elapsed-time format that SheetJS left as a raw
+ * serial (fraction of a day) instead of converting it to a Date.
+ */
+export interface ExcelDuration { excelDays: number }
+
+export type RawValue = string | number | boolean | Date | ExcelDuration | null | undefined;
+
+function readSpreadsheet(u8: Uint8Array, filename: string): Workbook {
+  // cellNF keeps each cell's number format (`z`) so duration formats can be told apart from plain numbers.
+  return workbookFromSheetJS(XLSX.read(u8, { type: "array", cellDates: true, cellNF: true, cellText: false }), filename);
+}
+
+/** SheetJS workbook (read with `cellDates`) → typed Workbook. Exported for tests that build sheets in memory. */
+export function workbookFromSheetJS(wb: XLSX.WorkBook, filename: string): Workbook {
+  const sheets: Grid[] = [];
+  for (const name of wb.SheetNames) {
+    const ws = wb.Sheets[name];
+    const ref = ws?.["!ref"];
+    if (!ws || !ref) { sheets.push({ sheet: name, rows: [], width: 0 }); continue; }
+    const range = XLSX.utils.decode_range(ref);
+    // Anchor the grid at A1 so column indices equal real sheet columns even
+    // when the used range starts further right/down.
+    const rows = XLSX.utils.sheet_to_json<RawValue[]>(ws, {
+      header: 1, raw: true, defval: null, blankrows: true,
+      range: { s: { r: 0, c: 0 }, e: range.e },
+    });
+    markDurationSerials(ws, rows);
+    const grid = gridFromValues(name, rows);
+    applyMerges(grid, ws["!merges"]);
+    sheets.push(grid);
+  }
+  return { filename, sheets };
+}
+
+/**
+ * Numeric cells that carry an elapsed-time / clock number format but that
+ * `cellDates` left as raw serials (in-memory sheets, or a format its date
+ * detection misses): wrap the fraction so typeValue reads "0.0625 as h:mm"
+ * as 1.5 h rather than as the number 0.0625.
+ */
+function markDurationSerials(ws: XLSX.WorkSheet, rows: RawValue[][]): void {
+  for (const addr of Object.keys(ws)) {
+    if (addr.startsWith("!")) continue;
+    const cell: XLSX.CellObject | undefined = ws[addr];
+    if (!cell || cell.t !== "n" || typeof cell.v !== "number" || typeof cell.z !== "string") continue;
+    if (cell.v < 0 || cell.v >= 1 || !isTimeFormat(cell.z)) continue;
+    const { r, c } = XLSX.utils.decode_cell(addr);
+    const row = rows[r];
+    if (row) row[c] = { excelDays: cell.v };
+  }
+}
+
+/**
+ * Elapsed-time / clock number formats: "h:mm", "hh:mm:ss", "[h]:mm",
+ * "h:mm AM/PM", "[hh]:mm;@" — hours and minutes with no day/month/year
+ * token. Only the first format section counts; quoted literals, escapes and
+ * colour / locale tags ("[Red]", "[$-409]") are ignored.
+ */
+export function isTimeFormat(z: string): boolean {
+  const f = z.split(";")[0].toLowerCase()
+    .replace(/"[^"]*"/g, "")
+    .replace(/\\./g, "")
+    .replace(/\[(?![hms]+\])[^\]]*\]/g, "")
+    .replace(/am\/pm|a\/p/g, "");
+  return /h/.test(f) && /mm/.test(f) && !/[dy]/.test(f);
+}
+
+/** Copy text anchors across merged ranges (header groups). Numbers/dates are never duplicated. */
+function applyMerges(grid: Grid, merges: XLSX.Range[] | undefined): void {
+  if (!merges) return;
+  for (const m of merges) {
+    const anchor = grid.rows[m.s.r]?.[m.s.c];
+    if (!anchor || anchor.kind !== "text") continue;
+    for (let r = m.s.r; r <= m.e.r; r++) {
+      const row = grid.rows[r];
+      if (!row) continue;
+      for (let c = m.s.c; c <= m.e.c; c++) {
+        if (row[c] === undefined || row[c].kind === "empty") row[c] = anchor;
+      }
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Typing
+// ---------------------------------------------------------------------------
+
+interface Provisional {
+  cell: Cell;
+  /** Set when the text was a date; `numeric` marks day/month ambiguity. */
+  reading?: DateReading;
+}
+
+/** Raw values (strings from CSV, mixed from SheetJS) → typed Grid. */
+export function gridFromValues(sheet: string, raw: RawValue[][]): Grid {
+  const width = raw.reduce((w, r) => Math.max(w, r.length), 0);
+  const prov: Provisional[][] = raw.map((r) => {
+    const out: Provisional[] = new Array(width);
+    for (let c = 0; c < width; c++) out[c] = typeValue(r[c]);
+    return out;
+  });
+  const dateCols = resolveDateColumns(prov, width);
+  resolveHHMMColumns(prov, width);
+  const rows: Cell[][] = prov.map((r) => r.map((p) => p.cell));
+  const grid: Grid = { sheet, rows, width };
+  if (Object.keys(dateCols).length > 0) grid.dateCols = dateCols;
+  return grid;
+}
+
+function typeValue(v: RawValue): Provisional {
+  if (v == null) return { cell: EMPTY };
+  if (v instanceof Date) {
+    // A duration cell ("1:30" = serial 0.0625) arrives as the Excel epoch plus the fraction.
+    const fraction = excelEpochFraction(v);
+    if (fraction != null) return durationCell(fraction);
+    const iso = dateObjectToISO(v);
+    return { cell: iso ? { kind: "date", value: iso } : EMPTY };
+  }
+  if (typeof v === "number") {
+    return { cell: Number.isFinite(v) ? { kind: "number", value: v } : EMPTY };
+  }
+  if (typeof v === "boolean") return { cell: { kind: "text", value: v ? "TRUE" : "FALSE" } };
+  if (typeof v === "object") return durationCell(v.excelDays);
+  return typeText(v);
+}
+
+/**
+ * Excel day fraction → the same cell a "1:30" text yields: hours as the value,
+ * "h:mm" as raw, so display, clock-time evidence and block-time parsing all
+ * behave as they do for a CSV of the same logbook.
+ */
+function durationCell(days: number): Provisional {
+  const { hours, raw } = excelDurationHours(days);
+  return { cell: { kind: "number", value: hours, raw } };
+}
+
+const NUM_PLAIN = /^[-+]?\d+(\.\d+)?$/;
+const NUM_THOUSANDS = /^[-+]?\d{1,3}(,\d{3})+(\.\d+)?$/;
+const NUM_DECIMAL_COMMA = /^[-+]?\d+,\d{1,2}$/;
+const DATE_COMPACT = /^(19|20)\d{6}$/;
+
+/**
+ * One string → typed cell (dates provisional; see resolveDateColumns).
+ *
+ * Durations in any written form — "1:30", "1:30:00", "1001:30" ([h]:mm
+ * totals of 1000 h and more), "1+30", "1h30", "1 h 30", "0h30", "1h",
+ * "1.5h", "90 min", "90min" — become hours with the text kept as `raw`.
+ * A bare "0130" is a plain number here; resolveHHMMColumns turns a whole
+ * column of those into clock times.
+ */
+export function typeText(input: string): Provisional {
+  const t = collapse(input);
+  if (EMPTY_TOKENS.has(t.toLowerCase())) return { cell: EMPTY };
+
+  if (DATE_COMPACT.test(t)) {
+    const y = +t.slice(0, 4), m = +t.slice(4, 6), d = +t.slice(6, 8);
+    if (isValidYMD(y, m, d)) return { cell: { kind: "date", value: isoDate(y, m, d), raw: t }, reading: { iso: isoDate(y, m, d) } };
+  }
+  if (NUM_PLAIN.test(t)) return { cell: { kind: "number", value: parseFloat(t), raw: t } };
+  if (NUM_THOUSANDS.test(t)) return { cell: { kind: "number", value: parseFloat(t.replace(/,/g, "")), raw: t } };
+  if (NUM_DECIMAL_COMMA.test(t)) return { cell: { kind: "number", value: parseFloat(t.replace(",", ".")), raw: t } };
+  const duration = parseDurationText(t);
+  if (duration != null) return { cell: { kind: "number", value: duration, raw: t } };
+
+  const reading = parseDateText(t);
+  if (reading) return { cell: { kind: "date", value: reading.iso, raw: t }, reading };
+
+  return { cell: { kind: "text", value: t } };
+}
+
+/**
+ * Decide day-first vs month-first per column for numeric dates such as
+ * "05/03/2024": prefer the reading under which every ambiguous value is a
+ * valid calendar date; when both are, the one with fewer out-of-order
+ * steps. When that still ties, the data alone cannot decide: the column is
+ * recorded as `ambiguous` in `Grid.dateCols` (with the separator default as
+ * a provisional reading) so analyze.ts can apply a locale / registration
+ * prior and apply.ts can re-parse each cell's `raw` under the convention it
+ * settles on. Every text-parsed date keeps its `raw` for exactly that.
+ */
+function resolveDateColumns(prov: Provisional[][], width: number): NonNullable<Grid["dateCols"]> {
+  const dateCols: NonNullable<Grid["dateCols"]> = {};
+  for (let c = 0; c < width; c++) {
+    const readings: { r: number; reading: DateReading }[] = [];
+    for (let r = 0; r < prov.length; r++) {
+      const p = prov[r][c];
+      if (p?.reading) readings.push({ r, reading: p.reading });
+    }
+    const ambiguous = readings.filter((x) => x.reading.numeric);
+    if (ambiguous.length === 0) continue;
+    const decision = dayFirstDecision(readings.map((x) => x.reading));
+    dateCols[c] = decision;
+    for (const { r, reading } of ambiguous) {
+      const n = reading.numeric!;
+      const iso = decision.dayFirst ? (n.dayFirstIso ?? n.monthFirstIso) : (n.monthFirstIso ?? n.dayFirstIso);
+      const cell = prov[r][c].cell;
+      if (iso && cell.kind === "date") prov[r][c] = { cell: { kind: "date", value: iso, raw: cell.raw }, reading };
+    }
+  }
+  return dateCols;
+}
+
+/** Day-first decision for one column's readings; see resolveDateColumns for the rules. */
+export function dayFirstDecision(readings: DateReading[]): { dayFirst: boolean; ambiguous: boolean } {
+  const amb = readings.filter((r) => r.numeric);
+  if (amb.length === 0) return { dayFirst: false, ambiguous: false };
+  const dfValid = amb.every((r) => r.numeric!.dayFirstIso);
+  const mfValid = amb.every((r) => r.numeric!.monthFirstIso);
+  const separatorDefault = amb[0].numeric!.defaultDayFirst;
+  if (dfValid !== mfValid) return { dayFirst: dfValid, ambiguous: false };
+  // Mixed validity — neither convention fits every cell; the per-cell fallback handles it.
+  if (!dfValid) return { dayFirst: separatorDefault, ambiguous: false };
+  const seq = (dayFirst: boolean) => readings.map((r) => {
+    if (!r.numeric) return r.iso;
+    return (dayFirst ? r.numeric.dayFirstIso : r.numeric.monthFirstIso) ?? r.iso;
+  });
+  const inversions = (s: string[]) => {
+    let n = 0;
+    for (let i = 1; i < s.length; i++) if (s[i] < s[i - 1]) n++;
+    return n;
+  };
+  const invDay = inversions(seq(true));
+  const invMonth = inversions(seq(false));
+  // A logbook is either ascending or descending; count against both.
+  const rev = (s: string[]) => [...s].reverse();
+  const dayScore = Math.min(invDay, inversions(rev(seq(true))));
+  const monthScore = Math.min(invMonth, inversions(rev(seq(false))));
+  if (dayScore !== monthScore) return { dayFirst: dayScore < monthScore, ambiguous: false };
+  // Every value is a valid date both ways and both orders are equally
+  // monotonic: the separator is a hint, not evidence — leave it to priors.
+  return { dayFirst: separatorDefault, ambiguous: true };
+}
+
+/** Boolean view of `dayFirstDecision` (kept for callers that only need the reading). */
+export function decideDayFirst(readings: DateReading[]): boolean {
+  return dayFirstDecision(readings).dayFirst;
+}
+
+/**
+ * Columns written as HHMM without a colon ("0130", "0045", "1005"): when at
+ * least 60 % of a column's numeric cells read as HHMM and at least one has
+ * a leading zero (a column of years — "2019", "2020" — or flight numbers
+ * never does), each such cell becomes the hours cell "01:30" would have
+ * produced: value 1.5, raw "01:30". shape.ts then counts the raw as clock
+ * evidence and the mapping sets `clockTimes`, exactly as for "1:30" text.
+ */
+function resolveHHMMColumns(prov: Provisional[][], width: number): void {
+  for (let c = 0; c < width; c++) {
+    let numeric = 0, hhmm = 0, leadingZero = 0;
+    for (let r = 0; r < prov.length; r++) {
+      const cell = prov[r][c]?.cell;
+      if (!cell || cell.kind !== "number") continue;
+      numeric++;
+      if (cell.raw && looksLikeHHMM(cell.raw)) {
+        hhmm++;
+        if (cell.raw.startsWith("0")) leadingZero++;
+      }
+    }
+    if (hhmm === 0 || leadingZero === 0 || hhmm < numeric * 0.6) continue;
+    for (let r = 0; r < prov.length; r++) {
+      const cell = prov[r][c]?.cell;
+      if (!cell || cell.kind !== "number" || !cell.raw || !looksLikeHHMM(cell.raw)) continue;
+      const h = parseInt(cell.raw.slice(0, 2), 10), mm = parseInt(cell.raw.slice(2), 10);
+      prov[r][c] = { cell: { kind: "number", value: h + mm / 60, raw: `${cell.raw.slice(0, 2)}:${cell.raw.slice(2)}` } };
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Cell helpers shared by headers / mapping / apply
+// ---------------------------------------------------------------------------
+
+export function cellAt(grid: Grid, r: number, c: number): Cell {
+  return grid.rows[r]?.[c] ?? EMPTY;
+}
+
+
+
+
+
+// Pure cell helpers live in ./cells so header detection and column mapping
+// can be imported by client code without dragging SheetJS along.
+export { cellDisplay, cellHeaderText, rowIsEmpty, countKinds } from "./cells";
+import { cellDisplay } from "./cells";
+
+/** Grid → CSV-ish text (first `maxRows` rows) for legacy signature detection. */
+export function gridToText(grid: Grid, maxRows = 80): string {
+  return grid.rows.slice(0, maxRows).map((r) => r.map((c) => {
+    const s = cellDisplay(c);
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  }).join(",")).join("\n");
+}

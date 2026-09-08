@@ -54,7 +54,9 @@ export type TotalsOptions = {
 
 /** Hours a flight contributes to experience totals under the user's convention. */
 export function creditedHours(f: FlightDerived, augHalfCredit: boolean): number {
-  return augHalfCredit && f.role === "SIC" ? r1(f.total_time * 0.5) : f.total_time;
+  // No per-flight rounding: Σ r1(h/2) drifts from the exact half (0.7 h on a
+  // 2,600-flight logbook) and disagrees with computeTotals. Round at display.
+  return augHalfCredit && f.role === "SIC" ? f.total_time * 0.5 : f.total_time;
 }
 
 export function computeTotals(flights: Flight[], opts: TotalsOptions = {}): Totals {
