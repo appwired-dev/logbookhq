@@ -135,6 +135,11 @@ export default function PrivacyPage() {
                     <td className="py-2 pr-3">Web hosting, edge delivery, analytics</td>
                     <td className="py-2">Global edge network</td>
                   </tr>
+                  <tr className="border-b border-slate-100">
+                    <td className="py-2 pr-3">Sentry (Functional Software, Inc.)</td>
+                    <td className="py-2 pr-3">Error &amp; performance monitoring (may receive browser and IP data)</td>
+                    <td className="py-2">United States</td>
+                  </tr>
                   <tr>
                     <td className="py-2 pr-3">Cloudflare, Inc.</td>
                     <td className="py-2 pr-3">Domain DNS</td>
@@ -198,7 +203,7 @@ export default function PrivacyPage() {
               <li><strong>Access</strong> your information &mdash; you can see it in your account, and export your
                 flight data anytime via Settings (CSV and PDF formats).</li>
               <li><strong>Correct</strong> inaccurate information &mdash; edit it in your account settings.</li>
-              <li><strong>Delete</strong> your account and information &mdash; from account settings, or by emailing us.</li>
+              <li><strong>Delete</strong> your account and information &mdash; contact us through the Support form in Settings or by email and we&rsquo;ll erase it.</li>
               <li><strong>Withdraw consent</strong> &mdash; by closing your account. Note that this may end your ability
                 to use the Service.</li>
               <li><strong>Complain</strong> to a data protection regulator &mdash; in Canada, the{" "}
