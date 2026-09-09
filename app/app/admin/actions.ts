@@ -21,6 +21,17 @@ async function requireAdmin() {
   return { ok: true as const };
 }
 
+/** Mark a support request resolved (admin only). Form action → returns void. */
+export async function resolveSupport(formData: FormData): Promise<void> {
+  const gate = await requireAdmin();
+  if (!("ok" in gate)) return;
+  const id = Number(formData.get("id"));
+  if (!Number.isFinite(id)) return;
+  const admin = createAdminClient();
+  await admin.from("support_requests").update({ status: "resolved" }).eq("id", id);
+  revalidatePath("/app/admin");
+}
+
 export async function updateUserTier(userId: string, tier: "free" | "pro" | "lifetime") {
   const gate = await requireAdmin();
   if (!("ok" in gate)) return gate;
