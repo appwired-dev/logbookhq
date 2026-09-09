@@ -32,6 +32,17 @@ export async function resolveSupport(formData: FormData): Promise<void> {
   revalidatePath("/app/admin");
 }
 
+/** Permanently delete a support request (admin only). Form action → void. */
+export async function deleteSupport(formData: FormData): Promise<void> {
+  const gate = await requireAdmin();
+  if (!("ok" in gate)) return;
+  const id = Number(formData.get("id"));
+  if (!Number.isFinite(id)) return;
+  const admin = createAdminClient();
+  await admin.from("support_requests").delete().eq("id", id);
+  revalidatePath("/app/admin");
+}
+
 export async function updateUserTier(userId: string, tier: "free" | "pro" | "lifetime") {
   const gate = await requireAdmin();
   if (!("ok" in gate)) return gate;

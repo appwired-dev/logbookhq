@@ -1,5 +1,5 @@
 import { Card, CardHeader, Pill } from "@/components/ui";
-import { resolveSupport } from "./actions";
+import { resolveSupport, deleteSupport } from "./actions";
 
 export type SupportRow = {
   id: number;
@@ -44,14 +44,22 @@ export default function SupportInbox({ requests, locale }: { requests: SupportRo
                       {new Date(r.created_at).toLocaleString(locale)}
                     </p>
                   </div>
-                  {r.status !== "resolved" && (
-                    <form action={resolveSupport} className="shrink-0">
+                  <div className="shrink-0 flex flex-col items-end gap-1.5">
+                    {r.status !== "resolved" && (
+                      <form action={resolveSupport}>
+                        <input type="hidden" name="id" value={r.id} />
+                        <button type="submit" className="text-xs font-medium text-brand hover:underline whitespace-nowrap">
+                          Resolve
+                        </button>
+                      </form>
+                    )}
+                    <form action={deleteSupport}>
                       <input type="hidden" name="id" value={r.id} />
-                      <button type="submit" className="text-xs font-medium text-brand hover:underline whitespace-nowrap">
-                        Resolve
+                      <button type="submit" className="text-xs text-ink-3 hover:text-bad-ink hover:underline whitespace-nowrap">
+                        Delete
                       </button>
                     </form>
-                  )}
+                  </div>
                 </div>
               </li>
             ))}
