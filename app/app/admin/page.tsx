@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getLocale } from "@/lib/i18n-server";
 import AdminClient, { type AdminUser } from "./AdminClient";
+import SupportInbox, { type SupportRow } from "./SupportInbox";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +31,11 @@ export default async function AdminPage() {
     .from("profiles")
     .select("id, email, full_name, tier, is_admin, primary_regime, stripe_customer_id");
   const { data: authUsers } = await admin.auth.admin.listUsers({ perPage: 1000 });
+  const { data: supportRows } = await admin
+    .from("support_requests")
+    .select("id, email, subject, message, status, created_at")
+    .order("created_at", { ascending: false })
+    .limit(200);
   const locale = await getLocale();
 
   // Join: profile rows + auth.users.created_at (signup date).
@@ -52,5 +58,10 @@ export default async function AdminPage() {
     .filter((u): u is AdminUser => u !== null)
     .sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
 
-  return <AdminClient users={users} locale={locale} />;
+  return (
+    <>
+      <AdminClient users={users} locale={locale} />
+      <SupportInbox requests={(supportRows ?? []) as SupportRow[]} locale={locale} />
+    </>
+  );
 }

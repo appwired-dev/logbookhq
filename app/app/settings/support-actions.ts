@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { bucketKey, underLimit } from "@/lib/rate-limit";
+import { notifyNewSupport } from "@/lib/notify";
 
 export type SupportResult = { ok: true } | { error: string };
 
@@ -33,6 +34,9 @@ export async function submitSupportRequest(formData: FormData): Promise<SupportR
     message,
   });
   if (error) return { error: "Couldn't send that right now. Please email us directly instead." };
+
+  // Best-effort inbox notification (no-op unless Resend env is configured).
+  await notifyNewSupport({ fromEmail: user.email ?? null, subject: subject || null, message });
 
   return { ok: true };
 }
