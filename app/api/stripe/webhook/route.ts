@@ -68,13 +68,17 @@ export async function POST(req: NextRequest) {
           console.error(`[stripe webhook] checkout.session.completed missing client_reference_id (event ${event.id})`);
           break;
         }
-        await admin
+        const { error, count } = await admin
           .from("profiles")
-          .update({
-            tier: tierForPlan(plan),
-            stripe_customer_id: stripeCustomerId ?? null,
-          })
+          .update(
+            { tier: tierForPlan(plan), stripe_customer_id: stripeCustomerId ?? null },
+            { count: "exact" },
+          )
           .eq("id", userId);
+        // Throw so the catch deletes the dedup row and 500s → Stripe retries.
+        // A swallowed error (or 0 rows) would leave a paid user un-upgraded.
+        if (error) throw new Error(`checkout upgrade: ${error.message}`);
+        if (!count) throw new Error(`checkout upgrade: no profile row for ${userId}`);
         break;
       }
       case "customer.subscription.updated": {
@@ -96,7 +100,9 @@ export async function POST(req: NextRequest) {
         if (current?.tier === "lifetime") break;
         // Active subscription stays Pro; past_due / unpaid get downgraded.
         const tier = ["active", "trialing"].includes(sub.status) ? tierForPlan(plan) : "free";
-        await admin.from("profiles").update({ tier }).eq("id", userId);
+        const { error, count } = await admin.from("profiles").update({ tier }, { count: "exact" }).eq("id", userId);
+        if (error) throw new Error(`subscription update: ${error.message}`);
+        if (!count) throw new Error(`subscription update: no profile row for ${userId}`);
         break;
       }
       case "customer.subscription.deleted": {
@@ -112,7 +118,9 @@ export async function POST(req: NextRequest) {
           .eq("id", userId)
           .single();
         if (current?.tier === "lifetime") break;
-        await admin.from("profiles").update({ tier: "free" }).eq("id", userId);
+        const { error, count } = await admin.from("profiles").update({ tier: "free" }, { count: "exact" }).eq("id", userId);
+        if (error) throw new Error(`subscription cancel: ${error.message}`);
+        if (!count) throw new Error(`subscription cancel: no profile row for ${userId}`);
         break;
       }
       default:
