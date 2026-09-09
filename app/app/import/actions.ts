@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
+import { FREE_FLIGHT_LIMIT, freeCapApplies } from "@/lib/limits";
 import {
   analyzeWorkbook, applyMapping, arbitrateWithClaude, detectHeaderBand, fingerprint, readWorkbook, reconcile, SYSTEM_TEMPLATES,
   type Analysis, type ApplyResult, type ColumnMapping, type ImportTemplate, type SkipReason,
@@ -253,6 +254,24 @@ export async function commitImportAction(formData: FormData): Promise<ActionResu
   if (flights.length === 0) return { error: "No valid flights to import. Check the mapping — at least a date, an aircraft and a time column are needed." };
   if (flights.length > MAX_PARSED_FLIGHTS) {
     return { error: `File contains ${flights.length.toLocaleString()} flights — over the ${MAX_PARSED_FLIGHTS.toLocaleString()} import limit. Split into smaller files.` };
+  }
+
+  // Free-tier cap. Replace mode wipes existing rows first, so only the incoming
+  // count matters; append adds to what's already there.
+  const { data: prof } = await supabase.from("profiles").select("tier, created_at").eq("id", userId).single();
+  if (freeCapApplies(prof?.tier, prof?.created_at)) {
+    let current = 0;
+    if (mode !== "replace") {
+      const { count } = await supabase
+        .from("flights")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", userId);
+      current = count ?? 0;
+    }
+    if (current + flights.length > FREE_FLIGHT_LIMIT) {
+      const over = mode !== "replace" && current > 0 ? ` on top of your ${current}` : "";
+      return { error: `Importing ${flights.length.toLocaleString()} flights${over} would exceed the free plan's ${FREE_FLIGHT_LIMIT}-flight limit. Upgrade to import your full logbook.` };
+    }
   }
 
   const result = await insertFlights(supabase, userId, flights, mode);
