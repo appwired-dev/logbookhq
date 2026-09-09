@@ -13,7 +13,7 @@ const T = {
     subject: "Subject", subjectPh: "What's this about?",
     message: "Message", messagePh: "How can we help?",
     send: "Send message", sending: "Sending…",
-    sentTitle: "Message sent", sentBody: "Thanks — we'll reply to {email}.",
+    sentTitle: "Message sent", sentBody: "Thanks — we'll reply from support@pilotlogbookhq.com.",
     or: "Prefer email? Write to",
   },
   ko: {
@@ -21,7 +21,7 @@ const T = {
     subject: "제목", subjectPh: "어떤 내용인가요?",
     message: "메시지", messagePh: "무엇을 도와드릴까요?",
     send: "메시지 보내기", sending: "보내는 중…",
-    sentTitle: "메시지를 보냈습니다", sentBody: "감사합니다 — {email}로 답장드리겠습니다.",
+    sentTitle: "메시지를 보냈습니다", sentBody: "감사합니다 — support@pilotlogbookhq.com에서 답변드리겠습니다.",
     or: "이메일을 선호하시나요? 다음으로 보내세요",
   },
   zh: {
@@ -29,7 +29,7 @@ const T = {
     subject: "主题", subjectPh: "这是关于什么的？",
     message: "消息", messagePh: "我们能帮您什么？",
     send: "发送消息", sending: "发送中…",
-    sentTitle: "消息已发送", sentBody: "谢谢 — 我们会回复到 {email}。",
+    sentTitle: "消息已发送", sentBody: "谢谢 — 我们会通过 support@pilotlogbookhq.com 回复您。",
     or: "更喜欢邮件？请写信至",
   },
   es: {
@@ -37,12 +37,12 @@ const T = {
     subject: "Asunto", subjectPh: "¿De qué se trata?",
     message: "Mensaje", messagePh: "¿Cómo podemos ayudar?",
     send: "Enviar mensaje", sending: "Enviando…",
-    sentTitle: "Mensaje enviado", sentBody: "Gracias — te responderemos a {email}.",
+    sentTitle: "Mensaje enviado", sentBody: "Gracias — te responderemos desde support@pilotlogbookhq.com.",
     or: "¿Prefieres correo? Escríbenos a",
   },
 } as const;
 
-export default function SupportCard({ locale, email }: { locale: Locale; email: string }) {
+export default function SupportCard({ locale }: { locale: Locale }) {
   const t = T[locale] ?? T.en;
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,7 +53,7 @@ export default function SupportCard({ locale, email }: { locale: Locale; email: 
       <CardHeader title={t.title} meta={t.desc} />
       {sent ? (
         <Alert variant="good" title={t.sentTitle}>
-          {t.sentBody.replace("{email}", email || SUPPORT_EMAIL)}
+          {t.sentBody}
         </Alert>
       ) : (
         <form

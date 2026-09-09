@@ -62,7 +62,7 @@ export default async function SettingsPage() {
           locale={locale}
         />
       }
-      support={<SupportCard locale={locale} email={profile?.email ?? user!.email ?? ""} />}
+      support={<SupportCard locale={locale} />}
     />
   );
 }
