@@ -1,5 +1,7 @@
+import { after } from "next/server";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { logout } from "../login/actions";
 import Brand from "@/components/Brand";
 import LocaleSwitcher from "@/components/LocaleSwitcher";
@@ -15,6 +17,20 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+
+  // Record last activity for the admin-only "last active" column. Runs after
+  // the response so it never delays navigation; service-role write, wrapped so
+  // a transient failure can't break the app shell.
+  after(async () => {
+    try {
+      await createAdminClient()
+        .from("profiles")
+        .update({ last_seen_at: new Date().toISOString() })
+        .eq("id", user.id);
+    } catch {
+      // best-effort telemetry — ignore
+    }
+  });
 
   const { data: profile } = await supabase
     .from("profiles")

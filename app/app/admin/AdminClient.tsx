@@ -17,6 +17,7 @@ export type AdminUser = {
   primary_regime: string | null;
   has_stripe: boolean;
   created_at: string;
+  last_seen_at: string | null;
 };
 type Tier = AdminUser["tier"];
 
@@ -200,6 +201,7 @@ export default function AdminClient({ users, locale }: { users: AdminUser[]; loc
               <th scope="col" className="!text-center">{s("colStripe")}</th>
               <th scope="col" className="!text-center">{s("colAdmin")}</th>
               <th scope="col">{s("colSignedUp")}</th>
+              <th scope="col">{s("colLastSeen")}</th>
               <th scope="col" className="!text-right">{s("colActions")}</th>
             </tr>
           </thead>
@@ -209,13 +211,14 @@ export default function AdminClient({ users, locale }: { users: AdminUser[]; loc
                 key={u.id}
                 u={u}
                 s={s}
+                locale={locale}
                 busy={confirming && confirm?.user.id === u.id}
                 onConfirm={(kind) => askConfirm(kind, u)}
               />
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={8} className="!px-3 !py-12 text-center text-ink-3">
+                <td colSpan={9} className="!px-3 !py-12 text-center text-ink-3">
                   {q.trim() ? s("noMatch", { q: q.trim() }) : s("noUsers")}
                 </td>
               </tr>
@@ -387,9 +390,10 @@ function CredentialsPanel({ c, s, onCopy, onDismiss }: { c: Credentials; s: Admi
 /* Row                                                                       */
 /* ------------------------------------------------------------------------ */
 
-function UserRow({ u, s, busy, onConfirm }: {
+function UserRow({ u, s, locale, busy, onConfirm }: {
   u: AdminUser;
   s: AdminT;
+  locale: Locale;
   /** A confirmation for this user is in flight (dims the row). */
   busy: boolean;
   onConfirm: (kind: ConfirmKind) => void;
@@ -534,6 +538,7 @@ function UserRow({ u, s, busy, onConfirm }: {
           </button>
         </td>
         <td className="mono text-xs text-ink-2 whitespace-nowrap">{u.created_at ? u.created_at.slice(0, 10) : "—"}</td>
+        <td className="whitespace-nowrap"><LastActive iso={u.last_seen_at} locale={locale} /></td>
         <td className="whitespace-nowrap">
           <div className="flex items-center justify-end gap-1">
             <Button size="sm" variant="ghost" className="h-11 sm:h-8" disabled={dim} onClick={() => onConfirm("reset")}>
@@ -555,7 +560,7 @@ function UserRow({ u, s, busy, onConfirm }: {
 
       {arming && (
         <tr className="bg-bad/5">
-          <td colSpan={8} className="!py-3">
+          <td colSpan={9} className="!py-3">
             <div
               role="group"
               aria-label={s("deleteArmTitle", { email: u.email })}
@@ -593,4 +598,30 @@ function UserRow({ u, s, busy, onConfirm }: {
       )}
     </>
   );
+}
+
+/**
+ * Relative "last active" time, admin-only. Rendered client-side after mount to
+ * avoid a hydration mismatch (Date.now / timezone differ server<->client);
+ * before mount it shows the deterministic ISO date so SSR and first paint agree.
+ */
+function LastActive({ iso, locale }: { iso: string | null; locale: Locale }) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  if (!iso) return <span className="text-ink-3">—</span>;
+  if (!mounted) return <span className="mono text-xs text-ink-2">{iso.slice(0, 10)}</span>;
+  const then = new Date(iso);
+  const t = then.getTime();
+  if (Number.isNaN(t)) return <span className="text-ink-3">—</span>;
+  const sec = (t - Date.now()) / 1000;
+  const a = Math.abs(sec);
+  const rtf = new Intl.RelativeTimeFormat(locale, { numeric: "auto" });
+  const rel =
+    a < 60 ? rtf.format(Math.round(sec), "second")
+    : a < 3600 ? rtf.format(Math.round(sec / 60), "minute")
+    : a < 86400 ? rtf.format(Math.round(sec / 3600), "hour")
+    : a < 2592000 ? rtf.format(Math.round(sec / 86400), "day")
+    : a < 31536000 ? rtf.format(Math.round(sec / 2592000), "month")
+    : rtf.format(Math.round(sec / 31536000), "year");
+  return <span className="text-xs text-ink-2 whitespace-nowrap" title={then.toLocaleString(locale)}>{rel}</span>;
 }
