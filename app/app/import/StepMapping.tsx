@@ -191,9 +191,24 @@ export default function StepMapping({
           : <span className="text-xs text-ink-3">{s("convNone")}</span>}
       </div>
 
-      {/* Mapping table */}
-      {/* Bleeds through the card's p-5 on phones so the table gets the full width. */}
-      <div className="-mx-5 sm:mx-0 overflow-x-auto sm:rounded-control sm:border sm:border-border">
+      {/* Mapping — phones get stacked cards (a 640px table is unreadable and
+          its per-column select would sit off-screen); sm+ gets the table. */}
+      <div className="space-y-2 sm:hidden">
+        {[...review, ...mapped].map((row) => (
+          <MappingCard key={row.path.col} row={row} s={s} onChange={setTarget} disabled={busy} />
+        ))}
+        {ignored.length > 0 && (
+          <Button variant="ghost" size="sm" className="w-full" aria-expanded={showIgnored} onClick={() => setShowIgnored((v) => !v)}>
+            <Icon.ChevronDown size={14} strokeWidth={2} aria-hidden className={`transition-transform duration-fast motion-reduce:transition-none ${showIgnored ? "rotate-180" : ""}`} />
+            {showIgnored ? s("hideIgnored") : s("showIgnored", { n: ignored.length })}
+          </Button>
+        )}
+        {showIgnored && ignored.map((row) => (
+          <MappingCard key={row.path.col} row={row} s={s} onChange={setTarget} disabled={busy} />
+        ))}
+      </div>
+
+      <div className="hidden sm:block overflow-x-auto rounded-control border border-border">
         <table className="import-table w-full min-w-[640px] text-sm">
           <thead>
             <tr>
@@ -290,19 +305,7 @@ function MappingRow({
           disabled={disabled}
           onChange={(e) => onChange(path.col, e.target.value)}
         >
-          {/* Safety net only — the library lists "ignore" in its own group, whose label is localised below. */}
-          {!LISTED_KEYS.has(IGNORE_KEY) && <option value={IGNORE_KEY}>{s("ignoreOption")}</option>}
-          {!LISTED_KEYS.has(currentKey) && currentKey !== IGNORE_KEY && (
-            <option value={currentKey}>{labelForTarget(assignment.target, s)}</option>
-          )}
-          {CANONICAL_OPTIONS.map((g: OptionGroup) => (
-            <optgroup key={g.group} label={targetGroupLabel(s, g.group)}>
-              {g.options.map((o: Option) => {
-                const k = targetKey(o.target);
-                return <option key={`${g.group}:${k}`} value={k}>{labelForTargetKey(k, s)}</option>;
-              })}
-            </optgroup>
-          ))}
+          <TargetOptions s={s} currentKey={currentKey} target={assignment.target} />
         </select>
       </td>
       <td>
@@ -324,5 +327,79 @@ function Breadcrumbs({ path }: { path: string[] }) {
         </span>
       ))}
     </span>
+  );
+}
+
+/** The grouped <option> list shared by the sm+ table row and the phone card. */
+function TargetOptions({ s, currentKey, target }: { s: ImportStrings; currentKey: string; target: CanonicalTarget }) {
+  return (
+    <>
+      {/* Safety net only — the library lists "ignore" in its own group, whose label is localised below. */}
+      {!LISTED_KEYS.has(IGNORE_KEY) && <option value={IGNORE_KEY}>{s("ignoreOption")}</option>}
+      {!LISTED_KEYS.has(currentKey) && currentKey !== IGNORE_KEY && (
+        <option value={currentKey}>{labelForTarget(target, s)}</option>
+      )}
+      {CANONICAL_OPTIONS.map((g: OptionGroup) => (
+        <optgroup key={g.group} label={targetGroupLabel(s, g.group)}>
+          {g.options.map((o: Option) => {
+            const k = targetKey(o.target);
+            return <option key={`${g.group}:${k}`} value={k}>{labelForTargetKey(k, s)}</option>;
+          })}
+        </optgroup>
+      ))}
+    </>
+  );
+}
+
+/**
+ * Phone layout for one column: identity + confidence on top, a sample line,
+ * then a full-width target <select>. Keeps the mapping control on-screen
+ * instead of in the 3rd column of a 640px table the user must pan to reach.
+ */
+function MappingCard({
+  row, s, onChange, disabled,
+}: {
+  row: Row;
+  s: ImportStrings;
+  onChange: (col: number, key: string) => void;
+  disabled: boolean;
+}) {
+  const id = useId();
+  const { path, assignment, samples, review } = row;
+  const currentKey = targetKey(assignment.target);
+  const pill = confidencePill(assignment, s);
+  const letter = colLetter(path.col);
+  const sampleText = samples.join("  \u00b7  ");
+
+  return (
+    <div
+      data-review={review || undefined}
+      className="rounded-control border border-border bg-surface p-3 data-[review=true]:border-warn/30 data-[review=true]:bg-warn/5"
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-start gap-2 min-w-0">
+          <span className="mono text-2xs text-ink-3 shrink-0 pt-0.5">{letter}</span>
+          <div className="min-w-0"><Breadcrumbs path={path.path} /></div>
+        </div>
+        <Pill variant={pill.variant}>{pill.label}</Pill>
+      </div>
+
+      {samples.length > 0 ? (
+        <div className="mt-1.5 mono text-xs text-ink-3 truncate" title={sampleText}>{sampleText}</div>
+      ) : (
+        <div className="mt-1.5 text-xs text-ink-3">{s("noSamples")}</div>
+      )}
+
+      <label htmlFor={id} className="sr-only">{s("mapSelectLabel", { col: `${letter} · ${path.label}` })}</label>
+      <select
+        id={id}
+        className="input input-sm h-11 w-full mt-2"
+        value={currentKey}
+        disabled={disabled}
+        onChange={(e) => onChange(path.col, e.target.value)}
+      >
+        <TargetOptions s={s} currentKey={currentKey} target={assignment.target} />
+      </select>
+    </div>
   );
 }
