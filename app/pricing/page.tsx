@@ -54,8 +54,8 @@ export default function PricingPage() {
             <span className="font-semibold tracking-tight text-[15px]">Pilot Logbook <span className="lp-amber-text">HQ</span></span>
           </Link>
           <nav className="flex items-center gap-1.5 sm:gap-3 text-sm">
-            <Link className="lp-link px-2.5 py-2" href="/login">Sign in</Link>
-            <Link className="lp-btn lp-btn-primary" style={{ height: 40, padding: "0 16px" }} href="/signup">Start free</Link>
+            <Link className="lp-link px-2.5 inline-flex items-center min-h-[44px]" href="/login">Sign in</Link>
+            <Link className="lp-btn lp-btn-primary" style={{ padding: "0 16px" }} href="/signup">Start free</Link>
           </nav>
         </div>
       </header>
@@ -115,11 +115,11 @@ export default function PricingPage() {
       <footer className="lp-hairline">
         <div className="mx-auto max-w-6xl px-5 py-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs" style={{ color: "var(--lp-ink-3)" }}>
           <span>© Pilot Logbook HQ · a multi-regime pilot logbook</span>
-          <nav className="flex items-center gap-4">
-            <Link className="lp-link" href="/">Home</Link>
-            <Link className="lp-link" href="/terms">Terms</Link>
-            <Link className="lp-link" href="/privacy">Privacy</Link>
-            <Link className="lp-link" href="/login">Sign in</Link>
+          <nav className="flex items-center gap-3 sm:gap-4">
+            <Link className="lp-link inline-flex items-center min-h-[44px]" href="/">Home</Link>
+            <Link className="lp-link inline-flex items-center min-h-[44px]" href="/terms">Terms</Link>
+            <Link className="lp-link inline-flex items-center min-h-[44px]" href="/privacy">Privacy</Link>
+            <Link className="lp-link inline-flex items-center min-h-[44px]" href="/login">Sign in</Link>
           </nav>
         </div>
       </footer>

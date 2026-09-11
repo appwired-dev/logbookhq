@@ -335,7 +335,7 @@ export default async function DashboardPage() {
               <li key={f.id}>
                 <Link
                   href={`/app/flights/${f.id}`}
-                  className="grid grid-cols-[5.5rem_minmax(0,1fr)_auto_3.5rem] sm:grid-cols-[5.5rem_minmax(0,1fr)_minmax(0,1fr)_auto_3.5rem] items-center gap-3 px-2 py-1.5 rounded-control text-sm text-ink-1 cursor-pointer hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60 transition-colors duration-fast ease-out"
+                  className="grid grid-cols-[5.5rem_minmax(0,1fr)_auto_3.5rem] sm:grid-cols-[5.5rem_minmax(0,1fr)_minmax(0,1fr)_auto_3.5rem] items-center gap-3 px-2 py-1.5 min-h-11 sm:min-h-0 rounded-control text-sm text-ink-1 cursor-pointer hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60 transition-colors duration-fast ease-out"
                 >
                   <span className="mono text-xs text-ink-2">{f.date}</span>
                   <span className="font-medium truncate">{f.make_model}</span>

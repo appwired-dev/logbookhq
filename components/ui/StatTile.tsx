@@ -40,7 +40,7 @@ export function StatTile({
       <span aria-hidden className="absolute left-0 top-3 bottom-3 w-[3px] rounded-r" style={{ background: "var(--accent)" }} />
       <div className="pl-2">
         <div className="text-2xs font-semibold uppercase tracking-[0.1em] text-ink-2">{label}</div>
-        <div className={`mt-1 flex items-baseline gap-1.5 ${hero ? "text-num font-semibold" : "text-xl font-semibold"} text-ink-1`}>
+        <div className={`mt-1 flex items-baseline gap-1.5 ${hero ? "text-2xl sm:text-num font-semibold" : "text-xl font-semibold"} text-ink-1`}>
           <CountUp value={value} decimals={decimals} />
           {unit && <span className="text-xs font-normal text-ink-3">{unit}</span>}
         </div>

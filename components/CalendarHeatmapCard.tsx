@@ -44,7 +44,7 @@ export default function CalendarHeatmapCard({ days, locale }: { days: HeatDay[];
         meta={t("charts.calDays", { year: calYear, days: calData.length })}
         actions={
           <select
-            className="input input-sm w-auto"
+            className="input input-sm w-auto h-11 sm:h-8"
             aria-label={l("year")}
             value={calYear}
             onChange={(e) => setCalYear(e.target.value)}

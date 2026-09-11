@@ -121,7 +121,7 @@ export default function StepReconcile({
           <button
             type="button"
             onClick={onReviewMapping}
-            className="font-medium text-brand-deep underline underline-offset-2 hover:text-brand rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60"
+            className="inline-block py-2 -my-2 font-medium text-brand-deep underline underline-offset-2 hover:text-brand rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60"
           >
             {s("reviewAnyway")}
           </button>
@@ -183,7 +183,7 @@ export default function StepReconcile({
         {/* Summary */}
         <aside aria-labelledby={summaryId} className="min-w-0 space-y-4 rounded-control border border-border bg-surface-2/40 p-3.5">
           <h3 id={summaryId} className="text-sm font-semibold text-ink-1">{s("summaryTitle")}</h3>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 min-[380px]:grid-cols-3 gap-2">
             <Tile label={s("tileFlights")} value={n.toLocaleString()} accent="brand" />
             <Tile label={s("tileSkipped")} value={preview.skipped.toLocaleString()} accent={preview.skipped > 0 ? "warn" : "ink-3"} />
             <Tile

@@ -335,6 +335,7 @@ export default function FlightForm({
   /* ---- input prop factories ---- */
   function textInput(k: TextField) {
     return {
+      autoCapitalize: "words" as const,
       className: INPUT,
       value: values[k],
       onChange: (e: ChangeEvent<HTMLInputElement>) => set(k, e.target.value),

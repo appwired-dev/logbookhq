@@ -127,7 +127,7 @@
 @layer components {
   /* ---- buttons ---- */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-control px-4 h-10 text-sm font-medium
+    @apply inline-flex items-center justify-center gap-2 rounded-control px-4 h-11 sm:h-10 text-sm font-medium
            border border-border-strong/70 bg-surface text-ink-1
            hover:bg-surface-2 hover:border-border-strong
            active:translate-y-px
@@ -136,7 +136,7 @@
            focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas
            transition-[background-color,border-color,color,box-shadow,transform] duration-med ease-out;
   }
-  .btn-sm { @apply h-8 px-3 text-xs gap-1.5; }
+  .btn-sm { @apply h-11 sm:h-8 px-3 text-xs gap-1.5; }
   .btn-icon { @apply h-9 w-9 px-0 grid place-items-center; }
   .btn-primary {
     @apply text-white border-transparent bg-gradient-aviation shadow-glow
@@ -154,7 +154,7 @@
   /* ---- fields ---- */
   .input {
     @apply block w-full rounded-control border border-border bg-surface
-           px-3 h-10 text-sm text-ink-1 placeholder:text-ink-3
+           px-3 h-11 sm:h-10 text-sm text-ink-1 placeholder:text-ink-3
            focus:outline-none focus:ring-4 focus:ring-brand/15 focus:border-brand
            transition-[border-color,box-shadow] duration-fast ease-out;
   }
@@ -208,6 +208,21 @@
   .pill-bad       { @apply pill bg-bad/10 text-bad-ink border-bad/30; }
   .pill-neutral   { @apply pill bg-surface-2 text-ink-2 border-border; }
   .pill-inverse   { @apply pill bg-white/10 text-white/85 border-white/15; }
+}
+
+/* iOS Safari zooms the whole page when a focused form control renders text
+   below 16px. Our compact scale (.input = 13px, .input-sm = 12px) trips that on
+   every field. Force 16px on text-entry controls below the sm breakpoint so
+   tapping a field never zooms; sm+ keeps the tighter desktop sizing. Unlayered
+   so it wins over the @layer components/utilities sizing above. */
+@media (max-width: 639.98px) {
+  .input,
+  .input-sm,
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="button"]):not([type="submit"]):not([type="reset"]),
+  select,
+  textarea {
+    font-size: 16px;
+  }
 }
 
 /* ---- progress bars (currency / limits) ---- */
