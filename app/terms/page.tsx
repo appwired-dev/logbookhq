@@ -17,9 +17,9 @@ export default function TermsPage() {
             Pilot Logbook <span className="text-sky-600">HQ</span>
           </div>
         </Link>
-        <nav className="flex items-center gap-3 text-sm">
-          <Link className="text-slate-700 hover:text-slate-900 px-2" href="/pricing">Pricing</Link>
-          <Link className="text-slate-700 hover:text-slate-900 px-2" href="/login">Sign in</Link>
+        <nav className="flex items-center gap-1.5 sm:gap-3 text-sm">
+          <Link className="hidden sm:inline-flex items-center min-h-[44px] px-2 text-slate-700 hover:text-slate-900" href="/pricing">Pricing</Link>
+          <Link className="inline-flex items-center min-h-[44px] px-2 text-slate-700 hover:text-slate-900" href="/login">Sign in</Link>
           <Link className="btn btn-primary" href="/signup">Start free</Link>
         </nav>
       </header>
