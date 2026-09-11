@@ -210,6 +210,21 @@
   .pill-inverse   { @apply pill bg-white/10 text-white/85 border-white/15; }
 }
 
+/* iOS Safari zooms the whole page when a focused form control renders text
+   below 16px. Our compact scale (.input = 13px, .input-sm = 12px) trips that on
+   every field. Force 16px on text-entry controls below the sm breakpoint so
+   tapping a field never zooms; sm+ keeps the tighter desktop sizing. Unlayered
+   so it wins over the @layer components/utilities sizing above. */
+@media (max-width: 639.98px) {
+  .input,
+  .input-sm,
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="button"]):not([type="submit"]):not([type="reset"]),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
 /* ---- progress bars (currency / limits) ---- */
 .bar-track { background: rgb(var(--surface-2)); box-shadow: inset 0 1px 2px rgb(15 23 42 / 0.06); }
 .bar-fill { transition: width var(--dur-slow) var(--ease-out); }
