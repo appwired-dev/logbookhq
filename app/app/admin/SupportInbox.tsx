@@ -1,5 +1,5 @@
 import { Card, CardHeader, Pill } from "@/components/ui";
-import { resolveSupport, deleteSupport } from "./actions";
+import SupportRowActions from "./SupportRowActions";
 
 export type SupportRow = {
   id: number;
@@ -36,30 +36,14 @@ export default function SupportInbox({ requests, locale }: { requests: SupportRo
                         : <Pill variant="warn">open</Pill>}
                     </div>
                     <p className="mt-1 text-sm text-ink-2 whitespace-pre-wrap break-words">{r.message}</p>
-                    <p className="mt-1 text-2xs text-ink-3">
+                    <div className="mt-1">
                       {r.email
-                        ? <a className="text-brand hover:underline" href={`mailto:${r.email}?subject=Re: ${encodeURIComponent(r.subject || "your message")}`}>{r.email}</a>
-                        : "unknown sender"}
-                      {" · "}
-                      {new Date(r.created_at).toLocaleString(locale)}
-                    </p>
+                        ? <a className="inline-flex items-center min-h-[44px] sm:min-h-0 text-xs text-brand hover:underline break-all" href={`mailto:${r.email}?subject=Re: ${encodeURIComponent(r.subject || "your message")}`}>{r.email}</a>
+                        : <span className="text-2xs text-ink-3">unknown sender</span>}
+                      <div className="text-2xs text-ink-3">{new Date(r.created_at).toLocaleString(locale)}</div>
+                    </div>
                   </div>
-                  <div className="shrink-0 flex flex-col items-end gap-1.5">
-                    {r.status !== "resolved" && (
-                      <form action={resolveSupport}>
-                        <input type="hidden" name="id" value={r.id} />
-                        <button type="submit" className="text-xs font-medium text-brand hover:underline whitespace-nowrap">
-                          Resolve
-                        </button>
-                      </form>
-                    )}
-                    <form action={deleteSupport}>
-                      <input type="hidden" name="id" value={r.id} />
-                      <button type="submit" className="text-xs text-ink-3 hover:text-bad-ink hover:underline whitespace-nowrap">
-                        Delete
-                      </button>
-                    </form>
-                  </div>
+                  <SupportRowActions id={r.id} resolved={r.status === "resolved"} />
                 </div>
               </li>
             ))}
