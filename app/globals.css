@@ -154,7 +154,7 @@
   /* ---- fields ---- */
   .input {
     @apply block w-full rounded-control border border-border bg-surface
-           px-3 h-10 text-sm text-ink-1 placeholder:text-ink-3
+           px-3 h-11 sm:h-10 text-sm text-ink-1 placeholder:text-ink-3
            focus:outline-none focus:ring-4 focus:ring-brand/15 focus:border-brand
            transition-[border-color,box-shadow] duration-fast ease-out;
   }
