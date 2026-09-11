@@ -29,7 +29,7 @@ export default async function AdminPage() {
   const admin = createAdminClient();
   const { data: profiles } = await admin
     .from("profiles")
-    .select("id, email, full_name, tier, is_admin, primary_regime, stripe_customer_id");
+    .select("id, email, full_name, tier, is_admin, primary_regime, stripe_customer_id, last_seen_at");
   const { data: authUsers } = await admin.auth.admin.listUsers({ perPage: 1000 });
   const { data: supportRows } = await admin
     .from("support_requests")
@@ -53,6 +53,7 @@ export default async function AdminPage() {
         primary_regime: p.primary_regime ?? null,
         has_stripe: !!p.stripe_customer_id,
         created_at: u.created_at ?? "",
+        last_seen_at: p.last_seen_at ?? null,
       };
     })
     .filter((u): u is AdminUser => u !== null)
