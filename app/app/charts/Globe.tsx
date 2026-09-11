@@ -236,7 +236,7 @@ export default function FlightGlobe({ airports, arcs: rawArcs, strings, locale }
     const el = wrapRef.current;
     if (!el) return;
     const apply = (width: number) => {
-      const w = Math.max(320, Math.floor(width));
+      const w = Math.max(240, Math.floor(width));
       setSize({ w, h: Math.min(640, Math.max(420, Math.round(w * 0.6))) });
     };
     // Measure immediately so the first WebGL frame is already the right size;
@@ -648,6 +648,25 @@ export default function FlightGlobe({ airports, arcs: rawArcs, strings, locale }
           <p className="globe-ink-2 text-2xs pointer-events-none">{legend}</p>
         </div>
       </div>
+
+      {/* Top routes on phones: a horizontal chip strip below the globe (the
+          desktop overlay is hidden md:block), so route fly-to stays reachable. */}
+      {topRoutes.length > 0 && (
+        <nav aria-label={strings.topRoutes} className="md:hidden mt-2 -mx-1 flex gap-1.5 overflow-x-auto overscroll-x-contain px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {topRoutes.map((a) => (
+            <button
+              key={a.id}
+              type="button"
+              onClick={() => selectRoute(a)}
+              aria-pressed={selected === a.id}
+              className={`shrink-0 inline-flex items-center gap-1.5 min-h-11 rounded-pill border px-3 text-xs font-mono transition-colors ${selected === a.id ? "border-brand bg-brand/10 text-brand-deep" : "border-border bg-surface text-ink-2 hover:text-ink-1"}`}
+            >
+              <span>{a.from} → {a.to}</span>
+              <span className="num text-2xs text-ink-3">{a.count.toLocaleString(locale)}</span>
+            </button>
+          ))}
+        </nav>
+      )}
     </div>
   );
 }
