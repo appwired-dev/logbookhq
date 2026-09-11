@@ -127,7 +127,7 @@
 @layer components {
   /* ---- buttons ---- */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-control px-4 h-10 text-sm font-medium
+    @apply inline-flex items-center justify-center gap-2 rounded-control px-4 h-11 sm:h-10 text-sm font-medium
            border border-border-strong/70 bg-surface text-ink-1
            hover:bg-surface-2 hover:border-border-strong
            active:translate-y-px
@@ -136,7 +136,7 @@
            focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas
            transition-[background-color,border-color,color,box-shadow,transform] duration-med ease-out;
   }
-  .btn-sm { @apply h-8 px-3 text-xs gap-1.5; }
+  .btn-sm { @apply h-11 sm:h-8 px-3 text-xs gap-1.5; }
   .btn-icon { @apply h-9 w-9 px-0 grid place-items-center; }
   .btn-primary {
     @apply text-white border-transparent bg-gradient-aviation shadow-glow
