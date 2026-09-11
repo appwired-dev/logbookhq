@@ -116,7 +116,7 @@ const FlightCard = memo(function FlightCard({ f, s, augHalfCredit, highlighted }
     >
       <div className="flex items-baseline gap-2 min-w-0">
         <span className="mono text-xs text-ink-2 shrink-0">{f.date}</span>
-        {f.route && <span className="mono text-xs text-ink-1 truncate">{f.route}</span>}
+        {f.route && <span className="mono text-xs text-ink-1 truncate min-w-0">{f.route}</span>}
         <span className="ml-auto text-sm font-medium text-ink-1 truncate max-w-[45%]">{f.make_model}</span>
       </div>
       <div className="mt-1.5 flex items-center gap-1.5 min-w-0">

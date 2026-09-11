@@ -33,7 +33,7 @@ export default function SignupPage() {
         </div>
         <div>
           <label className="label" htmlFor="signup-email">Email</label>
-          <input id="signup-email" className="input" type="email" name="email" autoComplete="email" required />
+          <input id="signup-email" className="input" type="email" inputMode="email" name="email" autoComplete="email" required />
         </div>
         <div>
           <label className="label" htmlFor="signup-password">Password</label>

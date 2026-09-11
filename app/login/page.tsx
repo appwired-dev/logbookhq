@@ -39,14 +39,14 @@ function LoginForm() {
     >
       <div>
         <label className="label" htmlFor="login-email">Email</label>
-        <input id="login-email" className="input" type="email" name="email" autoComplete="email" required />
+        <input id="login-email" className="input" type="email" inputMode="email" name="email" autoComplete="email" required />
       </div>
       <div>
         <div className="flex items-baseline justify-between gap-3">
           <label className="label" htmlFor="login-password">Password</label>
           <Link
             href="/forgot-password"
-            className="text-2xs text-brand hover:underline rounded-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60"
+            className="inline-flex items-center py-3.5 -my-3.5 px-1 -mx-1 text-2xs text-brand hover:underline rounded-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60"
           >
             Forgot password?
           </Link>

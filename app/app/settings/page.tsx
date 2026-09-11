@@ -122,7 +122,7 @@ function BillingCard({ tier, hasStripeCustomer, receipts, locale }: {
                   <span className="text-ink-2 tabular-nums">{day(r.created)}</span>
                   <span className="num font-medium text-ink-1">{money(r.amount, r.currency)}</span>
                   {r.url ? (
-                    <a href={r.url} target="_blank" rel="noopener noreferrer" className="text-brand hover:underline shrink-0">
+                    <a href={r.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center min-h-[44px] sm:min-h-0 text-brand hover:underline shrink-0">
                       {h.receipt}
                     </a>
                   ) : (
