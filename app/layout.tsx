@@ -32,7 +32,7 @@ export const metadata: Metadata = {
       "Log under Canadian, ICAO, FAA, or EASA. Currency that matches your jurisdiction. Clean PDF for the hiring office. $3/mo.",
   },
   alternates: {
-    canonical: "https://pilotlogbookhq.com",
+    canonical: "/",
   },
 };
 

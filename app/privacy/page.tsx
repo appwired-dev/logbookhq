@@ -3,6 +3,7 @@ import Link from "next/link";
 export const metadata = {
   title: "Privacy Policy — Pilot Logbook HQ",
   description: "How Pilot Logbook HQ collects, uses, and protects your information.",
+  alternates: { canonical: "/privacy" },
 };
 
 export default function PrivacyPage() {

@@ -9,6 +9,7 @@ import { startCheckoutFromForm } from "@/app/app/billing/actions";
 export const metadata = {
   title: "Pricing — Pilot Logbook HQ",
   description: "Free up to 100 flights, then $3/mo, $30/yr, or $119 once for lifetime. Cancel anytime.",
+  alternates: { canonical: "/pricing" },
 };
 
 type Plan = "monthly" | "annual" | "lifetime" | null;
