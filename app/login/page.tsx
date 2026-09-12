@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { login } from "./actions";
 import { AuthShell } from "@/components/AuthShell";
+import { GoogleSignInButton } from "@/components/GoogleSignInButton";
 import { LoginFormSkeleton } from "./loading";
 
 export default function LoginPage() {
@@ -37,6 +38,7 @@ function LoginForm() {
       }}
       className="space-y-4"
     >
+      <GoogleSignInButton next={next} />
       <div>
         <label className="label" htmlFor="login-email">Email</label>
         <input id="login-email" className="input" type="email" inputMode="email" name="email" autoComplete="email" required />

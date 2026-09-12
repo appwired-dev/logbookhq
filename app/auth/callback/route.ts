@@ -90,14 +90,18 @@ export async function GET(request: NextRequest) {
 
   // Mark this session as recovery-minted so /reset-password will accept it.
   // Any other authenticated session lacks the cookie and cannot change a
-  // password without knowing the current one.
+  // password without knowing the current one. Gate it on the recovery
+  // destination (next=/reset-password): other exchanges that land here — e.g. a
+  // Google OAuth sign-in — must NOT inherit password-reset privilege.
   const res = go(destination);
-  res.cookies.set(RECOVERY_COOKIE, crypto.randomUUID(), {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: new URL(base).protocol === "https:",
-    path: "/",
-    maxAge: RECOVERY_WINDOW_SECONDS,
-  });
+  if (destination.pathname === "/reset-password") {
+    res.cookies.set(RECOVERY_COOKIE, crypto.randomUUID(), {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: new URL(base).protocol === "https:",
+      path: "/",
+      maxAge: RECOVERY_WINDOW_SECONDS,
+    });
+  }
   return res;
 }
