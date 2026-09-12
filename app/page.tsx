@@ -24,9 +24,45 @@ export const metadata = {
 
 const FORMATS = ["Apple Numbers", "Excel", "ForeFlight", "LogTen", "MyFlightbook", "CSV"];
 
+// Structured data (schema.org) — helps Google understand this is a product and
+// its publisher. Only truthful facts: the free tier (price 0); no fabricated
+// ratings, and paid prices are omitted (their currency isn't asserted here).
+const STRUCTURED_DATA = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://pilotlogbookhq.com/#org",
+      name: "Pilot Logbook HQ",
+      url: "https://pilotlogbookhq.com",
+      logo: "https://pilotlogbookhq.com/icon",
+    },
+    {
+      "@type": "SoftwareApplication",
+      name: "Pilot Logbook HQ",
+      url: "https://pilotlogbookhq.com",
+      applicationCategory: "BusinessApplication",
+      operatingSystem: "Web",
+      description:
+        "Import your pilot logbook from any format or language, track currency under every aviation authority you fly, and see your whole career at a glance.",
+      publisher: { "@id": "https://pilotlogbookhq.com/#org" },
+      offers: {
+        "@type": "Offer",
+        price: "0",
+        priceCurrency: "USD",
+        description: "Free up to 100 flights",
+      },
+    },
+  ],
+};
+
 export default function LandingPage() {
   return (
     <div className="lp">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(STRUCTURED_DATA) }}
+      />
       <CursorGlow />
       {/* ---- top bar ---- */}
       <header className="sticky top-0 z-30 backdrop-blur-md" style={{ background: "rgba(10,15,22,0.72)", borderBottom: "1px solid var(--lp-line)" }}>

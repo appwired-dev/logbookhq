@@ -3,6 +3,7 @@ import Link from "next/link";
 export const metadata = {
   title: "Terms of Service — Pilot Logbook HQ",
   description: "Terms governing your use of Pilot Logbook HQ.",
+  alternates: { canonical: "/terms" },
 };
 
 export default function TermsPage() {
