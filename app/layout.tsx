@@ -34,6 +34,10 @@ export const metadata: Metadata = {
   alternates: {
     canonical: "/",
   },
+  // Google Search Console domain ownership (renders <meta name="google-site-verification">).
+  verification: {
+    google: "iKVGGCyMWsye_ia9_8-GntSvIoLZ49zP4mflB7UEp-U",
+  },
 };
 
 export const viewport: Viewport = {
