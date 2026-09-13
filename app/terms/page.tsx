@@ -57,8 +57,8 @@ export default function TermsPage() {
 
           <Section title="3. Subscriptions, Billing, and Refunds">
             <p>
-              We offer three paid tiers (Pro Monthly at USD $3/month, Pro Annual at USD $30/year, and Lifetime at a
-              one-time USD $119) plus a Free tier limited to 100 flights. Current pricing is shown at{" "}
+              We offer three paid tiers (Pro Monthly at CAD $4.99/month, Pro Annual at CAD $49/year, and Lifetime at a
+              one-time CAD $249) plus a Free tier limited to 100 flights. Current pricing is shown at{" "}
               <Link className="text-sky-700 hover:underline" href="/pricing">/pricing</Link> and may change with
               reasonable notice; existing subscriptions are honored at their original price for at least the current
               billing period.

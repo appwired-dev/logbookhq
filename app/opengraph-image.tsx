@@ -74,7 +74,7 @@ export default async function OG() {
         {/* Bottom — pricing + URL */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
           <div style={{ fontSize: 24, color: "#94a3b8" }}>
-            $3/mo · $30/yr · $119 lifetime · 100 flights free
+            $4.99/mo · $49/yr · $249 lifetime · 100 flights free
           </div>
           <div style={{ fontSize: 24, color: "#7dd3fc", fontWeight: 600 }}>
             pilotlogbookhq.com
