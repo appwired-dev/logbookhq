@@ -10,6 +10,18 @@ const config: NextConfig = {
       bodySizeLimit: "25mb",
     },
   },
+  // Canonicalise to the apex domain: www serves the same app, so 308-redirect it
+  // to non-www (matching the canonical tags) instead of serving a duplicate copy.
+  async redirects() {
+    return [
+      {
+        source: "/:path*",
+        has: [{ type: "host", value: "www.pilotlogbookhq.com" }],
+        destination: "https://pilotlogbookhq.com/:path*",
+        permanent: true,
+      },
+    ];
+  },
 };
 
 // Wrap with Sentry's config — uploads source maps at build time (if
