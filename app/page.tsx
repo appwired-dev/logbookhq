@@ -244,14 +244,22 @@ export default function LandingPage() {
       </main>
 
       <footer className="lp-hairline">
-        <div className="mx-auto max-w-6xl px-5 py-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs" style={{ color: "var(--lp-ink-3)" }}>
-          <span>© Pilot Logbook HQ · a multi-regime pilot logbook</span>
-          <nav className="flex items-center gap-3 sm:gap-4">
-            <Link className="lp-link inline-flex items-center min-h-[44px]" href="/pricing">Pricing</Link>
-            <Link className="lp-link inline-flex items-center min-h-[44px]" href="/terms">Terms</Link>
-            <Link className="lp-link inline-flex items-center min-h-[44px]" href="/privacy">Privacy</Link>
-            <Link className="lp-link inline-flex items-center min-h-[44px]" href="/login">Sign in</Link>
+        <div className="mx-auto max-w-6xl px-5 py-8 space-y-4">
+          <nav className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+            <Link className="lp-link inline-flex items-center min-h-[44px]" href="/multi-regime-pilot-logbook">Multi-regime logbook</Link>
+            <Link className="lp-link inline-flex items-center min-h-[44px]" href="/foreflight-logbook-alternative">ForeFlight alternative</Link>
+            <Link className="lp-link inline-flex items-center min-h-[44px]" href="/logten-pro-alternative">LogTen Pro alternative</Link>
+            <Link className="lp-link inline-flex items-center min-h-[44px]" href="/transport-canada-pilot-logbook">Transport Canada logbook</Link>
           </nav>
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs" style={{ color: "var(--lp-ink-3)" }}>
+            <span>© Pilot Logbook HQ · a multi-regime pilot logbook</span>
+            <nav className="flex items-center gap-3 sm:gap-4">
+              <Link className="lp-link inline-flex items-center min-h-[44px]" href="/pricing">Pricing</Link>
+              <Link className="lp-link inline-flex items-center min-h-[44px]" href="/terms">Terms</Link>
+              <Link className="lp-link inline-flex items-center min-h-[44px]" href="/privacy">Privacy</Link>
+              <Link className="lp-link inline-flex items-center min-h-[44px]" href="/login">Sign in</Link>
+            </nav>
+          </div>
         </div>
       </footer>
     </div>
