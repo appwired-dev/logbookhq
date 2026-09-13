@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { signup } from "../login/actions";
 import { AuthShell } from "@/components/AuthShell";
+import { GoogleSignInButton } from "@/components/GoogleSignInButton";
 
 export default function SignupPage() {
   const [error, setError] = useState<string | null>(null);
@@ -27,6 +28,7 @@ export default function SignupPage() {
         }}
         className="space-y-4"
       >
+        <GoogleSignInButton />
         <div>
           <label className="label" htmlFor="signup-name">Full Name</label>
           <input id="signup-name" className="input" type="text" name="full_name" autoComplete="name" required />
