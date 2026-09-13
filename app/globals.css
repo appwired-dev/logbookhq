@@ -873,3 +873,33 @@ svg:has(.lp-ribbon:hover) .lp-ribbon { fill-opacity: 0.2; }
   filter: drop-shadow(0 2px 5px rgb(15 23 42 / 0.16));
 }
 @media (prefers-reduced-motion: reduce) { .lp-ribbon { transition: none; } }
+
+/* ============================================================================
+   Marketing / content pages (comparisons, guides) — long-form prose in the
+   .lp dark theme. Scoped to .mkt-prose so it never touches the app.
+   ============================================================================ */
+.mkt-prose { color: var(--lp-ink-2); font-size: 16px; line-height: 1.75; }
+.mkt-prose > * + * { margin-top: 1.05em; }
+.mkt-prose h2 {
+  font-family: var(--lp-display), ui-sans-serif, system-ui, sans-serif;
+  font-weight: 700; color: var(--lp-ink);
+  font-size: clamp(22px, 3vw, 29px); line-height: 1.15; letter-spacing: 0.01em;
+  margin-top: 1.9em; text-wrap: balance;
+}
+.mkt-prose h3 { color: var(--lp-ink); font-weight: 600; font-size: 18px; margin-top: 1.6em; }
+.mkt-prose p, .mkt-prose li { color: var(--lp-ink-2); }
+.mkt-prose strong { color: var(--lp-ink); font-weight: 600; }
+.mkt-prose a { color: var(--lp-cyan); text-decoration: underline; text-underline-offset: 2px; }
+.mkt-prose a:hover { color: #fff; }
+.mkt-prose ul { padding-left: 1.15em; list-style: disc; }
+.mkt-prose ul ul { margin-top: 0.4em; }
+.mkt-prose li + li { margin-top: 0.4em; }
+.mkt-prose blockquote {
+  border-left: 2px solid var(--lp-cyan); padding: 0.1em 0 0.1em 1em;
+  color: var(--lp-ink); font-style: italic;
+}
+.mkt-prose code {
+  font-family: var(--lp-mono), ui-monospace, monospace; font-size: 0.9em;
+  background: rgba(255,255,255,.05); border: 1px solid var(--lp-line);
+  border-radius: 5px; padding: 1px 5px; color: var(--lp-ink);
+}
