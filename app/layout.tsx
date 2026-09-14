@@ -15,11 +15,11 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://pilotlogbookhq.com"),
   title: "Pilot Logbook HQ — Pilot Logbook for Every Regime",
   description:
-    "The pilot logbook that doesn't treat international pilots as second-class. Multi-regime (CA, FAA, EASA, ICAO, and more), clean, $3/mo.",
+    "The pilot logbook that doesn't treat international pilots as second-class. Multi-regime (CA, FAA, EASA, ICAO, and more), clean, $4.99/mo.",
   openGraph: {
     title: "Pilot Logbook HQ — multi-regime pilot logbook",
     description:
-      "Log under Canadian, ICAO, FAA, or EASA. Currency that matches your jurisdiction. Clean PDF for the hiring office. $3/mo.",
+      "Log under Canadian, ICAO, FAA, or EASA. Currency that matches your jurisdiction. Clean PDF for the hiring office. $4.99/mo.",
     url: "https://pilotlogbookhq.com",
     siteName: "Pilot Logbook HQ",
     type: "website",
@@ -29,7 +29,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Pilot Logbook HQ — multi-regime pilot logbook",
     description:
-      "Log under Canadian, ICAO, FAA, or EASA. Currency that matches your jurisdiction. Clean PDF for the hiring office. $3/mo.",
+      "Log under Canadian, ICAO, FAA, or EASA. Currency that matches your jurisdiction. Clean PDF for the hiring office. $4.99/mo.",
   },
   alternates: {
     canonical: "/",

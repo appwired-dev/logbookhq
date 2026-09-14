@@ -12,7 +12,7 @@ export default function SignupPage() {
   const [pending, startTransition] = useTransition();
 
   return (
-    <AuthShell title="Create your account" subtitle="$30/yr or $119 lifetime — start free.">
+    <AuthShell title="Create your account" subtitle="$49/yr or $249 lifetime — start free.">
       <form
         action={(fd) => {
           setError(null);

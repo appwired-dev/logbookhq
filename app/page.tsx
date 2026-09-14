@@ -49,7 +49,7 @@ const STRUCTURED_DATA = {
       offers: {
         "@type": "Offer",
         price: "0",
-        priceCurrency: "USD",
+        priceCurrency: "CAD",
         description: "Free up to 100 flights",
       },
     },
@@ -101,7 +101,7 @@ export default function LandingPage() {
                 <Link className="lp-btn lp-btn-ghost" href="/pricing">See pricing</Link>
               </div>
               <p className="lp-mono mt-4 text-xs lp-rise" style={{ color: "var(--lp-ink-3)", animationDelay: "180ms" }}>
-                Free up to 100 flights · no card · $3/mo after
+                Free up to 100 flights · no card · $4.99/mo after
               </p>
             </div>
 
@@ -207,12 +207,12 @@ export default function LandingPage() {
           </div>
           <div className="mt-9 grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <PriceTile name="Free" price="$0" unit="forever" note="Up to 100 flights" />
-            <PriceTile name="Monthly" price="$3" unit="/ month" note="Unlimited flights" />
-            <PriceTile name="Annual" price="$30" unit="/ year" note="Two months off" />
-            <PriceTile name="Lifetime" price="$119" unit="once" note="Pay once, keep forever" featured />
+            <PriceTile name="Monthly" price="$4.99" unit="/ month" note="Unlimited flights" />
+            <PriceTile name="Annual" price="$49" unit="/ year" note="Two months off" />
+            <PriceTile name="Lifetime" price="$249" unit="once" note="Pay once, keep forever" featured />
           </div>
           <p className="text-center mt-6 lp-mono text-xs" style={{ color: "var(--lp-ink-3)" }}>
-            No card to start · cancel anytime · <Link className="lp-cyan-text hover:underline" href="/pricing">full pricing →</Link>
+            Prices in CAD · no card to start · cancel anytime · <Link className="lp-cyan-text hover:underline" href="/pricing">full pricing →</Link>
           </p>
         </section>
 

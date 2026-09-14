@@ -47,7 +47,7 @@ export default function LogTenAlternativePage() {
           ["Setup", "Import and go", "Deep, configurable — rewards time spent"],
           ["Bring your history", "Reconciles your import against your own totals", "Imports logbook data"],
           ["Languages", "English, 한국어, 中文, Español", "English"],
-          ["Price", "Free to 100 flights, then $3/mo · $30/yr · $119 once", "Subscription"],
+          ["Price", "Free to 100 flights, then $4.99/mo · $49/yr · $249 once", "Subscription"],
         ]}
       />
 
@@ -93,7 +93,7 @@ export default function LogTenAlternativePage() {
           },
           {
             q: "What does it cost?",
-            a: "Free up to 100 flights with no card, then $3/month, $30/year, or $119 once for lifetime access.",
+            a: "Free up to 100 flights with no card, then $4.99/month, $49/year, or $249 once for lifetime access.",
           },
         ]}
       />

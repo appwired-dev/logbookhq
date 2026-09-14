@@ -86,7 +86,7 @@ export function PageHero({ eyebrow, title, lede, visual, cta = "Import your logb
             <Link className="lp-btn lp-btn-ghost" href="/pricing">See pricing</Link>
           </div>
           <p className="lp-mono mt-4 text-xs lp-rise" style={{ color: "var(--lp-ink-3)", animationDelay: "180ms" }}>
-            Free up to 100 flights &middot; no card &middot; $3/mo after
+            Free up to 100 flights &middot; no card &middot; $4.99/mo after
           </p>
         </div>
         {visual && <div className="lp-rise" style={{ animationDelay: "120ms" }}>{visual}</div>}

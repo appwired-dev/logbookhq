@@ -8,7 +8,7 @@ import { startCheckoutFromForm } from "@/app/app/billing/actions";
  */
 export const metadata = {
   title: "Pricing — Pilot Logbook HQ",
-  description: "Free up to 100 flights, then $3/mo, $30/yr, or $119 once for lifetime. Cancel anytime.",
+  description: "Free up to 100 flights, then $4.99/mo, $49/yr, or $249 once for lifetime. Cancel anytime.",
   alternates: { canonical: "/pricing" },
 };
 
@@ -26,19 +26,19 @@ const TIERS: Tier[] = [
     features: ["Up to 100 flights", "One authority (you pick)", "Import any layout · CSV export", "The full dashboard"],
   },
   {
-    name: "Monthly", price: "$3", cadence: "/ month",
+    name: "Monthly", price: "$4.99", cadence: "/ month",
     description: "Unlimited flights, every authority, PDF export, the charts.",
     cta: "Go Pro", href: "/signup?plan=monthly", highlight: false, plan: "monthly",
     features: ["Unlimited flights", "Every authority (CA · FAA · EASA · more)", "PDF export (18-column layout)", "Charts, Sankey & globe", "Cloud sync across devices", "Currency tracking per authority"],
   },
   {
-    name: "Annual", price: "$30", cadence: "/ year",
+    name: "Annual", price: "$49", cadence: "/ year",
     description: "Everything in Pro, billed yearly. Two months free.",
     cta: "Go Annual", href: "/signup?plan=annual", highlight: true, plan: "annual",
     features: ["Everything in Monthly", "Two months free vs. monthly", "Priority email support"],
   },
   {
-    name: "Lifetime", price: "$119", cadence: "once",
+    name: "Lifetime", price: "$249", cadence: "once",
     description: "Pay once. Yours forever. The clean exit from subscriptions.",
     cta: "Buy lifetime", href: "/signup?plan=lifetime", highlight: false, plan: "lifetime",
     features: ["Everything in Pro, forever", "All future authorities included", "No recurring charges", "Founding-member badge"],
@@ -108,7 +108,7 @@ export default function PricingPage() {
           </div>
 
           <p className="text-center mt-8 lp-mono text-xs" style={{ color: "var(--lp-ink-3)" }}>
-            Stripe billing · cancel anytime · 30-day refund on annual &amp; lifetime
+            Prices in CAD · Stripe billing · cancel anytime · 30-day refund on annual &amp; lifetime
           </p>
         </section>
       </main>

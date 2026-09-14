@@ -121,7 +121,7 @@ export default function MultiRegimePage() {
           },
           {
             q: "What does it cost?",
-            a: "Free up to 100 flights with no card. After that it's $3/month, $30/year, or $119 once for lifetime access.",
+            a: "Free up to 100 flights with no card. After that it's $4.99/month, $49/year, or $249 once for lifetime access.",
           },
         ]}
       />

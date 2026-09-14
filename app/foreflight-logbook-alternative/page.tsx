@@ -51,7 +51,7 @@ export default function ForeFlightAlternativePage() {
           ["Track more than one authority", <Yes key="a">Side by side, from one set of flights</Yes>, "Oriented around a single framework"],
           ["Bring your history in", "Reconciles your import against your own totals first", "Exports cleanly — easy to bring here"],
           ["Languages", "English, 한국어, 中文, Español", "English"],
-          ["Price", "Free to 100 flights, then $3/mo · $30/yr · $119 once", "Subscription, bundled with its flight-bag plans"],
+          ["Price", "Free to 100 flights, then $4.99/mo · $49/yr · $249 once", "Subscription, bundled with its flight-bag plans"],
         ]}
       />
 
