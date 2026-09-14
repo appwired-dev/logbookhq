@@ -20,7 +20,6 @@ export const metadata: Metadata = {
     title: "Pilot Logbook HQ — multi-regime pilot logbook",
     description:
       "Log under Canadian, ICAO, FAA, or EASA. Currency that matches your jurisdiction. Clean PDF for the hiring office. $4.99/mo.",
-    url: "https://pilotlogbookhq.com",
     siteName: "Pilot Logbook HQ",
     type: "website",
     locale: "en_US",
@@ -48,10 +47,33 @@ export const viewport: Viewport = {
   themeColor: "#0b1f3a",
 };
 
+// Site-wide identity graph — emitted on every page so Organization + WebSite
+// are asserted everywhere (page-level schema references publisher via @id #org).
+const SITE_LD = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://pilotlogbookhq.com/#org",
+      name: "Pilot Logbook HQ",
+      url: "https://pilotlogbookhq.com",
+      logo: "https://pilotlogbookhq.com/icon",
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://pilotlogbookhq.com/#website",
+      name: "Pilot Logbook HQ",
+      url: "https://pilotlogbookhq.com",
+      publisher: { "@id": "https://pilotlogbookhq.com/#org" },
+    },
+  ],
+};
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${sans.variable} ${mono.variable} ${display.variable}`}>
       <body>
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(SITE_LD) }} />
         {children}
         {/* Vercel Analytics — no cookies, no PII, country-level only. Enabled
             in Vercel Dashboard → project → Analytics. Privacy disclosed in /privacy. */}

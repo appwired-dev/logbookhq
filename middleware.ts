@@ -6,12 +6,19 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
+  // Only run the Supabase session middleware where it is actually needed: the
+  // signed-in app and the auth/recovery routes. Public marketing pages no
+  // longer trigger a per-request auth.getUser() (faster) and, freed from
+  // middleware cookie-writes, can be statically prerendered + edge-cached.
+  // Note: /app is ALSO gated in app/app/layout.tsx (defense in depth), so
+  // narrowing here cannot un-gate the private area.
   matcher: [
-    /*
-     * Match all request paths except for:
-     * - _next/static, _next/image, favicon
-     * - public assets (images, fonts)
-     */
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/app",
+    "/app/:path*",
+    "/login",
+    "/signup",
+    "/forgot-password",
+    "/reset-password",
+    "/auth/:path*",
   ],
 };

@@ -5,17 +5,18 @@ import type { MetadataRoute } from "next";
 // per-user secret links.
 export default function sitemap(): MetadataRoute.Sitemap {
   const base = "https://pilotlogbookhq.com";
-  const now = new Date();
+  // Stable, per-page lastmod (content-change dates), NOT build time — a bulk
+  // "everything changed on every deploy" signal trains crawlers to ignore lastmod.
   return [
-    { url: `${base}/`,        lastModified: now, changeFrequency: "weekly", priority: 1.0 },
-    { url: `${base}/pricing`, lastModified: now, changeFrequency: "monthly", priority: 0.9 },
-    { url: `${base}/signup`,  lastModified: now, changeFrequency: "monthly", priority: 0.7 },
+    { url: base,                                     lastModified: "2026-09-14", changeFrequency: "weekly", priority: 1.0 },
+    { url: `${base}/pricing`,                         lastModified: "2026-09-14", changeFrequency: "monthly", priority: 0.9 },
+    { url: `${base}/signup`,                          lastModified: "2026-05-19", changeFrequency: "monthly", priority: 0.7 },
     // Content / SEO landing pages (multi-regime wedge + comparison intent).
-    { url: `${base}/multi-regime-pilot-logbook`,    lastModified: now, changeFrequency: "monthly", priority: 0.8 },
-    { url: `${base}/foreflight-logbook-alternative`, lastModified: now, changeFrequency: "monthly", priority: 0.8 },
-    { url: `${base}/logten-pro-alternative`,         lastModified: now, changeFrequency: "monthly", priority: 0.8 },
-    { url: `${base}/transport-canada-pilot-logbook`, lastModified: now, changeFrequency: "monthly", priority: 0.8 },
-    { url: `${base}/terms`,   lastModified: now, changeFrequency: "yearly",  priority: 0.3 },
-    { url: `${base}/privacy`, lastModified: now, changeFrequency: "yearly",  priority: 0.3 },
+    { url: `${base}/multi-regime-pilot-logbook`,     lastModified: "2026-09-13", changeFrequency: "monthly", priority: 0.8 },
+    { url: `${base}/foreflight-logbook-alternative`, lastModified: "2026-09-13", changeFrequency: "monthly", priority: 0.8 },
+    { url: `${base}/logten-pro-alternative`,          lastModified: "2026-09-13", changeFrequency: "monthly", priority: 0.8 },
+    { url: `${base}/transport-canada-pilot-logbook`, lastModified: "2026-09-13", changeFrequency: "monthly", priority: 0.8 },
+    { url: `${base}/terms`,                           lastModified: "2026-05-19", changeFrequency: "yearly",  priority: 0.3 },
+    { url: `${base}/privacy`,                         lastModified: "2026-05-19", changeFrequency: "yearly",  priority: 0.3 },
   ];
 }

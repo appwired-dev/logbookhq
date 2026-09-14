@@ -50,6 +50,12 @@ export default function SignupPage() {
         <p className="text-sm text-ink-3 text-center">
           Already have one? <Link className="text-brand hover:underline" href="/login">Sign in</Link>
         </p>
+        <p className="text-xs text-ink-3 text-center">
+          By creating an account you agree to our{" "}
+          <Link className="text-brand hover:underline" href="/terms">Terms</Link> and{" "}
+          <Link className="text-brand hover:underline" href="/privacy">Privacy Policy</Link>. See{" "}
+          <Link className="text-brand hover:underline" href="/pricing">pricing</Link>.
+        </p>
       </form>
     </AuthShell>
   );
