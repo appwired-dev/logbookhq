@@ -14,6 +14,5 @@ export default function robots(): MetadataRoute.Robots {
       },
     ],
     sitemap: "https://pilotlogbookhq.com/sitemap.xml",
-    host: "https://pilotlogbookhq.com",
   };
 }

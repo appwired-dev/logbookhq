@@ -8,8 +8,46 @@ import { startCheckoutFromForm } from "@/app/app/billing/actions";
  */
 export const metadata = {
   title: "Pricing — Pilot Logbook HQ",
-  description: "Free up to 100 flights, then $4.99/mo, $49/yr, or $249 once for lifetime. Cancel anytime.",
+  description:
+    "Simple pricing for a multi-regime pilot logbook: free up to 100 flights, then $4.99/mo, $49/yr, or $249 lifetime. All prices CAD. Cancel anytime.",
   alternates: { canonical: "/pricing" },
+  openGraph: {
+    title: "Pricing — Pilot Logbook HQ",
+    description:
+      "Free up to 100 flights, then $4.99/mo, $49/yr, or $249 lifetime (CAD). Cancel anytime.",
+    url: "/pricing",
+  },
+};
+
+export const dynamic = "force-static";
+
+const PRICING_LD = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": ["SoftwareApplication", "WebApplication"],
+      name: "Pilot Logbook HQ",
+      applicationCategory: "BusinessApplication",
+      operatingSystem: "Web",
+      url: "https://pilotlogbookhq.com",
+      publisher: { "@id": "https://pilotlogbookhq.com/#org" },
+      offers: {
+        "@type": "AggregateOffer",
+        priceCurrency: "CAD",
+        lowPrice: "0",
+        highPrice: "249",
+        offerCount: 4,
+        url: "https://pilotlogbookhq.com/signup",
+      },
+    },
+    {
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        { "@type": "ListItem", position: 1, name: "Home", item: "https://pilotlogbookhq.com" },
+        { "@type": "ListItem", position: 2, name: "Pricing", item: "https://pilotlogbookhq.com/pricing" },
+      ],
+    },
+  ],
 };
 
 type Plan = "monthly" | "annual" | "lifetime" | null;
@@ -48,6 +86,7 @@ const TIERS: Tier[] = [
 export default function PricingPage() {
   return (
     <div className="lp">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(PRICING_LD) }} />
       <header className="sticky top-0 z-30 backdrop-blur-md" style={{ background: "rgba(10,15,22,0.72)", borderBottom: "1px solid var(--lp-line)" }}>
         <div className="mx-auto max-w-6xl px-5 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2.5">
@@ -114,14 +153,22 @@ export default function PricingPage() {
       </main>
 
       <footer className="lp-hairline">
-        <div className="mx-auto max-w-6xl px-5 py-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs" style={{ color: "var(--lp-ink-3)" }}>
-          <span>© Pilot Logbook HQ · a multi-regime pilot logbook</span>
-          <nav className="flex items-center gap-3 sm:gap-4">
-            <Link className="lp-link inline-flex items-center min-h-[44px]" href="/">Home</Link>
-            <Link className="lp-link inline-flex items-center min-h-[44px]" href="/terms">Terms</Link>
-            <Link className="lp-link inline-flex items-center min-h-[44px]" href="/privacy">Privacy</Link>
-            <Link className="lp-link inline-flex items-center min-h-[44px]" href="/login">Sign in</Link>
+        <div className="mx-auto max-w-6xl px-5 py-8 space-y-4">
+          <nav className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+            <Link className="lp-link inline-flex items-center min-h-[44px]" href="/multi-regime-pilot-logbook">Multi-regime logbook</Link>
+            <Link className="lp-link inline-flex items-center min-h-[44px]" href="/foreflight-logbook-alternative">ForeFlight alternative</Link>
+            <Link className="lp-link inline-flex items-center min-h-[44px]" href="/logten-pro-alternative">LogTen Pro alternative</Link>
+            <Link className="lp-link inline-flex items-center min-h-[44px]" href="/transport-canada-pilot-logbook">Transport Canada logbook</Link>
           </nav>
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs" style={{ color: "var(--lp-ink-3)" }}>
+            <span>© Pilot Logbook HQ · a multi-regime pilot logbook</span>
+            <nav className="flex items-center gap-3 sm:gap-4">
+              <Link className="lp-link inline-flex items-center min-h-[44px]" href="/">Home</Link>
+              <Link className="lp-link inline-flex items-center min-h-[44px]" href="/terms">Terms</Link>
+              <Link className="lp-link inline-flex items-center min-h-[44px]" href="/privacy">Privacy</Link>
+              <Link className="lp-link inline-flex items-center min-h-[44px]" href="/login">Sign in</Link>
+            </nav>
+          </div>
         </div>
       </footer>
     </div>

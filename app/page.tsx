@@ -17,26 +17,27 @@ import transferShot from "@/public/marketing/transfer.png";
  * stays light). Everything is visible at rest — only the hero rises on load.
  */
 export const metadata = {
-  title: "Pilot Logbook HQ — bring the logbook you already have",
+  title: "Multi-Regime Pilot Logbook — Pilot Logbook HQ",
   description:
-    "Import your pilot logbook from any format or language, track currency under every aviation authority you fly, and see your whole career at a glance. Free up to 100 flights.",
+    "Import your pilot logbook from any format or language, track currency under every authority you fly, and see your whole career at a glance.",
+  openGraph: {
+    title: "Multi-Regime Pilot Logbook — Pilot Logbook HQ",
+    description:
+      "One logbook that tracks currency and limits under every authority you fly. Import from any format. Free up to 100 flights.",
+    url: "/",
+  },
 };
+
+export const dynamic = "force-static";
 
 const FORMATS = ["Apple Numbers", "Excel", "ForeFlight", "LogTen", "MyFlightbook", "CSV"];
 
 // Structured data (schema.org) — helps Google understand this is a product and
 // its publisher. Only truthful facts: the free tier (price 0); no fabricated
-// ratings, and paid prices are omitted (their currency isn't asserted here).
+// ratings; paid prices shown as a truthful AggregateOffer (CAD 0-249).
 const STRUCTURED_DATA = {
   "@context": "https://schema.org",
   "@graph": [
-    {
-      "@type": "Organization",
-      "@id": "https://pilotlogbookhq.com/#org",
-      name: "Pilot Logbook HQ",
-      url: "https://pilotlogbookhq.com",
-      logo: "https://pilotlogbookhq.com/icon",
-    },
     {
       "@type": "SoftwareApplication",
       name: "Pilot Logbook HQ",
@@ -47,10 +48,12 @@ const STRUCTURED_DATA = {
         "Import your pilot logbook from any format or language, track currency under every aviation authority you fly, and see your whole career at a glance.",
       publisher: { "@id": "https://pilotlogbookhq.com/#org" },
       offers: {
-        "@type": "Offer",
-        price: "0",
+        "@type": "AggregateOffer",
         priceCurrency: "CAD",
-        description: "Free up to 100 flights",
+        lowPrice: "0",
+        highPrice: "249",
+        offerCount: 4,
+        url: "https://pilotlogbookhq.com/signup",
       },
     },
   ],
@@ -124,7 +127,7 @@ export default function LandingPage() {
         <Showcase
           eyebrow="The switch"
           title="Changing logbooks shouldn't mean re-typing your career."
-          lede="Every other app assumes you start from zero, or that you fly for the FAA. Drop in the logbook you kept for years — CSV, Excel, ForeFlight, LogTen, a Numbers file — and it detects your columns, then reconciles the import against the totals you already trust before it saves a thing."
+          lede={<>Every other app assumes you start from zero, or that you fly for the FAA. Drop in the logbook you kept for years — CSV, Excel, <Link className="lp-link" href="/foreflight-logbook-alternative">ForeFlight</Link>, <Link className="lp-link" href="/logten-pro-alternative">LogTen</Link>, a Numbers file — and it detects your columns, then reconciles the import against the totals you already trust before it saves a thing.</>}
           src={transferShot}
           alt="The import and export screen: reads ForeFlight, LogTen, MyFlightbook, Apple Numbers and CSV; exports PDF and CSV."
         />
@@ -340,7 +343,7 @@ function Feature({ eyebrow, title, body, children }: { eyebrow: string; title: s
    sides alternating down the page. No browser chrome.
    --------------------------------------------------------------------------- */
 function Showcase({ eyebrow, title, lede, src, alt, dark = false, flip = false }: {
-  eyebrow: string; title: string; lede: string; src: StaticImageData; alt: string; dark?: boolean; flip?: boolean;
+  eyebrow: string; title: string; lede: React.ReactNode; src: StaticImageData; alt: string; dark?: boolean; flip?: boolean;
 }) {
   const text = (
     <div key="t">

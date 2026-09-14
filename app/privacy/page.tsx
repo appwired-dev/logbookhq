@@ -6,6 +6,8 @@ export const metadata = {
   alternates: { canonical: "/privacy" },
 };
 
+export const dynamic = "force-static";
+
 export default function PrivacyPage() {
   return (
     <div className="min-h-screen flex flex-col">
@@ -297,6 +299,12 @@ export default function PrivacyPage() {
         <Link className="hover:text-slate-700" href="/pricing">Pricing</Link> ·{" "}
         <Link className="hover:text-slate-700" href="/terms">Terms</Link> ·{" "}
         <Link className="hover:text-slate-700" href="/privacy">Privacy</Link>
+        <div className="mt-3 flex flex-wrap justify-center gap-x-3 gap-y-1">
+          <Link className="hover:text-slate-700" href="/multi-regime-pilot-logbook">Multi-regime logbook</Link>
+          <Link className="hover:text-slate-700" href="/foreflight-logbook-alternative">ForeFlight alternative</Link>
+          <Link className="hover:text-slate-700" href="/logten-pro-alternative">LogTen Pro alternative</Link>
+          <Link className="hover:text-slate-700" href="/transport-canada-pilot-logbook">Transport Canada logbook</Link>
+        </div>
       </footer>
     </div>
   );
