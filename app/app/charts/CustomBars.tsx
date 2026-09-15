@@ -4,7 +4,6 @@
  * Infographic-style 3D bars for Recharts, plus the "Hours per aircraft type"
  * card that uses them.
  *
- *   ArrowBar3D            — vertical bar (flat top) for per-year charts.
  *   ArrowBar3DHorizontal  — horizontal bar (flat right edge) for per-type charts.
  *   TypeHoursChart        — card: horizontal bars + a table alternative.
  *
@@ -64,42 +63,6 @@ interface ShapeProps {
   neutral?: boolean;
 }
 
-/** Vertical 3D bar — grows upward, flat top. */
-export function ArrowBar3D(props: ShapeProps) {
-  const { x = 0, y = 0, width = 0, height = 0, index = 0, colored = false, neutral = false } = props;
-  if (height <= 0 || width <= 0) return null;
-
-  const pal = neutral ? neutralPalette() : paletteForIndex(colored ? index : 0);
-  const depth = Math.min(width * 0.42, 11);
-  const id = `varr-${Math.round(x)}-${Math.round(y)}-${Math.round(width)}`;
-
-  // Soft contact shadow — a short offset, not a full bar-width away.
-  const shDx = Math.round(width * 0.5);
-  const shDy = 4;
-
-  const front = [`M ${x},${y + height}`, `L ${x},${y}`, `L ${x + width},${y}`, `L ${x + width},${y + height}`, "Z"].join(" ");
-  const side = [`M ${x + width},${y}`, `L ${x + width + depth},${y - depth}`, `L ${x + width + depth},${y + height - depth}`, `L ${x + width},${y + height}`, "Z"].join(" ");
-  const top = [`M ${x},${y}`, `L ${x + depth},${y - depth}`, `L ${x + width + depth},${y - depth}`, `L ${x + width},${y}`, "Z"].join(" ");
-
-  return (
-    <g>
-      <defs>
-        <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" style={{ stopColor: pal.lite }} />
-          <stop offset="50%" style={{ stopColor: pal.mid }} />
-          <stop offset="100%" style={{ stopColor: pal.dark }} />
-        </linearGradient>
-      </defs>
-      <path d={front} transform={`translate(${shDx} ${shDy})`} style={SHADOW} />
-      <path d={side} opacity="0.82" style={{ fill: pal.dark }} />
-      <path d={top} opacity="0.85" style={{ fill: pal.lite }} />
-      <path d={front} fill={`url(#${id})`} />
-      {/* Specular highlight along the top-front edge */}
-      <path d={`M ${x + 1.5},${y + 0.5} L ${x + width - 1.5},${y + 0.5}`} strokeWidth="1" strokeLinecap="round" style={HIGHLIGHT} />
-    </g>
-  );
-}
-
 /** Horizontal 3D bar — grows rightward, flat right edge. */
 export function ArrowBar3DHorizontal(props: ShapeProps) {
   const { x = 0, y = 0, width = 0, height = 0, index = 0, colored = false, neutral = false } = props;
@@ -138,18 +101,10 @@ export function ArrowBar3DHorizontal(props: ShapeProps) {
   );
 }
 
-/** Same as ArrowBar3DHorizontal but cycles the chart palette by index. */
-export function ArrowBar3DHorizontalColored(props: ShapeProps) {
-  return <ArrowBar3DHorizontal {...props} colored />;
-}
-
 /** Single slate face — matches the aircraft nodes in the career Sankey. */
 export function ArrowBar3DHorizontalNeutral(props: ShapeProps) {
   return <ArrowBar3DHorizontal {...props} neutral />;
 }
-
-/** @deprecated — kept for backward compat. Use ArrowBar3DHorizontal instead. */
-export const CylinderBar = ArrowBar3DHorizontal;
 
 // ---------------------------------------------------------------------------
 
