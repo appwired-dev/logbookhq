@@ -16,6 +16,9 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${base}/foreflight-logbook-alternative`, lastModified: "2026-09-13", changeFrequency: "monthly", priority: 0.8 },
     { url: `${base}/logten-pro-alternative`,          lastModified: "2026-09-13", changeFrequency: "monthly", priority: 0.8 },
     { url: `${base}/transport-canada-pilot-logbook`, lastModified: "2026-09-13", changeFrequency: "monthly", priority: 0.8 },
+    { url: `${base}/myflightbook-alternative`,       lastModified: "2026-09-14", changeFrequency: "monthly", priority: 0.8 },
+    { url: `${base}/easa-pilot-logbook`,             lastModified: "2026-09-14", changeFrequency: "monthly", priority: 0.8 },
+    { url: `${base}/faa-easa-logbook`,               lastModified: "2026-09-14", changeFrequency: "monthly", priority: 0.8 },
     { url: `${base}/terms`,                           lastModified: "2026-05-19", changeFrequency: "yearly",  priority: 0.3 },
     { url: `${base}/privacy`,                         lastModified: "2026-05-19", changeFrequency: "yearly",  priority: 0.3 },
   ];

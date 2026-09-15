@@ -1,20 +1,26 @@
 import type { Metadata } from "next";
-import { MarketingShell, PageHero, Article, Faq, CtaBand, ReconcileVisual } from "@/components/marketing/kit";
+import { MarketingShell, PageHero, Article, Faq, CtaBand, ReconcileVisual, Breadcrumb } from "@/components/marketing/kit";
 
 // Pure static content — no per-request data. Prerender at build so these
 // SEO pages are served from the CDN (instant TTFB, no serverless cost).
 export const dynamic = "force-static";
 
 export const metadata: Metadata = {
-  title: "A multi-regime pilot logbook — one logbook, every authority",
+  title: "Multi-regime pilot logbook — one logbook, every authority",
   description:
     "Fly under more than one aviation authority? Keep one logbook that tracks currency and flight-time limits under CAA, EASA, FAA, TCCA and more — instead of a spreadsheet per regulator.",
   alternates: { canonical: "/multi-regime-pilot-logbook" },
+  openGraph: {
+    title: "Multi-regime pilot logbook — one logbook, every authority",
+    description: "Fly under more than one aviation authority? Keep one logbook that tracks currency and flight-time limits under CAA, EASA, FAA, TCCA and more — instead of a spreadsheet per regulator.",
+    url: "/multi-regime-pilot-logbook",
+  },
 };
 
 export default function MultiRegimePage() {
   return (
     <MarketingShell>
+      <Breadcrumb name="Multi-regime pilot logbook" path="/multi-regime-pilot-logbook" />
       <PageHero
         eyebrow="For pilots who fly under more than one authority"
         title={<>One logbook.<br />Every authority.</>}
