@@ -106,7 +106,7 @@ export default function EasaPage() {
           },
           {
             q: "Can I export in the EASA logbook layout?",
-            a: "Yes. Export a PDF arranged in the EASA standard column order from AMC1 FCL.050 — the layout an examiner expects. It captures the FCL.050-required data items; it's the standard AMC layout for handover, not an EASA-certified filing. (Departure/arrival clock times and the single-/multi-pilot split are inferred or omitted where we don't yet store them — shown in the export screen.)",
+            a: "Yes. Export a PDF arranged in the EASA standard column order from AMC1 FCL.050 — the layout an examiner expects. It captures the FCL.050-required data items; it's the standard AMC layout for handover, not an EASA-certified filing. (The single-/multi-pilot split uses each flight's multi-pilot flag; departure/arrival clock times aren't included yet — shown on the export screen.)",
           },
           {
             q: "I also fly under the FAA or UK CAA. Can it handle both?",

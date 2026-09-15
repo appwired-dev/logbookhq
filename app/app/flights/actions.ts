@@ -21,7 +21,7 @@ const WRITABLE_COLUMNS: Record<keyof FlightInput, true> = {
   date: true, make_model: true, registration: true,
   pic: true, copilot: true, third_pilot: true, check_pilot: true,
   route: true, remarks: true, category: true, role: true,
-  day_time: true, night_time: true, is_xcountry: true,
+  day_time: true, night_time: true, is_xcountry: true, multi_pilot: true,
   actual_inst: true, hood_inst: true, sim_inst: true,
   ifr_approaches: true, precision_approaches: true, non_precision_approaches: true, holds: true,
   cfi_time: true, takeoffs_day: true, takeoffs_night: true, landings_day: true, landings_night: true,
@@ -76,6 +76,7 @@ function validateFlight(input: FlightInput): { ok: true; value: FlightInput } | 
     cleaned[f as string] = r;
   }
   cleaned.is_xcountry = !!input.is_xcountry;
+  cleaned.multi_pilot = !!input.multi_pilot;
 
   return { ok: true, value: cleaned as FlightInput };
 }

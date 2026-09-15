@@ -50,6 +50,8 @@ const s = StyleSheet.create({
   subtotalRow: { flexDirection: "row", borderTop: "1pt solid #0f172a", borderBottom: "1pt solid #0f172a", backgroundColor: "#f1f5f9" },
   subtotalCell: { paddingHorizontal: 2, paddingVertical: 3, fontSize: 6, fontFamily: "Helvetica-Bold", borderRight: "1pt solid #94a3b8", textAlign: "right" },
   pageFooter: { position: "absolute", bottom: 14, left: 22, right: 22, flexDirection: "row", justifyContent: "space-between", fontSize: 7, color: "#64748b" },
+  remarksRow: { borderBottom: "1pt solid #cbd5e1", backgroundColor: "#fbfcfe", paddingHorizontal: 3, paddingVertical: 2 },
+  remarksText: { fontSize: 6, color: "#334155", fontStyle: "italic" },
 });
 
 type Align = "center" | "right";
@@ -59,6 +61,7 @@ interface Col {
   align?: Align;
   key?: string;                          // direct FlightDerived field
   calc?: (r: FlightDerived) => number | string; // derived value (number => numeric column)
+  snug?: boolean;                        // keep width fixed (don't stretch to fill)
 }
 
 function fmtNum(n: number): string {
@@ -68,10 +71,6 @@ function fmtNum(n: number): string {
 }
 const num = (r: FlightDerived, k: string): number => Number((r as FlightDerived & Record<string, unknown>)[k] ?? 0) || 0;
 const T = (r: FlightDerived): number => num(r, "total_time");
-// Multi-pilot heuristic: FO/SIC function implies a multi-crew operation. We do
-// not yet store an explicit single-/multi-pilot flag, so captain time on a
-// multi-crew type still reads as single-pilot — disclosed in the export UI.
-const isMP = (r: FlightDerived): boolean => r.role === "FO" || r.role === "SIC";
 const inCat = (r: FlightDerived, ...cats: string[]): boolean => cats.includes(r.category as string);
 const roleTime = (r: FlightDerived, ...roles: string[]): number => (roles.includes(r.role as string) ? T(r) : 0);
 function fromTo(r: FlightDerived): [string, string] {
@@ -83,7 +82,7 @@ function fromTo(r: FlightDerived): [string, string] {
 // ---- comprehensive (unchanged default) ----
 const COLS_COMPREHENSIVE: Col[] = [
   { key: "date", label: "Date", w: 38, align: "center" },
-  { key: "make_model", label: "Aircraft", w: 42 },
+  { key: "make_model", label: "Aircraft", w: 34, snug: true },
   { key: "registration", label: "Reg", w: 38 },
   { key: "route", label: "Route", w: 54 },
   { key: "pic", label: "PIC", w: 36 },
@@ -116,7 +115,7 @@ const COLS_COMPREHENSIVE: Col[] = [
 // ---- FAA — conventional 14 CFR 61.51 ----
 const COLS_FAA: Col[] = [
   { key: "date", label: "Date", w: 38, align: "center" },
-  { key: "make_model", label: "Make/Model", w: 46 },
+  { key: "make_model", label: "Make/Model", w: 34, snug: true },
   { key: "registration", label: "Ident", w: 34 },
   { calc: (r) => fromTo(r)[0], label: "From", w: 30, align: "center" },
   { calc: (r) => fromTo(r)[1], label: "To", w: 30, align: "center" },
@@ -139,7 +138,6 @@ const COLS_FAA: Col[] = [
   { key: "landings_day", label: "Ldg D", w: 20, align: "right" },
   { key: "landings_night", label: "Ldg N", w: 20, align: "right" },
   { key: "total_time", label: "Total", w: 26, align: "right" },
-  { calc: (r) => (r.remarks ?? "") as string, label: "Remarks", w: 150 },
 ];
 
 // ---- EASA — AMC1 FCL.050 standard column order ----
@@ -147,11 +145,11 @@ const COLS_EASA: Col[] = [
   { key: "date", label: "Date", w: 38, align: "center" },
   { calc: (r) => fromTo(r)[0], label: "Dep", w: 30, align: "center" },
   { calc: (r) => fromTo(r)[1], label: "Arr", w: 30, align: "center" },
-  { key: "make_model", label: "Make/Model", w: 44 },
+  { key: "make_model", label: "Make/Model", w: 34, snug: true },
   { key: "registration", label: "Reg", w: 34 },
-  { calc: (r) => (!isMP(r) && inCat(r, "SE", "SES") ? T(r) : 0), label: "SP SE", w: 24, align: "right" },
-  { calc: (r) => (!isMP(r) && inCat(r, "ME", "MES") ? T(r) : 0), label: "SP ME", w: 24, align: "right" },
-  { calc: (r) => (isMP(r) ? T(r) : 0), label: "MP", w: 24, align: "right" },
+  { calc: (r) => (!r.multi_pilot && inCat(r, "SE", "SES") ? T(r) : 0), label: "SP SE", w: 24, align: "right" },
+  { calc: (r) => (!r.multi_pilot && inCat(r, "ME", "MES") ? T(r) : 0), label: "SP ME", w: 24, align: "right" },
+  { calc: (r) => (r.multi_pilot ? T(r) : 0), label: "MP", w: 24, align: "right" },
   { key: "total_time", label: "Total", w: 26, align: "right" },
   { calc: (r) => (r.role === "PIC" ? "SELF" : (r.pic ?? "")) as string, label: "PIC name", w: 44 },
   { key: "landings_day", label: "Ldg D", w: 20, align: "right" },
@@ -163,13 +161,12 @@ const COLS_EASA: Col[] = [
   { calc: (r) => roleTime(r, "DUAL"), label: "Fn Dual", w: 24, align: "right" },
   { key: "cfi_time", label: "Fn Instr", w: 24, align: "right" },
   { key: "sim_inst", label: "FSTD", w: 24, align: "right" },
-  { calc: (r) => (r.remarks ?? "") as string, label: "Remarks", w: 140 },
 ];
 
 // ---- CARs — conventional Transport Canada (CAR 401.08) ----
 const COLS_CARS: Col[] = [
   { key: "date", label: "Date", w: 36, align: "center" },
-  { key: "make_model", label: "Type", w: 40 },
+  { key: "make_model", label: "Type", w: 32, snug: true },
   { key: "registration", label: "Reg", w: 32 },
   { key: "pic", label: "PIC", w: 36 },
   { key: "copilot", label: "Co-Pilot", w: 36 },
@@ -194,7 +191,6 @@ const COLS_CARS: Col[] = [
   { key: "holds", label: "Hld", w: 18, align: "right" },
   { key: "cfi_time", label: "Instr", w: 22, align: "right" },
   { key: "total_time", label: "Total", w: 26, align: "right" },
-  { calc: (r) => (r.remarks ?? "") as string, label: "Remarks", w: 120 },
 ];
 
 const LAYOUTS: Record<PdfLayout, { cols: Col[]; label: string }> = {
@@ -234,8 +230,21 @@ interface Props {
   layout?: PdfLayout;
 }
 
+const USABLE = 806; // A4 landscape usable width (842 - 2*22 padding, minus a hair)
+// Stretch non-snug columns to fill the freed width so the grid isn't cramped;
+// snug columns (make/model) keep their tight width.
+function fitCols(base: Col[]): Col[] {
+  const sum = base.reduce((a, c) => a + c.w, 0);
+  if (sum >= USABLE) return base;
+  const flexSum = base.filter((c) => !c.snug).reduce((a, c) => a + c.w, 0);
+  if (flexSum <= 0) return base;
+  const extra = USABLE - sum;
+  return base.map((c) => (c.snug ? c : { ...c, w: Math.round(c.w + (extra * c.w) / flexSum) }));
+}
+
 export function LogbookPDF({ flights, totals, pilotName, licenseNumber, fromDate, toDate, generatedAt, avatarUrl, layout = "comprehensive" }: Props) {
-  const { cols, label: layoutLabel } = LAYOUTS[layout] ?? LAYOUTS.comprehensive;
+  const { cols: baseCols, label: layoutLabel } = LAYOUTS[layout] ?? LAYOUTS.comprehensive;
+  const cols = fitCols(baseCols);
   const pages: FlightDerived[][] = [];
   for (let i = 0; i < flights.length; i += ROWS_PER_PAGE) {
     pages.push(flights.slice(i, i + ROWS_PER_PAGE));
@@ -290,13 +299,23 @@ export function LogbookPDF({ flights, totals, pilotName, licenseNumber, fromDate
                   <Text key={ci} style={[s.th, { width: c.w, textAlign: c.align ?? "left" }]}>{c.label}</Text>
                 ))}
               </View>
-              {rows.map((r, ri) => (
-                <View style={[s.tr, ri % 2 === 1 ? s.trAlt : {}]} key={r.id}>
-                  {cols.map((c, ci) => (
-                    <Text key={ci} style={[s.td, { width: c.w, textAlign: c.align ?? "left" }]}>{cellText(r, c)}</Text>
-                  ))}
-                </View>
-              ))}
+              {rows.flatMap((r, ri) => {
+                const els = [
+                  <View style={[s.tr, ri % 2 === 1 ? s.trAlt : {}]} key={r.id}>
+                    {cols.map((c, ci) => (
+                      <Text key={ci} style={[s.td, { width: c.w, textAlign: c.align ?? "left" }]}>{cellText(r, c)}</Text>
+                    ))}
+                  </View>,
+                ];
+                if (r.remarks && r.remarks.trim()) {
+                  els.push(
+                    <View style={s.remarksRow} key={`${r.id}-rem`}>
+                      <Text style={s.remarksText}>Remarks: {r.remarks}</Text>
+                    </View>,
+                  );
+                }
+                return els;
+              })}
               <View style={s.subtotalRow}>
                 {cols.map((c, ci) => (
                   <Text key={ci} style={[s.subtotalCell, { width: c.w, textAlign: c.align ?? "left" }]}>

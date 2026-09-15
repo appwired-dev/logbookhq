@@ -24,6 +24,7 @@ export interface Flight {
   day_time: number;
   night_time: number;
   is_xcountry: boolean;
+  multi_pilot: boolean;
   actual_inst: number;
   hood_inst: number;
   sim_inst: number;

@@ -449,7 +449,7 @@ export function reconcile(
   }
 
   // ---- summary -----------------------------------------------------------------
-  const asFlights: Flight[] = flights.map((f, i) => ({ ...f, id: i + 1, user_id: "", duty_time: 0, created_at: "", updated_at: "" }));
+  const asFlights: Flight[] = flights.map((f, i) => ({ ...f, id: i + 1, user_id: "", duty_time: 0, multi_pilot: false, created_at: "", updated_at: "" }));
   const rawTotals = computeTotals(asFlights, { augHalfCredit: false });
   const creditedTotals = aug ? computeTotals(asFlights, { augHalfCredit: true }) : rawTotals;
   const byRole: Record<string, number> = {};

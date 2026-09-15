@@ -182,7 +182,7 @@ export default function ExportClient({ flights, defaultName, defaultLicense, ava
             {layout === "faa" ? "FAA" : layout === "easa" ? "EASA (AMC1 FCL.050)" : "Transport Canada"}{" "}
             column layout — a formatting convenience for handing to an examiner or employer, not a certified
             or officially-approved filing.{" "}
-            {layout === "easa" && "The single-/multi-pilot split is inferred from crew role, and departure/arrival clock times are not included yet."}
+            {layout === "easa" && "The single-/multi-pilot split comes from each flight's multi-pilot flag; departure/arrival clock times are not included yet."}
           </p>
         )}
 

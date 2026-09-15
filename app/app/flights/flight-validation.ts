@@ -25,6 +25,7 @@ export type FlightFormValues = Record<TextField, string> & Record<NumericField, 
   category: Category;
   role: Role;
   is_xcountry: boolean;
+  multi_pilot: boolean;
 };
 
 /** Same option sets as the previous <select>s and the server-side validator. */
@@ -86,7 +87,7 @@ export function blankFlightValues(): FlightFormValues {
   return {
     date: "",
     make_model: "", registration: "", pic: "", copilot: "", third_pilot: "", check_pilot: "", route: "", remarks: "",
-    category: "SE", role: "PIC", is_xcountry: false,
+    category: "SE", role: "PIC", is_xcountry: false, multi_pilot: false,
     ...numericStrings({ takeoffs_day: 1, landings_day: 1 }),
   };
 }
@@ -106,6 +107,7 @@ export function flightToValues(f: FlightInput): FlightFormValues {
     category: f.category,
     role: f.role,
     is_xcountry: !!f.is_xcountry,
+    multi_pilot: !!f.multi_pilot,
     ...numericStrings(f),
   };
 }
@@ -131,6 +133,7 @@ export function valuesToFlightInput(v: FlightFormValues): FlightInput {
     category: v.category,
     role: v.role,
     is_xcountry: v.is_xcountry,
+    multi_pilot: v.multi_pilot,
     day_time: hours("day_time"),
     night_time: hours("night_time"),
     actual_inst: hours("actual_inst"),
