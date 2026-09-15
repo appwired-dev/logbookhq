@@ -1,8 +1,9 @@
 import Link from "next/link";
+import { createClient } from "@/lib/supabase/server";
 import { getLocale, getT } from "@/lib/i18n-server";
 import { Card, Icon, PageHeader, Pill } from "@/components/ui";
 import type { LucideIcon } from "@/components/ui/icons";
-import ImportClient from "../import/ImportClient";
+import ImportWizard from "../import/ImportWizard";
 import { IMPORT_STRINGS } from "../import/import-strings";
 import { exportStrings } from "../export/export-strings";
 
@@ -19,6 +20,15 @@ export default async function TransferPage() {
   const locale = await getLocale();
   const t = await getT();
   const s = exportStrings(locale);
+  // The embedded wizard needs the aug-half convention (to caption the
+  // reconcile suggestion); the layout already redirected signed-out visitors.
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("aug_half_credit")
+    .eq("id", user!.id)
+    .maybeSingle();
   const supportedLabel = IMPORT_STRINGS.supported[locale] ?? IMPORT_STRINGS.supported.en;
 
   return (
@@ -48,7 +58,7 @@ export default async function TransferPage() {
 
       <section aria-label={s("hubImportHere")} className="pt-6 border-t border-border">
         <p className="text-2xs font-semibold uppercase tracking-[0.12em] text-brand-deep mb-3">{s("hubImportHere")}</p>
-        <ImportClient locale={locale} />
+        <ImportWizard locale={locale} augHalfCredit={Boolean(profile?.aug_half_credit)} />
       </section>
     </div>
   );
