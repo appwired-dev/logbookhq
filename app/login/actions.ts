@@ -124,16 +124,19 @@ export async function logout() {
  * signInWithOAuth on the server does not redirect; it returns the provider URL,
  * which we redirect to (with the freshly-set verifier cookie riding along).
  */
-export async function signInWithGoogle(formData: FormData) {
-  const next = safeNext(String(formData.get("next") ?? "/app"));
+export async function signInWithGoogle(nextRaw: string): Promise<{ url: string } | { error: string }> {
+  const next = safeNext(nextRaw ?? "/app");
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: { redirectTo: `${APP_URL}/auth/callback?next=${encodeURIComponent(next)}` },
   });
-  if (error || !data?.url) {
-    redirect(`/login?next=${encodeURIComponent(next)}&error=google`);
-  }
-  // Redirect carries the Set-Cookie for the PKCE verifier written just above.
-  redirect(data.url);
+  if (error || !data?.url) return { error: error?.message ?? "Could not start Google sign-in." };
+  // Return the provider URL for the client to navigate to. We do NOT redirect()
+  // here: a Server Action redirect() to an EXTERNAL origin is not followed by
+  // the App Router client, so the page would just sit on /login. The PKCE
+  // code-verifier cookie set by signInWithOAuth above still rides out on this
+  // action's response, so it's in place before the client leaves for the
+  // provider — and is read back by /auth/callback at exchange time.
+  return { url: data.url };
 }
