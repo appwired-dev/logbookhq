@@ -25,10 +25,10 @@ export const metadata: Metadata = {
     locale: "en_US",
   },
   twitter: {
+    // Only the card TYPE is set site-wide. Title/description/image are left
+    // unset so Next derives them per-page from each route's title/description/
+    // openGraph.images — otherwise every page inherited the homepage tagline.
     card: "summary_large_image",
-    title: "Pilot Logbook HQ — multi-regime pilot logbook",
-    description:
-      "Log under Canadian, ICAO, FAA, or EASA. Currency that matches your jurisdiction. Clean PDF for the hiring office. $4.99/mo.",
   },
   alternates: {
     canonical: "/",
@@ -58,6 +58,8 @@ const SITE_LD = {
       name: "Pilot Logbook HQ",
       url: "https://pilotlogbookhq.com",
       logo: "https://pilotlogbookhq.com/logo",
+      description:
+        "A multi-regime digital pilot logbook: log once and track currency and duty limits under Transport Canada, the FAA, EASA, ICAO and more.",
     },
     {
       "@type": "WebSite",

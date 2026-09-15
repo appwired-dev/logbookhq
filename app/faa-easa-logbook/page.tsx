@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { MarketingShell, PageHero, Article, Faq, CtaBand, ReconcileVisual, Breadcrumb } from "@/components/marketing/kit";
+import { RelatedLinks, MarketingShell, PageHero, Article, Faq, CtaBand, ReconcileVisual, Breadcrumb } from "@/components/marketing/kit";
 
 // Pure static content — no per-request data. Prerender at build so these
 // SEO pages are served from the CDN (instant TTFB, no serverless cost).
+import { OG_BASE } from "@/lib/seo";
 export const dynamic = "force-static";
 
 export const metadata: Metadata = {
@@ -12,6 +13,7 @@ export const metadata: Metadata = {
     "Hold an FAA certificate and an EASA licence? Keep one pilot logbook: import once, and track currency and flight-time limits under whichever authority you set — switch between them anytime.",
   alternates: { canonical: "/faa-easa-logbook" },
   openGraph: {
+    ...OG_BASE,
     title: "FAA + EASA logbook for dual-licensed pilots",
     description: "Hold an FAA certificate and an EASA licence? Keep one pilot logbook: import once, and track currency and flight-time limits under whichever authority you set — switch between them anytime.",
     url: "/faa-easa-logbook",
@@ -150,6 +152,14 @@ export default function FaaEasaPage() {
             q: "What does it cost?",
             a: "Free up to 100 flights with no card. After that it's $4.99/month, $49/year, or $249 once for lifetime access.",
           },
+        ]}
+      />
+
+      <RelatedLinks
+        links={[
+          { href: "/multi-regime-pilot-logbook", label: "Multi-regime logbook" },
+          { href: "/easa-pilot-logbook", label: "EASA pilot logbook" },
+          { href: "/transport-canada-pilot-logbook", label: "Transport Canada logbook" },
         ]}
       />
 

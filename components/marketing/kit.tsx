@@ -81,8 +81,11 @@ export function PageHero({ eyebrow, title, lede, visual, cta = "Import your logb
     <section className="mx-auto max-w-6xl px-5 pt-16 sm:pt-24 pb-8">
       <div className={`grid ${visual ? "lg:grid-cols-[1.05fr_0.95fr]" : ""} gap-12 lg:gap-10 items-center`}>
         <div>
-          <div className="lp-eyebrow lp-rise" style={{ animationDelay: "0ms" }}>{eyebrow}</div>
-          <h1 className="lp-h1 lp-h1-3d mt-4">{title}</h1>
+          {/* The target query IS the eyebrow; promote it to the page H1 (visual
+              unchanged via .lp-eyebrow) and render the punchy tagline as a
+              styled paragraph, so the H1 carries the keyword. */}
+          <h1 className="lp-eyebrow lp-rise" style={{ animationDelay: "0ms" }}>{eyebrow}</h1>
+          <p className="lp-h1 lp-h1-3d mt-4">{title}</p>
           <p className="lp-lede mt-5 max-w-xl lp-rise" style={{ animationDelay: "90ms" }}>{lede}</p>
           <div className="mt-8 flex flex-wrap items-center gap-3 lp-rise" style={{ animationDelay: "140ms" }}>
             <Link className="lp-btn lp-btn-primary lp-btn-sheen" href={href}>{cta}</Link>
@@ -221,6 +224,23 @@ export function Faq({ items }: { items: { q: string; a: string }[] }) {
           </details>
         ))}
       </div>
+    </section>
+  );
+}
+
+/** In-content links to sibling guides — passes more topical weight to the
+ *  pillar than the footer's boilerplate nav, and keeps the crawl hub-and-spoke. */
+export function RelatedLinks({ links }: { links: { href: string; label: string }[] }) {
+  return (
+    <section className="mx-auto max-w-3xl px-5 pt-2 pb-6">
+      <p className="lp-mono text-2xs uppercase tracking-[0.14em] mb-3" style={{ color: "var(--lp-ink-3)" }}>Related guides</p>
+      <ul className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
+        {links.map((l) => (
+          <li key={l.href}>
+            <Link className="lp-link inline-flex items-center gap-1 min-h-[44px]" href={l.href}>{l.label} &rarr;</Link>
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }
