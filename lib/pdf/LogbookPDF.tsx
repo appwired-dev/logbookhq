@@ -1,9 +1,25 @@
 /**
- * LogbookHQ PDF document. Cover + landscape flight pages (18-col layout) + totals summary.
- * Ported from ~/pilot-logbook/src/pdf/LogbookPDF.tsx, adapted to use shared LogbookHQ types.
+ * LogbookHQ PDF document. Cover + landscape flight pages + totals summary.
+ *
+ * Supports selectable column LAYOUTS so the same flights can be printed in the
+ * arrangement a given authority expects:
+ *   - comprehensive : the full LogbookHQ detail layout (default, unchanged).
+ *   - faa           : conventional US 14 CFR 61.51 layout.
+ *   - easa          : EASA AMC1 FCL.050 standard column order (the "EASA layout").
+ *   - cars          : conventional Transport Canada (CAR 401.08) layout.
+ *
+ * Honesty note: none of these are "certified/approved" formats. FAA/TC prescribe
+ * required PARTICULARS (not a rigid grid); the EASA column format is AMC1
+ * FCL.050 — an Acceptable Means of Compliance, i.e. the standard/recommended
+ * layout, not a legal mandate. A few EASA cells we can't populate faithfully yet
+ * (departure/arrival clock times; a true single-vs-multi-pilot flag; IFR-flight
+ * time) are left blank or approximated and disclosed in the UI.
  */
 import { Document, Page, Text, View, Image, StyleSheet } from "@react-pdf/renderer";
 import type { FlightDerived, Totals } from "@/lib/types";
+import { parseRoute } from "@/lib/routes";
+
+export type PdfLayout = "comprehensive" | "faa" | "easa" | "cars";
 
 const ROWS_PER_PAGE = 24;
 
@@ -36,52 +52,174 @@ const s = StyleSheet.create({
   pageFooter: { position: "absolute", bottom: 14, left: 22, right: 22, flexDirection: "row", justifyContent: "space-between", fontSize: 7, color: "#64748b" },
 });
 
-// Column widths trimmed (names + breakdowns down ~4pt each) to make room for
-// the migration-0009 fields without overflowing A4 landscape (~840pt usable).
-const COLS = [
-  { key: "date",                    label: "Date",     w: 38, align: "center" as const },
-  { key: "make_model",              label: "Aircraft", w: 42 },
-  { key: "registration",            label: "Reg",      w: 38 },
-  { key: "route",                   label: "Route",    w: 54 },
-  { key: "pic",                     label: "PIC",      w: 36 },
-  { key: "copilot",                 label: "Co-Pilot", w: 36 },
-  { key: "category",                label: "Cat",      w: 18, align: "center" as const },
-  { key: "role",                    label: "Role",     w: 22, align: "center" as const },
-  { key: "se_dual_day",             label: "SE D Du",  w: 24, align: "right" as const },
-  { key: "se_pic_day",              label: "SE D PIC", w: 24, align: "right" as const },
-  { key: "se_dual_night",           label: "SE N Du",  w: 24, align: "right" as const },
-  { key: "se_pic_night",            label: "SE N PIC", w: 24, align: "right" as const },
-  { key: "me_dual_day",             label: "ME D Du",  w: 24, align: "right" as const },
-  { key: "me_pic_day",              label: "ME D PIC", w: 24, align: "right" as const },
-  { key: "me_fo_day",               label: "ME D FO",  w: 24, align: "right" as const },
-  { key: "me_aug_day",              label: "ME D AU",  w: 24, align: "right" as const },
-  { key: "me_dual_night",           label: "ME N Du",  w: 24, align: "right" as const },
-  { key: "me_pic_night",            label: "ME N PIC", w: 24, align: "right" as const },
-  { key: "me_fo_night",             label: "ME N FO",  w: 24, align: "right" as const },
-  { key: "me_aug_night",            label: "ME N AU",  w: 24, align: "right" as const },
-  { key: "actual_inst",             label: "Act In",   w: 22, align: "right" as const },
-  { key: "hood_inst",               label: "Hood",     w: 20, align: "right" as const },
-  { key: "sim_inst",                label: "Sim",      w: 20, align: "right" as const },
-  { key: "ifr_approaches",          label: "App",      w: 18, align: "right" as const },
-  // Migration 0009 additions — traditional logbook fields.
-  { key: "precision_approaches",    label: "Prec",     w: 18, align: "right" as const },
-  { key: "non_precision_approaches",label: "NPr",      w: 18, align: "right" as const },
-  { key: "holds",                   label: "Hld",      w: 18, align: "right" as const },
-  { key: "cfi_time",                label: "CFI",      w: 22, align: "right" as const },
-  { key: "total_time",              label: "Total",    w: 26, align: "right" as const },
-];
-const NUMERIC_KEYS = COLS.filter((c) => c.align === "right").map((c) => c.key);
+type Align = "center" | "right";
+interface Col {
+  label: string;
+  w: number;
+  align?: Align;
+  key?: string;                          // direct FlightDerived field
+  calc?: (r: FlightDerived) => number | string; // derived value (number => numeric column)
+}
 
 function fmtNum(n: number): string {
   if (!n) return "";
   if (Number.isInteger(n)) return String(n);
   return n.toFixed(1);
 }
-function valueOf(row: FlightDerived, key: string): string {
-  if (key === "role") return row.role === "DUAL" ? "Du" : row.role === "PIC" ? "PIC" : row.role === "FO" ? "FO" : "AU";
-  if (NUMERIC_KEYS.includes(key)) return fmtNum((row as any)[key] ?? 0);
-  const v = (row as any)[key];
+const num = (r: FlightDerived, k: string): number => Number((r as FlightDerived & Record<string, unknown>)[k] ?? 0) || 0;
+const T = (r: FlightDerived): number => num(r, "total_time");
+// Multi-pilot heuristic: FO/SIC function implies a multi-crew operation. We do
+// not yet store an explicit single-/multi-pilot flag, so captain time on a
+// multi-crew type still reads as single-pilot — disclosed in the export UI.
+const isMP = (r: FlightDerived): boolean => r.role === "FO" || r.role === "SIC";
+const inCat = (r: FlightDerived, ...cats: string[]): boolean => cats.includes(r.category as string);
+const roleTime = (r: FlightDerived, ...roles: string[]): number => (roles.includes(r.role as string) ? T(r) : 0);
+function fromTo(r: FlightDerived): [string, string] {
+  const arcs = parseRoute(r.route);
+  if (!arcs.length) return ["", ""];
+  return [arcs[0][0], arcs[arcs.length - 1][1]];
+}
+
+// ---- comprehensive (unchanged default) ----
+const COLS_COMPREHENSIVE: Col[] = [
+  { key: "date", label: "Date", w: 38, align: "center" },
+  { key: "make_model", label: "Aircraft", w: 42 },
+  { key: "registration", label: "Reg", w: 38 },
+  { key: "route", label: "Route", w: 54 },
+  { key: "pic", label: "PIC", w: 36 },
+  { key: "copilot", label: "Co-Pilot", w: 36 },
+  { key: "category", label: "Cat", w: 18, align: "center" },
+  { key: "role", label: "Role", w: 22, align: "center" },
+  { key: "se_dual_day", label: "SE D Du", w: 24, align: "right" },
+  { key: "se_pic_day", label: "SE D PIC", w: 24, align: "right" },
+  { key: "se_dual_night", label: "SE N Du", w: 24, align: "right" },
+  { key: "se_pic_night", label: "SE N PIC", w: 24, align: "right" },
+  { key: "me_dual_day", label: "ME D Du", w: 24, align: "right" },
+  { key: "me_pic_day", label: "ME D PIC", w: 24, align: "right" },
+  { key: "me_fo_day", label: "ME D FO", w: 24, align: "right" },
+  { key: "me_aug_day", label: "ME D AU", w: 24, align: "right" },
+  { key: "me_dual_night", label: "ME N Du", w: 24, align: "right" },
+  { key: "me_pic_night", label: "ME N PIC", w: 24, align: "right" },
+  { key: "me_fo_night", label: "ME N FO", w: 24, align: "right" },
+  { key: "me_aug_night", label: "ME N AU", w: 24, align: "right" },
+  { key: "actual_inst", label: "Act In", w: 22, align: "right" },
+  { key: "hood_inst", label: "Hood", w: 20, align: "right" },
+  { key: "sim_inst", label: "Sim", w: 20, align: "right" },
+  { key: "ifr_approaches", label: "App", w: 18, align: "right" },
+  { key: "precision_approaches", label: "Prec", w: 18, align: "right" },
+  { key: "non_precision_approaches", label: "NPr", w: 18, align: "right" },
+  { key: "holds", label: "Hld", w: 18, align: "right" },
+  { key: "cfi_time", label: "CFI", w: 22, align: "right" },
+  { key: "total_time", label: "Total", w: 26, align: "right" },
+];
+
+// ---- FAA — conventional 14 CFR 61.51 ----
+const COLS_FAA: Col[] = [
+  { key: "date", label: "Date", w: 38, align: "center" },
+  { key: "make_model", label: "Make/Model", w: 46 },
+  { key: "registration", label: "Ident", w: 34 },
+  { calc: (r) => fromTo(r)[0], label: "From", w: 30, align: "center" },
+  { calc: (r) => fromTo(r)[1], label: "To", w: 30, align: "center" },
+  { calc: (r) => (inCat(r, "SE") ? T(r) : 0), label: "ASEL", w: 24, align: "right" },
+  { calc: (r) => (inCat(r, "ME") ? T(r) : 0), label: "AMEL", w: 24, align: "right" },
+  { calc: (r) => (inCat(r, "SES") ? T(r) : 0), label: "ASES", w: 22, align: "right" },
+  { calc: (r) => (inCat(r, "MES") ? T(r) : 0), label: "AMES", w: 22, align: "right" },
+  { calc: (r) => (inCat(r, "HELI") ? T(r) : 0), label: "Heli", w: 22, align: "right" },
+  { calc: (r) => roleTime(r, "PIC"), label: "PIC", w: 24, align: "right" },
+  { calc: (r) => roleTime(r, "SIC", "FO"), label: "SIC", w: 24, align: "right" },
+  { calc: (r) => roleTime(r, "DUAL"), label: "Dual", w: 24, align: "right" },
+  { key: "cfi_time", label: "CFI", w: 22, align: "right" },
+  { key: "day_time", label: "Day", w: 24, align: "right" },
+  { key: "night_time", label: "Night", w: 24, align: "right" },
+  { calc: (r) => num(r, "xc_day") + num(r, "xc_night"), label: "XC", w: 24, align: "right" },
+  { key: "actual_inst", label: "Act Inst", w: 22, align: "right" },
+  { key: "hood_inst", label: "Sim Inst", w: 22, align: "right" },
+  { key: "sim_inst", label: "FTD", w: 20, align: "right" },
+  { key: "ifr_approaches", label: "Appr", w: 18, align: "right" },
+  { key: "landings_day", label: "Ldg D", w: 20, align: "right" },
+  { key: "landings_night", label: "Ldg N", w: 20, align: "right" },
+  { key: "total_time", label: "Total", w: 26, align: "right" },
+  { calc: (r) => (r.remarks ?? "") as string, label: "Remarks", w: 150 },
+];
+
+// ---- EASA — AMC1 FCL.050 standard column order ----
+const COLS_EASA: Col[] = [
+  { key: "date", label: "Date", w: 38, align: "center" },
+  { calc: (r) => fromTo(r)[0], label: "Dep", w: 30, align: "center" },
+  { calc: (r) => fromTo(r)[1], label: "Arr", w: 30, align: "center" },
+  { key: "make_model", label: "Make/Model", w: 44 },
+  { key: "registration", label: "Reg", w: 34 },
+  { calc: (r) => (!isMP(r) && inCat(r, "SE", "SES") ? T(r) : 0), label: "SP SE", w: 24, align: "right" },
+  { calc: (r) => (!isMP(r) && inCat(r, "ME", "MES") ? T(r) : 0), label: "SP ME", w: 24, align: "right" },
+  { calc: (r) => (isMP(r) ? T(r) : 0), label: "MP", w: 24, align: "right" },
+  { key: "total_time", label: "Total", w: 26, align: "right" },
+  { calc: (r) => (r.role === "PIC" ? "SELF" : (r.pic ?? "")) as string, label: "PIC name", w: 44 },
+  { key: "landings_day", label: "Ldg D", w: 20, align: "right" },
+  { key: "landings_night", label: "Ldg N", w: 20, align: "right" },
+  { key: "night_time", label: "Night", w: 24, align: "right" },
+  { key: "actual_inst", label: "IFR", w: 24, align: "right" },
+  { calc: (r) => roleTime(r, "PIC"), label: "Fn PIC", w: 24, align: "right" },
+  { calc: (r) => roleTime(r, "FO", "SIC"), label: "Fn Co", w: 24, align: "right" },
+  { calc: (r) => roleTime(r, "DUAL"), label: "Fn Dual", w: 24, align: "right" },
+  { key: "cfi_time", label: "Fn Instr", w: 24, align: "right" },
+  { key: "sim_inst", label: "FSTD", w: 24, align: "right" },
+  { calc: (r) => (r.remarks ?? "") as string, label: "Remarks", w: 140 },
+];
+
+// ---- CARs — conventional Transport Canada (CAR 401.08) ----
+const COLS_CARS: Col[] = [
+  { key: "date", label: "Date", w: 36, align: "center" },
+  { key: "make_model", label: "Type", w: 40 },
+  { key: "registration", label: "Reg", w: 32 },
+  { key: "pic", label: "PIC", w: 36 },
+  { key: "copilot", label: "Co-Pilot", w: 36 },
+  { calc: (r) => fromTo(r)[0], label: "From", w: 26, align: "center" },
+  { calc: (r) => fromTo(r)[1], label: "To", w: 26, align: "center" },
+  { key: "se_dual_day", label: "SE D Du", w: 22, align: "right" },
+  { key: "se_pic_day", label: "SE D PIC", w: 22, align: "right" },
+  { key: "se_dual_night", label: "SE N Du", w: 22, align: "right" },
+  { key: "se_pic_night", label: "SE N PIC", w: 22, align: "right" },
+  { key: "me_dual_day", label: "ME D Du", w: 22, align: "right" },
+  { key: "me_pic_day", label: "ME D PIC", w: 22, align: "right" },
+  { key: "me_dual_night", label: "ME N Du", w: 22, align: "right" },
+  { key: "me_pic_night", label: "ME N PIC", w: 22, align: "right" },
+  { key: "xc_day", label: "XC D", w: 22, align: "right" },
+  { key: "xc_night", label: "XC N", w: 22, align: "right" },
+  { key: "landings_day", label: "Ldg D", w: 20, align: "right" },
+  { key: "landings_night", label: "Ldg N", w: 20, align: "right" },
+  { key: "actual_inst", label: "Act", w: 20, align: "right" },
+  { key: "hood_inst", label: "Hood", w: 20, align: "right" },
+  { key: "sim_inst", label: "Sim", w: 20, align: "right" },
+  { key: "ifr_approaches", label: "App", w: 18, align: "right" },
+  { key: "holds", label: "Hld", w: 18, align: "right" },
+  { key: "cfi_time", label: "Instr", w: 22, align: "right" },
+  { key: "total_time", label: "Total", w: 26, align: "right" },
+  { calc: (r) => (r.remarks ?? "") as string, label: "Remarks", w: 120 },
+];
+
+const LAYOUTS: Record<PdfLayout, { cols: Col[]; label: string }> = {
+  comprehensive: { cols: COLS_COMPREHENSIVE, label: "Comprehensive layout" },
+  faa: { cols: COLS_FAA, label: "FAA layout (conventional 14 CFR 61.51)" },
+  easa: { cols: COLS_EASA, label: "EASA layout (AMC1 FCL.050 standard)" },
+  cars: { cols: COLS_CARS, label: "Transport Canada layout (CAR 401.08)" },
+};
+
+function isNumericCol(c: Col): boolean {
+  return c.align === "right";
+}
+function cellText(r: FlightDerived, c: Col): string {
+  if (c.calc) {
+    const v = c.calc(r);
+    return typeof v === "number" ? fmtNum(v) : String(v ?? "");
+  }
+  if (c.key === "role") return r.role === "DUAL" ? "Du" : r.role === "PIC" ? "PIC" : r.role === "FO" ? "FO" : r.role;
+  if (isNumericCol(c) && c.key) return fmtNum(num(r, c.key));
+  const v = c.key ? (r as FlightDerived & Record<string, unknown>)[c.key] : "";
   return v == null ? "" : String(v);
+}
+function cellNumber(r: FlightDerived, c: Col): number {
+  if (c.calc) { const v = c.calc(r); return typeof v === "number" ? v : 0; }
+  return c.key ? num(r, c.key) : 0;
 }
 
 interface Props {
@@ -93,9 +231,11 @@ interface Props {
   toDate: string;
   generatedAt: string;
   avatarUrl?: string;
+  layout?: PdfLayout;
 }
 
-export function LogbookPDF({ flights, totals, pilotName, licenseNumber, fromDate, toDate, generatedAt, avatarUrl }: Props) {
+export function LogbookPDF({ flights, totals, pilotName, licenseNumber, fromDate, toDate, generatedAt, avatarUrl, layout = "comprehensive" }: Props) {
+  const { cols, label: layoutLabel } = LAYOUTS[layout] ?? LAYOUTS.comprehensive;
   const pages: FlightDerived[][] = [];
   for (let i = 0; i < flights.length; i += ROWS_PER_PAGE) {
     pages.push(flights.slice(i, i + ROWS_PER_PAGE));
@@ -107,14 +247,12 @@ export function LogbookPDF({ flights, totals, pilotName, licenseNumber, fromDate
     <Document>
       <Page size="A4" style={s.cover}>
         <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 16, marginBottom: 8 }}>
-          {avatarUrl && (
-            // @react-pdf/renderer fetches and embeds the image at render time.
-            <Image src={avatarUrl} style={{ width: 70, height: 70, borderRadius: 35 }} />
-          )}
+          {avatarUrl && <Image src={avatarUrl} style={{ width: 70, height: 70, borderRadius: 35 }} />}
           <View style={{ flex: 1 }}>
             <Text style={s.coverTitle}>Pilot Logbook HQ</Text>
             <Text style={s.coverMeta}>{pilotName || "—"}</Text>
             {licenseNumber && <Text style={s.coverMeta}>License: {licenseNumber}</Text>}
+            <Text style={s.coverMeta}>Format: {layoutLabel}</Text>
             <Text style={s.coverMeta}>Date range: {dateRangeLabel}</Text>
             <Text style={s.coverMeta}>Flights included: {flights.length}</Text>
             <Text style={s.coverMeta}>Generated: {generatedAt}</Text>
@@ -138,31 +276,31 @@ export function LogbookPDF({ flights, totals, pilotName, licenseNumber, fromDate
       </Page>
 
       {pages.map((rows, pi) => {
-        const sub = subtotal(rows);
+        const sub = subtotal(rows, cols);
         return (
           <Page key={pi} size="A4" orientation="landscape" style={s.page}>
             <View style={s.pageHeader}>
-              <Text style={s.pageTitle}>{pilotName || "Pilot Logbook HQ"} — {dateRangeLabel}</Text>
+              <Text style={s.pageTitle}>{pilotName || "Pilot Logbook HQ"} — {dateRangeLabel} — {layoutLabel}</Text>
               <Text style={s.pageMeta}>Page {pi + 2} of {totalPages}</Text>
             </View>
 
             <View style={s.table}>
               <View style={s.thRow}>
-                {COLS.map((c) => (
-                  <Text key={c.key} style={[s.th, { width: c.w, textAlign: c.align ?? "left" }]}>{c.label}</Text>
+                {cols.map((c, ci) => (
+                  <Text key={ci} style={[s.th, { width: c.w, textAlign: c.align ?? "left" }]}>{c.label}</Text>
                 ))}
               </View>
               {rows.map((r, ri) => (
                 <View style={[s.tr, ri % 2 === 1 ? s.trAlt : {}]} key={r.id}>
-                  {COLS.map((c) => (
-                    <Text key={c.key} style={[s.td, { width: c.w, textAlign: c.align ?? "left" }]}>{valueOf(r, c.key)}</Text>
+                  {cols.map((c, ci) => (
+                    <Text key={ci} style={[s.td, { width: c.w, textAlign: c.align ?? "left" }]}>{cellText(r, c)}</Text>
                   ))}
                 </View>
               ))}
               <View style={s.subtotalRow}>
-                {COLS.map((c, ci) => (
-                  <Text key={c.key} style={[s.subtotalCell, { width: c.w, textAlign: c.align ?? "left" }]}>
-                    {ci === 0 ? "Page subtotal" : NUMERIC_KEYS.includes(c.key) ? fmtNum(sub[c.key] ?? 0) : ""}
+                {cols.map((c, ci) => (
+                  <Text key={ci} style={[s.subtotalCell, { width: c.w, textAlign: c.align ?? "left" }]}>
+                    {ci === 0 ? "Page subtotal" : isNumericCol(c) ? fmtNum(sub[ci] ?? 0) : ""}
                   </Text>
                 ))}
               </View>
@@ -200,12 +338,6 @@ export function LogbookPDF({ flights, totals, pilotName, licenseNumber, fromDate
   );
 }
 
-/**
- * Grand totals page — same conditional logic as the cover summary, plus a
- * couple of extras (Total FO is always shown here since this is the
- * career-level summary). Mirrors the labels used in summaryRows for
- * consistency between the cover sheet and the back-page totals.
- */
 function grandTotalRows(t: Totals): [string, number | string][] {
   const rows: [string, number | string][] = [
     ["Total Time", t.total_time],
@@ -230,8 +362,6 @@ function grandTotalRows(t: Totals): [string, number | string][] {
 }
 
 function summaryRows(t: Totals): [string, string][] {
-  // Conditionally include sea/heli/CFI/holds rows only when non-zero — keeps
-  // the cover summary clean for typical airline pilots who never log them.
   const rows: [string, string][] = [
     ["Total Time", t.total_time.toFixed(1)],
     ["PIC", t.total_pic.toFixed(1)],
@@ -254,12 +384,13 @@ function summaryRows(t: Totals): [string, string][] {
   return rows;
 }
 
-function subtotal(rows: FlightDerived[]): Record<string, number> {
-  const out: Record<string, number> = {};
-  for (const k of NUMERIC_KEYS) out[k] = 0;
-  for (const r of rows) {
-    for (const k of NUMERIC_KEYS) out[k] += Number((r as any)[k] ?? 0);
-  }
-  for (const k of NUMERIC_KEYS) out[k] = Math.round(out[k] * 10) / 10;
+function subtotal(rows: FlightDerived[], cols: Col[]): Record<number, number> {
+  const out: Record<number, number> = {};
+  cols.forEach((c, ci) => {
+    if (!isNumericCol(c)) return;
+    let sum = 0;
+    for (const r of rows) sum += cellNumber(r, c);
+    out[ci] = Math.round(sum * 10) / 10;
+  });
   return out;
 }

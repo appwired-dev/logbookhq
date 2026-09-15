@@ -2,7 +2,7 @@
 
 import { useId, useMemo, useState } from "react";
 import { pdf } from "@react-pdf/renderer";
-import { LogbookPDF } from "@/lib/pdf/LogbookPDF";
+import { LogbookPDF, type PdfLayout } from "@/lib/pdf/LogbookPDF";
 import { exportFlightsCsv } from "@/lib/csv-export";
 import { computeTotals } from "@/lib/derive";
 import { makeT, type Locale } from "@/lib/i18n";
@@ -41,6 +41,7 @@ export default function ExportClient({ flights, defaultName, defaultLicense, ava
   const toast = useToast();
   const ids = useId();
   const [format, setFormat] = useState<Format>("pdf");
+  const [layout, setLayout] = useState<PdfLayout>("comprehensive");
   const [name, setName] = useState(defaultName);
   const [license, setLicense] = useState(defaultLicense);
   const [from, setFrom] = useState("");
@@ -78,6 +79,7 @@ export default function ExportClient({ flights, defaultName, defaultLicense, ava
               toDate={to}
               generatedAt={new Date().toLocaleString()}
               avatarUrl={avatarUrl ?? undefined}
+              layout={layout}
             />,
           ).toBlob();
         } catch (e) {
@@ -90,7 +92,7 @@ export default function ExportClient({ flights, defaultName, defaultLicense, ava
           setTimeout(() => URL.revokeObjectURL(url), 60_000);
           toast.push({ tone: "good", title: s("pdfReady"), description: s("pdfReadyBody", { n: n.toLocaleString() }) });
         } else {
-          downloadBlob(blob, `logbookhq-logbook-${stamp()}.pdf`);
+          downloadBlob(blob, `logbookhq-logbook-${layout}-${stamp()}.pdf`);
           toast.push({ tone: "warn", title: s("popupBlocked") });
         }
       } else {
@@ -145,6 +147,14 @@ export default function ExportClient({ flights, defaultName, defaultLicense, ava
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {format === "pdf" && (
               <>
+                <Field label="PDF layout">
+                  <select className={INPUT} value={layout} onChange={(e) => setLayout(e.target.value as PdfLayout)}>
+                    <option value="comprehensive">Comprehensive (all detail)</option>
+                    <option value="faa">FAA — 14 CFR 61.51</option>
+                    <option value="easa">EASA — AMC1 FCL.050</option>
+                    <option value="cars">Transport Canada — CAR 401.08</option>
+                  </select>
+                </Field>
                 <Field label={t("export.pilotName")}>
                   <input className={INPUT} value={name} autoComplete="name" onChange={(e) => setName(e.target.value)} />
                 </Field>
@@ -166,6 +176,15 @@ export default function ExportClient({ flights, defaultName, defaultLicense, ava
           <Icon.Info size={14} strokeWidth={2} aria-hidden className="mt-0.5 shrink-0 text-ink-3" />
           <span>{s(format === "pdf" ? "pdfIncludes" : "csvIncludes")}</span>
         </p>
+        {format === "pdf" && layout !== "comprehensive" && (
+          <p className="mt-2 text-xs text-ink-3">
+            Arranged to the standard{" "}
+            {layout === "faa" ? "FAA" : layout === "easa" ? "EASA (AMC1 FCL.050)" : "Transport Canada"}{" "}
+            column layout — a formatting convenience for handing to an examiner or employer, not a certified
+            or officially-approved filing.{" "}
+            {layout === "easa" && "The single-/multi-pilot split is inferred from crew role, and departure/arrival clock times are not included yet."}
+          </p>
+        )}
 
         {err && <Alert variant="bad" title={s("failed")} className="mt-4 whitespace-pre-wrap">{err}</Alert>}
         {n === 0 && !err && <Alert variant="warn" className="mt-4">{s("noFlights")}</Alert>}

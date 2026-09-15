@@ -47,6 +47,7 @@ export default function TransportCanadaPage() {
           <li>
             <strong>Your personal log, kept properly.</strong> The record Transport Canada expects,
             with your totals added up the way you keep them &mdash; not forced into an FAA column layout.
+            When you need it on paper, export a PDF in the Transport Canada (CAR 401.08) column layout.
           </li>
           <li>
             <strong>Recency you can see at a glance.</strong> The takeoffs and landings behind passenger
