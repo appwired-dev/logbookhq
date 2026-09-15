@@ -8,11 +8,11 @@ export const dynamic = "force-static";
 export const metadata: Metadata = {
   title: "ForeFlight logbook alternative for multi-authority pilots",
   description:
-    "A ForeFlight logbook alternative for multi-authority pilots: import your ForeFlight export, track currency under each regulator, and take your data anywhere.",
+    "A ForeFlight logbook alternative for multi-authority pilots: one logbook on every device, currency under whichever regulator you fly, and your ForeFlight export read in a minute.",
   alternates: { canonical: "/foreflight-logbook-alternative" },
   openGraph: {
     title: "ForeFlight logbook alternative for multi-authority pilots",
-    description: "A ForeFlight logbook alternative for multi-authority pilots: import your ForeFlight export, track currency under each regulator, and take your data anywhere.",
+    description: "One logbook on every device, currency under whichever regulator you fly, and your ForeFlight export read in a minute.",
     url: "/foreflight-logbook-alternative",
   },
 };
@@ -23,115 +23,93 @@ export default function ForeFlightAlternativePage() {
       <Breadcrumb name="ForeFlight alternative" path="/foreflight-logbook-alternative" />
       <PageHero
         eyebrow="ForeFlight logbook alternative"
-        title={<>More than<br />a flight bag.</>}
+        title={<>Off the tablet.<br />Across every regulator.</>}
         visual={<ReconcileVisual />}
         lede={
           <>
-            ForeFlight is a superb electronic flight bag, and its logbook is a convenient part of it if you
-            live on an iPad and fly under the FAA. If either of those isn&rsquo;t quite you &mdash; you want your
-            logbook on any device, or you fly under more than one authority &mdash; here&rsquo;s a straight
-            comparison and an easy way to bring your history across.
+            Your logbook shouldn&rsquo;t be locked to one tablet or wired to one regulator. ForeFlight&rsquo;s
+            logbook lives inside an iPad subscription built around the FAA &mdash; fine until you fly under a
+            second authority or open a laptop. This is a dedicated logbook that runs on every device, tracks
+            currency under whichever authority you fly, and reads your ForeFlight export in about a minute.
           </>
         }
       />
 
       <Article>
         <p>
-          First, the honest part: this isn&rsquo;t a knock on ForeFlight. It does a different job. It&rsquo;s a flight
-          bag &mdash; charts, planning, weather, plates, the tool you fly the aeroplane with &mdash; and the logbook
-          rides along inside it. That&rsquo;s a real convenience, and if your whole flying life is FAA and iPad,
-          it may be all the logbook you ever need.
-        </p>
-        <p>
-          This is a different thing on purpose: a dedicated logbook, on the web, built for pilots who don&rsquo;t
-          fit the single-authority mould. The differences that actually matter are below.
+          A logbook is a career-long record. It should open on any device you own, count your hours under
+          every authority you answer to, and leave with you if you ever go. A logbook bundled inside a
+          flight bag &mdash; on one platform, under one regulator, behind a subscription &mdash; does none of those
+          three. That gap is the whole reason to keep your logbook here instead.
         </p>
       </Article>
 
       <CompareTable
         them="ForeFlight Logbook"
         rows={[
-          ["What it is", "A dedicated pilot logbook", "A full electronic flight bag; the logbook is one feature"],
-          ["Runs on", "Any browser — Mac, Windows, phone, tablet", "Primarily iPhone and iPad (Apple)"],
-          ["Regulatory focus", "Multi-regime: CARs, FAR 117, EASA ORO.FTL and more", "Strongest for US / FAA operations"],
-          ["Track more than one authority", <Yes key="a">Side by side, from one set of flights</Yes>, "Oriented around a single framework"],
-          ["Fill it in with no signal", "A ground logbook — you log the flight after you land", "A flight bag built to run offline in the cockpit"],
-          ["Bring your history in", "Reconciles your import against your own totals first", "Exports cleanly — easy to bring here"],
-          ["Take your data out", <Yes key="e">Export to a spreadsheet anytime</Yes>, "Exports your logbook data"],
-          ["Languages", "English, 한국어, 中文, Español", "English"],
-          ["Price", "Free to 100 flights, then $4.99/mo · $49/yr · $249 once", "Subscription, bundled with its flight-bag plans"],
+          ["What it is", "A dedicated pilot logbook", "A flight bag; the logbook is one bundled feature"],
+          ["Runs on", <Yes key="r">Any browser — Mac, Windows, phone, tablet</Yes>, "Primarily iPhone and iPad (Apple)"],
+          ["Track more than one authority", <Yes key="a">CARs, FAR 117, EASA ORO.FTL and more — pick yours, switch anytime</Yes>, "Oriented around the FAA"],
+          ["Import your history", <Yes key="i">Reconciles your import against your own totals first</Yes>, "Exports cleanly — easy to bring here"],
+          ["Take your data out", <Yes key="e">Full spreadsheet export, anytime, no lock-in</Yes>, "Exports your logbook data"],
+          ["Languages", <Yes key="l">English, 한국어, 中文, Español</Yes>, "English"],
+          ["Price", <Yes key="p">Free to 100 flights, then $4.99/mo · $49/yr · $249 once</Yes>, "Subscription, bundled with flight-bag plans"],
         ]}
       />
 
       <Article>
-        <h2>What it costs, and the way to stop paying</h2>
+        <h2>Currency and limits under every authority you fly</h2>
         <p>
-          Pricing is short, and it has a door most subscriptions don&rsquo;t: a way to stop paying without
-          losing your logbook. It&rsquo;s free up to 100 flights, no card. After that it&rsquo;s $4.99 a month, $49 a
-          year, or $249 once &mdash; and the once is the one to notice. Buy it that way and the logbook is simply
-          yours, with nothing left to renew to keep it open. A flight bag can&rsquo;t sell you that, for a fair
-          reason: its charts and weather have to stay current, so the subscription earns its keep and the
-          logbook rides along inside it. Sensible for a flight bag &mdash; a little strange for a record you may
-          want to open in twenty years.
+          This is the part a logbook built around one framework was never meant to do. Set the authority
+          you fly and it runs those rules against your flights: passenger and IFR recency, and the rolling
+          flight-time windows &mdash; the last 28, 90 and 365 days &mdash; measured against the real limit, whether
+          that&rsquo;s CAR 700.28, FAR 117 or EASA ORO.FTL. Each window stays green until it doesn&rsquo;t, and the
+          dates that matter turn amber before they lapse, not after. Fly under a different authority next
+          month? Switch it in Settings and the same flights are re-checked against those rules &mdash; one
+          logbook, no re-entry.
         </p>
 
         <h2>One logbook, every device</h2>
         <p>
-          It runs in a browser, so the same logbook opens on a work laptop, a home Mac, an Android phone or
-          an iPad &mdash; one copy, no second app to install, nothing tied to whichever platform you happen to
-          own. There&rsquo;s a real limit to that, and it&rsquo;s worth saying plainly: a web logbook needs a
-          connection, so you fill it in on the ground, not at altitude. That trade is the right way round.
-          The thing that has to keep working with no signal over the ocean is the flight bag &mdash; the moving
-          map, the plates, the weather &mdash; and running offline in the cockpit is exactly what ForeFlight is
-          built for. Logging the flight is ground work, and a logbook on every device beats one on a single
-          tablet.
+          It runs in a browser, so the same logbook opens on a work laptop, a home Mac, an Android phone
+          and an iPad &mdash; one copy, nothing to install, nothing tied to whichever platform you happen to
+          own. Log your flights from wherever you actually do the paperwork, not only from the one tablet
+          that has the app.
         </p>
 
-        <h2>Moving your ForeFlight logbook over</h2>
+        <h2>Your ForeFlight export, read in a minute</h2>
         <p>
-          ForeFlight exports your logbook to a file, and that file is what the import reads &mdash; directly, in
-          its own column layout, with no cleanup pass in a spreadsheet first. The app maps your columns,
-          then reconciles the totals against the ones ForeFlight showed you: total time, PIC, night,
-          cross-country, the approach count. Each named total has to agree before a single flight is saved.
-          If a column lands in the wrong place or a figure drifts by an hour, the mismatch shows up front
-          and you fix the mapping &mdash; nothing is quietly rounded, dropped, or brought in wrong and discovered
+          ForeFlight exports your logbook to a file, and that file is what the import reads directly &mdash; no
+          cleanup pass in a spreadsheet first. It maps your columns, then reconciles the totals against the
+          ones ForeFlight showed you: total time, PIC, night, cross-country, the approach count. Every named
+          total has to agree before a single flight is saved, so if a column lands wrong or a figure drifts
+          by an hour, you see it up front and fix it &mdash; nothing is quietly rounded, dropped, or discovered
           a year later.
         </p>
 
-        <h2>Currency and rolling limits, per authority</h2>
+        <h2>Pay once, and stop paying</h2>
         <p>
-          This is the part a logbook built around one framework never set out to do. Tell it which
-          authorities you fly and it runs each one&rsquo;s rules against the same flights: passenger and IFR
-          recency under each set of regulations, and the rolling flight-time windows &mdash; the last 28, 90 and
-          365 days &mdash; measured against the actual limit, whether that&rsquo;s CAR 700.28, FAR 117 or EASA
-          ORO.FTL. Each window stays green until it doesn&rsquo;t, and the dates that matter turn amber before
-          they lapse rather than after. It models the rules so you can see where you stand; signing for the
-          flight is still yours, as it should be.
+          It&rsquo;s free up to 100 flights with no card. After that it&rsquo;s $4.99 a month, $49 a year, or $249
+          once &mdash; and the once is the one to notice: buy it that way and the logbook is simply yours, with
+          nothing left to renew to keep it open. A flight bag can&rsquo;t offer that, and shouldn&rsquo;t &mdash; its
+          charts and weather have to stay current, so the logbook is stuck riding along inside a subscription
+          that never ends. Your record shouldn&rsquo;t be.
         </p>
 
         <h2>Your records leave when you do</h2>
         <p>
-          A logbook is a career-long document, so it has no business being held hostage. Export the whole
-          thing to an ordinary spreadsheet whenever you like &mdash; not a locked format, a plain file you can
-          open anywhere and hand to an examiner, an employer or another app. Cancel and you walk away with
-          everything. It&rsquo;s the same reason the import reconciles on the way in: coming or going, your
-          records should never be the thing that traps you.
+          Export the whole logbook to an ordinary spreadsheet whenever you like &mdash; a plain file you can open
+          anywhere and hand to an examiner, an employer or another app. Cancel and you walk away with
+          everything. Coming or going, your records are never the thing that traps you.
         </p>
 
-        <h2>Where ForeFlight is the better choice</h2>
+        <h2>Keep ForeFlight for the cockpit</h2>
         <p>
-          Plainly: in the cockpit. If what you want is one app to plan, brief and fly &mdash; moving map,
-          weather, geo-referenced plates &mdash; a dedicated logbook doesn&rsquo;t replace that, and it isn&rsquo;t trying
-          to. Plenty of pilots fly with ForeFlight and keep their logbook here, and the export makes running
-          both painless. Pick the tool for the job; they don&rsquo;t have to be the same one.
-        </p>
-
-        <h2>Where this one earns its place</h2>
-        <p>
-          If you fly under more than one authority, want your logbook on a laptop and a phone as readily as
-          on a tablet, or simply don&rsquo;t want your records living inside a subscription you keep for other
-          reasons &mdash; that&rsquo;s the gap this fills. It reads the logbook you already have and hands it back the
-          same way, so trying it costs nothing but the minute it takes to export.
+          None of this is a shot at ForeFlight &mdash; for planning, briefing and flying, a moving map with live
+          weather and geo-referenced plates is exactly what you want, and nothing here replaces it. Plenty
+          of pilots fly with ForeFlight and keep their logbook here; the clean export makes running both
+          effortless. Fly with the flight bag. Just keep the logbook somewhere it can follow you across
+          authorities and devices, and somewhere you can always walk away with it.
         </p>
       </Article>
 
@@ -143,19 +121,19 @@ export default function ForeFlightAlternativePage() {
           },
           {
             q: "Do I have to stop using ForeFlight?",
-            a: "No, and most pilots don't. ForeFlight is a flight bag; this is a logbook. It's common to fly with ForeFlight and keep your logbook here — the clean export makes running both easy.",
+            a: "No — fly with it. ForeFlight is a flight bag; this is a logbook. Plenty of pilots fly with ForeFlight and keep their logbook here, and the clean export makes running both easy.",
           },
           {
             q: "Does it work on Windows and Android?",
             a: "Yes. It runs in any modern browser — Windows, Mac, Android, iPhone, iPad — because it's web-based rather than a native app for one platform.",
           },
           {
-            q: "Can I export my logbook back out later?",
-            a: "Yes, anytime. Export the whole logbook to a standard spreadsheet you can open anywhere, hand to an examiner or employer, or move into another app. Nothing is locked in, and if you cancel you leave with everything.",
+            q: "What if I fly under the FAA and Transport Canada?",
+            a: "That's exactly what it's built for. Record each flight once; set your authority and see your currency and rolling flight-time limits under its rules. Switch between them anytime in Settings — one logbook, no re-entry.",
           },
           {
-            q: "What if I fly under the FAA and Transport Canada?",
-            a: "That's exactly the case it's built for. Record each flight once and see your currency and rolling flight-time limits under each authority side by side, without a second logbook.",
+            q: "Can I get my logbook back out later?",
+            a: "Anytime. Export the whole logbook to a standard spreadsheet you can open anywhere or move into another app. Nothing is locked in, and if you cancel you leave with everything.",
           },
           {
             q: "What does it cost?",
@@ -164,7 +142,7 @@ export default function ForeFlightAlternativePage() {
         ]}
       />
 
-      <CtaBand title={<>Bring your ForeFlight export. See it reconcile.</>} />
+      <CtaBand title={<>Bring your ForeFlight export. Keep your logbook for good.</>} />
     </MarketingShell>
   );
 }

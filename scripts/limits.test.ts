@@ -67,7 +67,7 @@ function flight(date: string, hours: number, over: Partial<Flight> = {}): Flight
     pic: null, copilot: null, third_pilot: null, check_pilot: null,
     route: null, remarks: null,
     category: "ME", role: "PIC",
-    day_time: hours, night_time: 0, is_xcountry: false,
+    day_time: hours, night_time: 0, is_xcountry: false, multi_pilot: false,
     actual_inst: 0, hood_inst: 0, sim_inst: 0, ifr_approaches: 0,
     precision_approaches: 0, non_precision_approaches: 0, holds: 0, cfi_time: 0,
     takeoffs_day: 0, takeoffs_night: 0, landings_day: 0, landings_night: 0,

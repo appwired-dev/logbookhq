@@ -6,13 +6,13 @@ import { MarketingShell, PageHero, Article, CompareTable, Faq, CtaBand, Yes, Rec
 export const dynamic = "force-static";
 
 export const metadata: Metadata = {
-  title: "MyFlightbook alternative for multi-authority pilots",
+  title: "MyFlightbook alternative — modern, multi-regime, import-first",
   description:
-    "A MyFlightbook alternative for pilots who fly under more than one authority: a lighter, multi-regime logbook that imports your MyFlightbook CSV export.",
+    "A MyFlightbook alternative for pilots who fly under more than one authority: a faster, modern logbook with multi-regime currency and regulator-layout export that imports your MyFlightbook CSV.",
   alternates: { canonical: "/myflightbook-alternative" },
   openGraph: {
-    title: "MyFlightbook alternative for multi-authority pilots",
-    description: "A MyFlightbook alternative for pilots who fly under more than one authority: a lighter, multi-regime logbook that imports your MyFlightbook CSV export.",
+    title: "MyFlightbook alternative — modern, multi-regime, import-first",
+    description: "A faster, modern logbook with multi-regime currency and regulator-layout export that imports your MyFlightbook CSV.",
     url: "/myflightbook-alternative",
   },
 };
@@ -23,77 +23,74 @@ export default function MyFlightbookAlternativePage() {
       <Breadcrumb name="MyFlightbook alternative" path="/myflightbook-alternative" />
       <PageHero
         eyebrow="MyFlightbook alternative"
-        title={<>Lighter on<br />its feet.</>}
+        title={<>Lighter.<br />Multi-regime.</>}
         visual={<ReconcileVisual />}
         lede={
           <>
-            MyFlightbook is free, open-source, and has been kept up for well over a decade &mdash; no
-            upsell, no catch. This isn&rsquo;t a case against it. It&rsquo;s for the pilots who&rsquo;d trade the
-            longest feature list for a lighter, quicker logbook that tracks more than one authority
-            out of the box &mdash; and since it reads your MyFlightbook export, trying it costs a minute.
+            A logbook that stays quick the fiftieth time you open it, tracks currency under more than one
+            authority out of the box, and prints in your regulator&rsquo;s column layout &mdash; and it reads your
+            MyFlightbook CSV export, so trying it costs about a minute.
           </>
         }
       />
 
       <Article>
         <p>
-          Credit where it&rsquo;s due first. MyFlightbook is free, open-source, and has been quietly
-          maintained for years &mdash; a full logbook with no paywall waiting a few screens in. If you&rsquo;ve
-          used it, you know how much it packs in. Any honest MyFlightbook alternative has to open by
-          saying so.
-        </p>
-        <p>
-          So this page is about one gap, not a verdict. MyFlightbook grew feature by feature over a long
-          time, and it shows: the interface is dense and built for function over finish, and its currency
-          engine, deep as it is, grew up around FAA rules. This is a logbook built more recently around
-          two things instead &mdash; an interface that stays out of your way, and currency and rolling
-          limits under more than one authority, side by side &mdash; and it reads the logbook you already
-          keep.
+          MyFlightbook is free and packs in an enormous feature set built up over many years &mdash; and if
+          free-and-exhaustive is what you&rsquo;re after, it&rsquo;s a genuinely good answer. This is a different
+          one: a modern, focused logbook built around three things MyFlightbook wasn&rsquo;t &mdash; an interface
+          that stays out of your way, currency and limits under whichever authority you fly (switch anytime), and an import
+          that checks itself before it saves. Here&rsquo;s where that lands.
         </p>
       </Article>
 
       <CompareTable
         them="MyFlightbook"
         rows={[
-          ["What it is", "A lean, dedicated logbook", "A free, open-source logbook with a huge feature set"],
-          ["Interface", "Built recently — quick and uncluttered", "Dense and utilitarian; function over finish"],
-          ["Track more than one authority", <Yes key="a">Side by side, from one set of flights</Yes>, "Deep, customisable currency — FAA-first"],
-          ["Bring your history in", "Reconciles your import against your own totals first", "Exports to CSV — read directly here"],
-          ["Feature breadth", "Focused: logging, currency, multi-regime limits", "Vast — endorsements, attachments, deadlines, sharing"],
-          ["Languages", "English, 한국어, 中文, Español", "English-first"],
-          ["Price", "Free to 100 flights, then $4.99/mo · $49/yr · $249 once", "Free and open-source; donations welcome"],
+          ["Interface", <Yes key="i">Built recently — quick and uncluttered</Yes>, "Dense; function over finish"],
+          ["Multi-authority currency & limits", <Yes key="a">CARs, FAR 117, EASA ORO.FTL — pick yours, switch anytime</Yes>, "Deep, customisable — FAA-first"],
+          ["Regulator-layout export", <Yes key="e">FAA, EASA (AMC1 FCL.050) & Transport Canada layouts</Yes>, "Exports data (CSV, and more)"],
+          ["Import reconciles first", <Yes key="r">Checks totals before it saves</Yes>, "Imports logbook data"],
+          ["Languages", <Yes key="l">English, 한국어, 中文, Español</Yes>, "English-first"],
+          ["Feature breadth", "Focused: logging, currency, multi-regime limits", "Vast — endorsements, attachments, sharing"],
+          ["Price", "Free to 100 flights, then $4.99/mo · $49/yr · $249 once", "Free and open-source"],
         ]}
       />
 
       <Article>
-        <h2>Moving your MyFlightbook logbook over</h2>
+        <h2>Bring your MyFlightbook logbook over</h2>
         <p>
-          MyFlightbook exports your flights to a CSV file, and that file is exactly what the import here
-          reads. Drop it in, the app maps your columns, and it reconciles the totals against the ones
-          MyFlightbook shows you &mdash; total time, PIC, night, approaches &mdash; so every number is confirmed
-          matched before a single flight is saved. If a column doesn&rsquo;t line up, you catch it on day one,
-          not three months later.
+          MyFlightbook exports your flights to a CSV, and that file is exactly what the import here reads.
+          Drop it in, the app maps your columns, and it reconciles the totals against the ones MyFlightbook
+          shows you &mdash; total time, PIC, night, approaches &mdash; so every number is confirmed matched before a
+          single flight is saved. If a column doesn&rsquo;t line up, you catch it on day one, not three months
+          later.
         </p>
 
-        <h2>Where MyFlightbook is the better choice</h2>
+        <h2>A logbook that stays out of your way</h2>
         <p>
-          Two places, and neither is small. On price: it&rsquo;s free and open-source, and nothing here beats
-          free &mdash; if cost is the deciding factor, the comparison is over and MyFlightbook wins it. On
-          depth: if you lean on its breadth &mdash; endorsement tracking, image and document attachments,
-          deadlines, sharing, the sheer number of things it can record &mdash; it does more than this logbook
-          does, and it does it for nothing. If that depth is what you need, keep it. This isn&rsquo;t out to
-          talk you off a tool that already fits.
+          MyFlightbook can do a great many things, and the interface shows it. This one is built the other
+          way round: the common path &mdash; log a flight, check you&rsquo;re current, print what you need &mdash; is
+          quick and uncluttered, on any device, in your language. You give up some of MyFlightbook&rsquo;s
+          breadth for that; whether it&rsquo;s a fair trade depends on how much of that breadth you actually use.
         </p>
 
-        <h2>Where this one earns its place</h2>
+        <h2>Currency and export that speak your authorities</h2>
         <p>
-          The case for this one is narrower, on purpose. You want a logbook that feels quick and
-          uncluttered the fiftieth time you open it, not one you fight. You fly under more than one
-          authority &mdash; the CARs and the FAA, say, or EASA on top &mdash; and want currency and rolling
-          limits tracked side by side without wiring it up yourself. Maybe you&rsquo;d rather keep your records
-          in Korean, Chinese or Spanish than in English. If that&rsquo;s you, the export turns trying it into a
-          two-minute job &mdash; and if you decide MyFlightbook was right for you all along, you&rsquo;ve lost
-          nothing but the two minutes.
+          Tell it which authorities you fly and it runs each one&rsquo;s rules against the same flights &mdash;
+          passenger and IFR recency, and the rolling 28-, 90- and 365-day limits under CARs, FAR 117 or
+          ORO.FTL &mdash; and when you need it on paper, exports a PDF in the FAA, EASA (AMC1 FCL.050) or
+          Transport Canada column layout. One logbook that counts and prints the way each authority expects,
+          instead of a US-first tool you bend to fit.
+        </p>
+
+        <h2>Where MyFlightbook still fits</h2>
+        <p>
+          Honestly: if cost is the deciding factor, MyFlightbook is free and hard to argue with, and if you
+          lean on its sheer breadth &mdash; endorsement tracking, attachments, the long tail of things it
+          records &mdash; it does more than this does. This isn&rsquo;t here to pull you off a tool that already fits.
+          It&rsquo;s here for the pilot who wants a lighter, multi-regime logbook and would happily pay a little
+          for it &mdash; and the CSV import means finding out costs you two minutes, either way.
         </p>
       </Article>
 
@@ -104,12 +101,12 @@ export default function MyFlightbookAlternativePage() {
             a: "Yes. Export your flights from MyFlightbook as a CSV and import that file here. The app maps your columns and reconciles the totals against the ones MyFlightbook shows you before anything is saved, so you can confirm your history came across cleanly first.",
           },
           {
-            q: "Isn't MyFlightbook more feature-complete?",
-            a: "In raw breadth, yes — and it's free. MyFlightbook tracks more distinct things than this does. Where this one is ahead: a lighter, faster interface, currency and rolling flight-time limits under more than one authority out of the box, an import that reconciles before it saves, and the interface in four languages.",
+            q: "MyFlightbook is free — why would I pay for this?",
+            a: "Often you shouldn't, and that's fair. Pay for this only if a faster interface, multi-authority currency and limits, regulator-layout export, or the reconciling import are worth a few dollars to you. It's free up to 100 flights, then $4.99/month, $49/year, or $249 once for lifetime access.",
           },
           {
-            q: "MyFlightbook is free — why would I pay for this?",
-            a: "Often you shouldn't, and that's a fair answer. Pay for this only if a faster interface, multi-authority tracking, or the reconciling import are worth a few dollars to you. It's free up to 100 flights with no card, then $4.99/month, $49/year, or $249 once for lifetime access.",
+            q: "Does it handle more than one authority?",
+            a: "Yes — that's the core of it. Record each flight once; set your authority and it tracks currency and rolling flight-time limits under CARs, FAR 117 or EASA ORO.FTL. Switch the authority anytime, and export in its column layout — one logbook, no re-entry.",
           },
           {
             q: "Does it run on my phone?",

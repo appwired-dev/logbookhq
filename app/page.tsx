@@ -19,11 +19,11 @@ import transferShot from "@/public/marketing/transfer.png";
 export const metadata = {
   title: "Multi-Regime Pilot Logbook — Pilot Logbook HQ",
   description:
-    "Import your pilot logbook from any format or language, track currency under every authority you fly, and see your whole career at a glance.",
+    "Import your pilot logbook from any layout or language, track currency under every authority you fly, and see your whole career at a glance.",
   openGraph: {
     title: "Multi-Regime Pilot Logbook — Pilot Logbook HQ",
     description:
-      "One logbook that tracks currency and limits under every authority you fly. Import from any format. Free up to 100 flights.",
+      "One logbook that tracks currency and limits under every authority you fly. Import from any layout. Free up to 100 flights.",
     url: "/",
   },
 };
@@ -45,7 +45,7 @@ const STRUCTURED_DATA = {
       applicationCategory: "BusinessApplication",
       operatingSystem: "Web",
       description:
-        "Import your pilot logbook from any format or language, track currency under every aviation authority you fly, and see your whole career at a glance.",
+        "Import your pilot logbook from any layout or language, track currency under every aviation authority you fly, and see your whole career at a glance.",
       publisher: { "@id": "https://pilotlogbookhq.com/#org" },
       offers: {
         "@type": "AggregateOffer",
@@ -89,7 +89,7 @@ export default function LandingPage() {
         <section className="mx-auto max-w-6xl px-5 pt-16 sm:pt-24 pb-8">
           <div className="grid lg:grid-cols-[1.05fr_0.95fr] gap-12 lg:gap-10 items-center">
             <div>
-              <div className="lp-eyebrow lp-rise" style={{ animationDelay: "0ms" }}>Import · any format · any language</div>
+              <div className="lp-eyebrow lp-rise" style={{ animationDelay: "0ms" }}>Import · any layout · any language</div>
               <h1 className="lp-h1 lp-h1-3d mt-4">
                 Bring the logbook<br />you already have.
               </h1>

@@ -134,7 +134,7 @@ const TRANSLATIONS = {
 
   // Export PDF page
   "export.title":          { en: "Export PDF",             ko: "PDF 내보내기", zh: "导出 PDF",    es: "Exportar PDF" },
-  "export.subtitle":       { en: "Cover · 18-column flight pages · grand-totals summary. For ATPL verification, job applications, medical, recurrent paperwork.", ko: "표지 · 18칸 비행 페이지 · 총계 요약. ATPL 검증, 취업 지원, 신체검사, 정기 교육 서류용.", zh: "封面 · 18 列飞行页面 · 总计摘要。适用于 ATPL 验证、求职申请、体检、复训文档。", es: "Portada · páginas de vuelo de 18 columnas · resumen de totales. Para verificación ATPL, solicitudes de empleo, médico, papeleo recurrente." },
+  "export.subtitle":       { en: "Cover · formatted flight pages · grand-totals summary. For ATPL verification, job applications, medical, recurrent paperwork.", ko: "표지 · 서식이 적용된 비행 페이지 · 총계 요약. ATPL 검증, 취업 지원, 신체검사, 정기 교육 서류용.", zh: "封面 · 格式化飞行页面 · 总计摘要。适用于 ATPL 验证、求职申请、体检、复训文档。", es: "Portada · páginas de vuelo con formato · resumen de totales. Para verificación ATPL, solicitudes de empleo, médico, papeleo recurrente." },
   "export.pilotName":      { en: "Pilot Name",             ko: "조종사 이름", zh: "飞行员姓名",  es: "Nombre del Piloto" },
   "export.licenseOpt":     { en: "License # (optional)",   ko: "면허 번호 (선택)", zh: "执照号 (可选)", es: "N.º de Licencia (opcional)" },
   "export.fromDate":       { en: "From Date",              ko: "시작 날짜",  zh: "起始日期",    es: "Fecha Desde" },
@@ -263,6 +263,8 @@ const TRANSLATIONS = {
   "form.nightTime":        { en: "Night Time (hrs)",       ko: "야간 비행시간", zh: "夜间飞行时间 (小时)", es: "Tiempo Noche (h)" },
   "form.xc":               { en: "Cross-Country",          ko: "장거리",     zh: "越野",        es: "Travesía" },
   "form.xcCheck":          { en: "This flight is x-country", ko: "이 비행은 장거리입니다", zh: "此次飞行为越野飞行", es: "Este vuelo es de travesía" },
+  "form.multiPilot":       { en: "Multi-pilot",           ko: "복수 조종",   zh: "多机组",      es: "Multipiloto" },
+  "form.multiPilotCheck":  { en: "Multi-pilot operation (EASA)", ko: "복수 조종 운항 (EASA)", zh: "多机组运行（EASA）", es: "Operación multipiloto (EASA)" },
   "form.dutyTime":         { en: "Duty Time (hrs)",        ko: "근무시간",   zh: "执勤时间 (小时)", es: "Tiempo de Servicio (h)" },
   // Migration 0009 — traditional logbook fields
   "form.cfiTime":          { en: "As Flight Instructor (hrs)", ko: "교관 비행 (h)", zh: "教官时间 (小时)", es: "Como Instructor (h)" },

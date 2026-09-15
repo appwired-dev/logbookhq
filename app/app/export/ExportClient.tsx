@@ -1,14 +1,16 @@
 "use client";
 
 import { useId, useMemo, useState } from "react";
+import Link from "next/link";
 import { pdf } from "@react-pdf/renderer";
-import { LogbookPDF } from "@/lib/pdf/LogbookPDF";
+import { LogbookPDF, type PdfLayout } from "@/lib/pdf/LogbookPDF";
 import { exportFlightsCsv } from "@/lib/csv-export";
 import { computeTotals } from "@/lib/derive";
 import { makeT, type Locale } from "@/lib/i18n";
 import type { FlightDerived } from "@/lib/types";
 import { Alert, Button, Card, CardFooter, CardHeader, Field, Icon, PageHeader } from "@/components/ui";
 import type { LucideIcon } from "@/components/ui/icons";
+import { buttonClass } from "@/components/ui/button-class";
 import { useToast } from "@/components/ui/toast";
 import { exportStrings, type ExportStringKey } from "./export-strings";
 
@@ -33,14 +35,15 @@ function downloadBlob(blob: Blob, fileName: string) {
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
-export default function ExportClient({ flights, defaultName, defaultLicense, avatarUrl, locale }: {
-  flights: FlightDerived[]; defaultName: string; defaultLicense: string; avatarUrl: string | null; locale: Locale;
+export default function ExportClient({ flights, defaultName, defaultLicense, avatarUrl, isPaid, locale }: {
+  flights: FlightDerived[]; defaultName: string; defaultLicense: string; avatarUrl: string | null; isPaid: boolean; locale: Locale;
 }) {
   const t = makeT(locale);
   const s = exportStrings(locale);
   const toast = useToast();
   const ids = useId();
   const [format, setFormat] = useState<Format>("pdf");
+  const [layout, setLayout] = useState<PdfLayout>("comprehensive");
   const [name, setName] = useState(defaultName);
   const [license, setLicense] = useState(defaultLicense);
   const [from, setFrom] = useState("");
@@ -58,7 +61,7 @@ export default function ExportClient({ flights, defaultName, defaultLicense, ava
   const stamp = () => new Date().toISOString().slice(0, 10);
 
   async function generate() {
-    if (busy || n === 0) return;
+    if (busy || n === 0 || (format === "pdf" && !isPaid)) return;
     setErr(null);
     setBusy(true);
     try {
@@ -78,6 +81,7 @@ export default function ExportClient({ flights, defaultName, defaultLicense, ava
               toDate={to}
               generatedAt={new Date().toLocaleString()}
               avatarUrl={avatarUrl ?? undefined}
+              layout={layout}
             />,
           ).toBlob();
         } catch (e) {
@@ -90,7 +94,7 @@ export default function ExportClient({ flights, defaultName, defaultLicense, ava
           setTimeout(() => URL.revokeObjectURL(url), 60_000);
           toast.push({ tone: "good", title: s("pdfReady"), description: s("pdfReadyBody", { n: n.toLocaleString() }) });
         } else {
-          downloadBlob(blob, `logbookhq-logbook-${stamp()}.pdf`);
+          downloadBlob(blob, `logbookhq-logbook-${layout}-${stamp()}.pdf`);
           toast.push({ tone: "warn", title: s("popupBlocked") });
         }
       } else {
@@ -145,6 +149,14 @@ export default function ExportClient({ flights, defaultName, defaultLicense, ava
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {format === "pdf" && (
               <>
+                <Field label={s("pdfLayout")}>
+                  <select className={INPUT} value={layout} onChange={(e) => setLayout(e.target.value as PdfLayout)}>
+                    <option value="comprehensive">{s("layoutComprehensive")}</option>
+                    <option value="faa">{s("layoutFaa")}</option>
+                    <option value="easa">{s("layoutEasa")}</option>
+                    <option value="cars">{s("layoutCars")}</option>
+                  </select>
+                </Field>
                 <Field label={t("export.pilotName")}>
                   <input className={INPUT} value={name} autoComplete="name" onChange={(e) => setName(e.target.value)} />
                 </Field>
@@ -166,23 +178,38 @@ export default function ExportClient({ flights, defaultName, defaultLicense, ava
           <Icon.Info size={14} strokeWidth={2} aria-hidden className="mt-0.5 shrink-0 text-ink-3" />
           <span>{s(format === "pdf" ? "pdfIncludes" : "csvIncludes")}</span>
         </p>
+        {format === "pdf" && layout !== "comprehensive" && (
+          <p className="mt-2 text-xs text-ink-3">
+            {s("layoutDisclaimer", { standard: layout === "faa" ? s("layoutStandardFaa") : layout === "easa" ? s("layoutStandardEasa") : s("layoutStandardCars") })}
+            {layout === "easa" && <> {s("layoutEasaNote")}</>}
+          </p>
+        )}
 
         {err && <Alert variant="bad" title={s("failed")} className="mt-4 whitespace-pre-wrap">{err}</Alert>}
         {n === 0 && !err && <Alert variant="warn" className="mt-4">{s("noFlights")}</Alert>}
+        {format === "pdf" && !isPaid && (
+          <Alert variant="warn" title={s("pdfLocked")} className="mt-4">{s("pdfLockedBody")}</Alert>
+        )}
 
         <CardFooter className="justify-between">
           <p role="status" className="text-sm text-ink-2 num">
             {t("export.inRange", { flights: n.toLocaleString(), hours: totals.total_time.toFixed(1) })}
           </p>
           <div className="flex items-center gap-3 flex-wrap justify-end">
-            {format === "pdf" && <span className="text-xs text-ink-3">{s("opensNewTab")}</span>}
-            <Button variant="primary" className="h-11 sm:h-10" loading={busy} disabled={n === 0} onClick={generate} aria-describedby={includesId}>
-              {busy
-                ? t("export.generating")
-                : format === "pdf"
-                  ? <><Icon.FileBadge size={16} strokeWidth={1.75} aria-hidden />{s("generatePdf")}</>
-                  : <><Icon.Download size={16} strokeWidth={1.75} aria-hidden />{s("downloadCsv")}</>}
-            </Button>
+            {format === "pdf" && isPaid && <span className="text-xs text-ink-3">{s("opensNewTab")}</span>}
+            {format === "pdf" && !isPaid ? (
+              <Link href="/pricing" className={buttonClass("primary", "md", "h-11 sm:h-10")}>
+                <Icon.Sparkles size={16} strokeWidth={1.75} aria-hidden />{s("pdfUpgrade")}
+              </Link>
+            ) : (
+              <Button variant="primary" className="h-11 sm:h-10" loading={busy} disabled={n === 0} onClick={generate} aria-describedby={includesId}>
+                {busy
+                  ? t("export.generating")
+                  : format === "pdf"
+                    ? <><Icon.FileBadge size={16} strokeWidth={1.75} aria-hidden />{s("generatePdf")}</>
+                    : <><Icon.Download size={16} strokeWidth={1.75} aria-hidden />{s("downloadCsv")}</>}
+              </Button>
+            )}
           </div>
         </CardFooter>
       </Card>

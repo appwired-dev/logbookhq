@@ -608,6 +608,11 @@ export default function FlightForm({
                 {t("form.xcCheck")}
               </Switch>
             </Field>
+            <Field label={t("form.multiPilot")} className="col-span-2 sm:col-span-1">
+              <Switch checked={values.multi_pilot} onChange={(v) => set("multi_pilot", v)}>
+                {t("form.multiPilotCheck")}
+              </Switch>
+            </Field>
             <Field label={t("form.dutyTime")} error={visibleError("duty_time")}>
               <input {...hourInput("duty_time")} />
             </Field>
