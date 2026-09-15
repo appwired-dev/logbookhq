@@ -57,7 +57,7 @@ const SITE_LD = {
       "@id": "https://pilotlogbookhq.com/#org",
       name: "Pilot Logbook HQ",
       url: "https://pilotlogbookhq.com",
-      logo: "https://pilotlogbookhq.com/icon",
+      logo: "https://pilotlogbookhq.com/logo",
     },
     {
       "@type": "WebSite",
