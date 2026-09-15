@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
-import { MarketingShell, PageHero, Article, CompareTable, Faq, CtaBand, Yes, ReconcileVisual, Breadcrumb } from "@/components/marketing/kit";
+import { RelatedLinks, MarketingShell, PageHero, Article, CompareTable, Faq, CtaBand, Yes, ReconcileVisual, Breadcrumb } from "@/components/marketing/kit";
 
 // Pure static content — no per-request data. Prerender at build so these
 // SEO pages are served from the CDN (instant TTFB, no serverless cost).
+import { OG_BASE } from "@/lib/seo";
 export const dynamic = "force-static";
 
 export const metadata: Metadata = {
@@ -11,6 +12,7 @@ export const metadata: Metadata = {
     "A LogTen Pro alternative that runs in any browser, not just on Apple: multi-authority currency built in, regulator-layout exports, and a $249 lifetime option instead of a subscription.",
   alternates: { canonical: "/logten-pro-alternative" },
   openGraph: {
+    ...OG_BASE,
     title: "LogTen Pro alternative — web-based and multi-regime",
     description: "Runs in any browser, not just on Apple: multi-authority currency built in, regulator-layout exports, and a $249 lifetime option instead of a subscription.",
     url: "/logten-pro-alternative",
@@ -139,6 +141,14 @@ export default function LogTenAlternativePage() {
             q: "What does it cost?",
             a: "Free up to 100 flights with no card, then $4.99/month, $49/year, or $249 once for lifetime access.",
           },
+        ]}
+      />
+
+      <RelatedLinks
+        links={[
+          { href: "/multi-regime-pilot-logbook", label: "Multi-regime logbook" },
+          { href: "/foreflight-logbook-alternative", label: "ForeFlight alternative" },
+          { href: "/myflightbook-alternative", label: "MyFlightbook alternative" },
         ]}
       />
 

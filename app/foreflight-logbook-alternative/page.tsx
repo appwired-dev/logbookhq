@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
-import { MarketingShell, PageHero, Article, CompareTable, Faq, CtaBand, Yes, ReconcileVisual, Breadcrumb } from "@/components/marketing/kit";
+import { RelatedLinks, MarketingShell, PageHero, Article, CompareTable, Faq, CtaBand, Yes, ReconcileVisual, Breadcrumb } from "@/components/marketing/kit";
 
 // Pure static content — no per-request data. Prerender at build so these
 // SEO pages are served from the CDN (instant TTFB, no serverless cost).
+import { OG_BASE } from "@/lib/seo";
 export const dynamic = "force-static";
 
 export const metadata: Metadata = {
@@ -11,6 +12,7 @@ export const metadata: Metadata = {
     "A ForeFlight logbook alternative for multi-authority pilots: one logbook on every device, currency under whichever regulator you fly, and your ForeFlight export read in a minute.",
   alternates: { canonical: "/foreflight-logbook-alternative" },
   openGraph: {
+    ...OG_BASE,
     title: "ForeFlight logbook alternative for multi-authority pilots",
     description: "One logbook on every device, currency under whichever regulator you fly, and your ForeFlight export read in a minute.",
     url: "/foreflight-logbook-alternative",
@@ -139,6 +141,14 @@ export default function ForeFlightAlternativePage() {
             q: "What does it cost?",
             a: "Free up to 100 flights with no card. After that it's $4.99/month, $49/year, or $249 once for lifetime access — buy it once and the logbook stays yours with nothing to renew.",
           },
+        ]}
+      />
+
+      <RelatedLinks
+        links={[
+          { href: "/multi-regime-pilot-logbook", label: "Multi-regime logbook" },
+          { href: "/logten-pro-alternative", label: "LogTen Pro alternative" },
+          { href: "/myflightbook-alternative", label: "MyFlightbook alternative" },
         ]}
       />
 

@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
-import { MarketingShell, PageHero, Article, Faq, CtaBand, ReconcileVisual, Breadcrumb } from "@/components/marketing/kit";
+import { RelatedLinks, MarketingShell, PageHero, Article, Faq, CtaBand, ReconcileVisual, Breadcrumb } from "@/components/marketing/kit";
 
 // Pure static content — no per-request data. Prerender at build so these
 // SEO pages are served from the CDN (instant TTFB, no serverless cost).
+import { OG_BASE } from "@/lib/seo";
 export const dynamic = "force-static";
 
 export const metadata: Metadata = {
@@ -11,6 +12,7 @@ export const metadata: Metadata = {
     "Fly under more than one aviation authority? Keep one logbook that tracks currency and flight-time limits under Transport Canada, EASA, FAA, UK CAA and more — instead of a spreadsheet per regulator.",
   alternates: { canonical: "/multi-regime-pilot-logbook" },
   openGraph: {
+    ...OG_BASE,
     title: "Multi-regime pilot logbook — one logbook, every authority",
     description: "Fly under more than one aviation authority? Keep one logbook that tracks currency and flight-time limits under Transport Canada, EASA, FAA, UK CAA and more — instead of a spreadsheet per regulator.",
     url: "/multi-regime-pilot-logbook",
@@ -129,6 +131,14 @@ export default function MultiRegimePage() {
             q: "What does it cost?",
             a: "Free up to 100 flights with no card. After that it's $4.99/month, $49/year, or $249 once for lifetime access.",
           },
+        ]}
+      />
+
+      <RelatedLinks
+        links={[
+          { href: "/faa-easa-logbook", label: "FAA + EASA logbook" },
+          { href: "/easa-pilot-logbook", label: "EASA pilot logbook" },
+          { href: "/transport-canada-pilot-logbook", label: "Transport Canada logbook" },
         ]}
       />
 

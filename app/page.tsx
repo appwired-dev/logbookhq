@@ -16,11 +16,13 @@ import transferShot from "@/public/marketing/transfer.png";
  * globals.css under `.lp` (self-contained dark theme; the app behind the login
  * stays light). Everything is visible at rest — only the hero rises on load.
  */
+import { OG_BASE } from "@/lib/seo";
 export const metadata = {
   title: "Multi-Regime Pilot Logbook — Pilot Logbook HQ",
   description:
     "Import your pilot logbook from any layout or language, track currency under every authority you fly, and see your whole career at a glance.",
   openGraph: {
+    ...OG_BASE,
     title: "Multi-Regime Pilot Logbook — Pilot Logbook HQ",
     description:
       "One logbook that tracks currency and limits under every authority you fly. Import from any layout. Free up to 100 flights.",

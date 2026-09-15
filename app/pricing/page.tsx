@@ -6,12 +6,14 @@ import { startCheckoutFromForm } from "@/app/app/billing/actions";
  * the landing. Tiers, Stripe checkout wiring and the free-vs-paid CTA split
  * are unchanged; only the presentation moved onto the `.lp` theme.
  */
+import { OG_BASE } from "@/lib/seo";
 export const metadata = {
   title: "Pricing — Pilot Logbook HQ",
   description:
     "Simple pricing for a multi-regime pilot logbook: free up to 100 flights, then $4.99/mo, $49/yr, or $249 lifetime. All prices CAD. Cancel anytime.",
   alternates: { canonical: "/pricing" },
   openGraph: {
+    ...OG_BASE,
     title: "Pricing — Pilot Logbook HQ",
     description:
       "Free up to 100 flights, then $4.99/mo, $49/yr, or $249 lifetime (CAD). Cancel anytime.",

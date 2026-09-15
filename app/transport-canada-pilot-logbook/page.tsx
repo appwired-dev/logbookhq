@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
-import { MarketingShell, PageHero, Article, Faq, CtaBand, ReconcileVisual, Breadcrumb } from "@/components/marketing/kit";
+import { RelatedLinks, MarketingShell, PageHero, Article, Faq, CtaBand, ReconcileVisual, Breadcrumb } from "@/components/marketing/kit";
 
 // Pure static content — no per-request data. Prerender at build so these
 // SEO pages are served from the CDN (instant TTFB, no serverless cost).
+import { OG_BASE } from "@/lib/seo";
 export const dynamic = "force-static";
 
 export const metadata: Metadata = {
@@ -11,6 +12,7 @@ export const metadata: Metadata = {
     "A pilot logbook built for Canadian flying: keep your personal log, track recency under the CARs, and watch your 700-series flight-time limits — and still handle FAA time if you fly N-registered.",
   alternates: { canonical: "/transport-canada-pilot-logbook" },
   openGraph: {
+    ...OG_BASE,
     title: "Transport Canada pilot logbook (CARs currency & limits)",
     description: "A pilot logbook built for Canadian flying: keep your personal log, track recency under the CARs, and watch your 700-series flight-time limits — and still handle FAA time if you fly N-registered.",
     url: "/transport-canada-pilot-logbook",
@@ -103,6 +105,14 @@ export default function TransportCanadaPage() {
             q: "Is it a Canadian company?",
             a: "It's built and run by a working Canadian line pilot who uses it for their own logbook. Canadian flying is the starting point, not a bolt-on.",
           },
+        ]}
+      />
+
+      <RelatedLinks
+        links={[
+          { href: "/multi-regime-pilot-logbook", label: "Multi-regime logbook" },
+          { href: "/faa-easa-logbook", label: "FAA + EASA logbook" },
+          { href: "/easa-pilot-logbook", label: "EASA pilot logbook" },
         ]}
       />
 

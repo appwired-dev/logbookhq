@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
-import { MarketingShell, PageHero, Article, Faq, CtaBand, ReconcileVisual, Breadcrumb } from "@/components/marketing/kit";
+import { RelatedLinks, MarketingShell, PageHero, Article, Faq, CtaBand, ReconcileVisual, Breadcrumb } from "@/components/marketing/kit";
 
 // Pure static content — no per-request data. Prerender at build so these
 // SEO pages are served from the CDN (instant TTFB, no serverless cost).
+import { OG_BASE } from "@/lib/seo";
 export const dynamic = "force-static";
 
 export const metadata: Metadata = {
@@ -11,6 +12,7 @@ export const metadata: Metadata = {
     "An EASA pilot logbook that tracks Part-FCL recency and ORO.FTL limits, exports in the EASA standard (AMC1 FCL.050) column layout, and still counts your FAA and UK CAA time.",
   alternates: { canonical: "/easa-pilot-logbook" },
   openGraph: {
+    ...OG_BASE,
     title: "EASA pilot logbook — Part-FCL currency, limits & export",
     description: "Tracks Part-FCL recency and ORO.FTL limits, exports in the EASA standard (AMC1 FCL.050) column layout, and counts your FAA and UK CAA time too.",
     url: "/easa-pilot-logbook",
@@ -120,6 +122,14 @@ export default function EasaPage() {
             q: "What does it cost?",
             a: "Free up to 100 flights with no card. After that it's $4.99/month, $49/year, or $249 once for lifetime access.",
           },
+        ]}
+      />
+
+      <RelatedLinks
+        links={[
+          { href: "/multi-regime-pilot-logbook", label: "Multi-regime logbook" },
+          { href: "/faa-easa-logbook", label: "FAA + EASA logbook" },
+          { href: "/transport-canada-pilot-logbook", label: "Transport Canada logbook" },
         ]}
       />
 

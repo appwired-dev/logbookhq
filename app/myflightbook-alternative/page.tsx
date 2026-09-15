@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
-import { MarketingShell, PageHero, Article, CompareTable, Faq, CtaBand, Yes, ReconcileVisual, Breadcrumb } from "@/components/marketing/kit";
+import { RelatedLinks, MarketingShell, PageHero, Article, CompareTable, Faq, CtaBand, Yes, ReconcileVisual, Breadcrumb } from "@/components/marketing/kit";
 
 // Pure static content — no per-request data. Prerender at build so these
 // SEO pages are served from the CDN (instant TTFB, no serverless cost).
+import { OG_BASE } from "@/lib/seo";
 export const dynamic = "force-static";
 
 export const metadata: Metadata = {
@@ -11,6 +12,7 @@ export const metadata: Metadata = {
     "A MyFlightbook alternative for pilots who fly under more than one authority: a faster, modern logbook with multi-regime currency and regulator-layout export that imports your MyFlightbook CSV.",
   alternates: { canonical: "/myflightbook-alternative" },
   openGraph: {
+    ...OG_BASE,
     title: "MyFlightbook alternative — modern, multi-regime, import-first",
     description: "A faster, modern logbook with multi-regime currency and regulator-layout export that imports your MyFlightbook CSV.",
     url: "/myflightbook-alternative",
@@ -112,6 +114,14 @@ export default function MyFlightbookAlternativePage() {
             q: "Does it run on my phone?",
             a: "Yes. It's web-based, so it runs in any modern browser on Windows, Mac, Android, iPhone and iPad — nothing to install, and the same logbook on every one of them.",
           },
+        ]}
+      />
+
+      <RelatedLinks
+        links={[
+          { href: "/multi-regime-pilot-logbook", label: "Multi-regime logbook" },
+          { href: "/foreflight-logbook-alternative", label: "ForeFlight alternative" },
+          { href: "/logten-pro-alternative", label: "LogTen Pro alternative" },
         ]}
       />
 
