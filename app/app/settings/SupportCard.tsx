@@ -80,7 +80,7 @@ export default function SupportCard({ locale }: { locale: Locale }) {
             </Button>
             <span className="text-sm text-ink-3">
               {t.or}{" "}
-              <a className="text-brand hover:underline" href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>
+              <a className="text-brand-deep hover:underline" href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>
             </span>
           </div>
         </form>

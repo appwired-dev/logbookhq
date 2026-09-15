@@ -11,7 +11,7 @@ import { requestPasswordReset, type ForgotPasswordResult } from "./actions";
 /** `.input` / `.btn` are h-10; phones get the 44px touch target. */
 const CONTROL = "h-11 sm:h-10";
 const LINK =
-  "text-brand hover:underline rounded-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:ring-offset-2 focus-visible:ring-offset-surface";
+  "text-brand-deep hover:underline rounded-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:ring-offset-2 focus-visible:ring-offset-surface";
 
 type Outcome = Extract<ForgotPasswordResult, { status: "sent" | "cooldown" | "error" }>["status"];
 

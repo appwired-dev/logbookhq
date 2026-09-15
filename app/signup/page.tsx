@@ -39,8 +39,8 @@ export default function SignupPage() {
         </div>
         <div>
           <label className="label" htmlFor="signup-password">Password</label>
-          <input id="signup-password" className="input" type="password" name="password" autoComplete="new-password" minLength={8} required />
-          <p className="text-xs text-ink-3 mt-1">At least 8 characters.</p>
+          <input id="signup-password" className="input" type="password" name="password" autoComplete="new-password" minLength={8} required aria-describedby="signup-password-hint" />
+          <p id="signup-password-hint" className="text-xs text-ink-3 mt-1">At least 8 characters.</p>
         </div>
         {error && <p className="text-sm text-bad-ink" role="alert">{error}</p>}
         {message && <p className="text-sm text-good-ink" role="status">{message}</p>}
@@ -48,13 +48,13 @@ export default function SignupPage() {
           {pending ? "Creating account…" : "Create account"}
         </button>
         <p className="text-sm text-ink-3 text-center">
-          Already have one? <Link className="text-brand hover:underline" href="/login">Sign in</Link>
+          Already have one? <Link className="text-brand-deep hover:underline" href="/login">Sign in</Link>
         </p>
         <p className="text-xs text-ink-3 text-center">
           By creating an account you agree to our{" "}
-          <Link className="text-brand hover:underline" href="/terms">Terms</Link> and{" "}
-          <Link className="text-brand hover:underline" href="/privacy">Privacy Policy</Link>. See{" "}
-          <Link className="text-brand hover:underline" href="/pricing">pricing</Link>.
+          <Link className="text-brand-deep hover:underline" href="/terms">Terms</Link> and{" "}
+          <Link className="text-brand-deep hover:underline" href="/privacy">Privacy Policy</Link>. See{" "}
+          <Link className="text-brand-deep hover:underline" href="/pricing">pricing</Link>.
         </p>
       </form>
     </AuthShell>

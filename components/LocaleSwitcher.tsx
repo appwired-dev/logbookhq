@@ -146,13 +146,13 @@ export default function LocaleSwitcher({ current }: { current: Locale }) {
                 onClick={() => pick(code)}
                 className={`w-full text-left px-3 py-2 text-sm flex items-center gap-2.5 cursor-pointer transition-colors duration-fast focus-visible:outline-none ${
                   isActive
-                    ? "bg-brand/10 text-brand font-medium focus-visible:bg-brand/15"
+                    ? "bg-brand/10 text-brand-deep font-medium focus-visible:bg-brand/15"
                     : "text-ink-1 hover:bg-surface-2 focus-visible:bg-surface-2"
                 }`}
               >
                 <span
                   className={`mono text-2xs font-semibold w-7 shrink-0 rounded-pill border px-1 py-0.5 text-center ${
-                    isActive ? "border-brand/30 bg-brand/10 text-brand" : "border-border bg-surface-2 text-ink-2"
+                    isActive ? "border-brand/30 bg-brand/10 text-brand-deep" : "border-border bg-surface-2 text-ink-2"
                   }`}
                 >
                   {SHORT_LABEL[code]}

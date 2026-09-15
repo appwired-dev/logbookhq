@@ -48,7 +48,7 @@ function LoginForm() {
           <label className="label" htmlFor="login-password">Password</label>
           <Link
             href="/forgot-password"
-            className="inline-flex items-center py-3.5 -my-3.5 px-1 -mx-1 text-2xs text-brand hover:underline rounded-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60"
+            className="inline-flex items-center py-3.5 -my-3.5 px-1 -mx-1 text-2xs text-brand-deep hover:underline rounded-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60"
           >
             Forgot password?
           </Link>
@@ -60,7 +60,7 @@ function LoginForm() {
         {pending ? "Signing in…" : "Sign in"}
       </button>
       <p className="text-sm text-ink-3 text-center">
-        New here? <Link className="text-brand hover:underline" href="/signup">Create an account</Link>
+        New here? <Link className="text-brand-deep hover:underline" href="/signup">Create an account</Link>
       </p>
     </form>
   );
