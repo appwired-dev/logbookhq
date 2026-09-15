@@ -9,11 +9,11 @@ export const dynamic = "force-static";
 export const metadata: Metadata = {
   title: "FAA + EASA logbook for dual-licensed pilots",
   description:
-    "Hold an FAA certificate and an EASA licence? Keep one pilot logbook: import once and see each authority's currency and flight-time limits on the same flights.",
+    "Hold an FAA certificate and an EASA licence? Keep one pilot logbook: import once, and track currency and flight-time limits under whichever authority you set — switch between them anytime.",
   alternates: { canonical: "/faa-easa-logbook" },
   openGraph: {
     title: "FAA + EASA logbook for dual-licensed pilots",
-    description: "Hold an FAA certificate and an EASA licence? Keep one pilot logbook: import once and see each authority's currency and flight-time limits on the same flights.",
+    description: "Hold an FAA certificate and an EASA licence? Keep one pilot logbook: import once, and track currency and flight-time limits under whichever authority you set — switch between them anytime.",
     url: "/faa-easa-logbook",
   },
 };
@@ -30,8 +30,8 @@ export default function FaaEasaPage() {
           <>
             Plenty of pilots hold both an FAA certificate and an EASA licence &mdash; trained on one side
             of the Atlantic and working the other, or flying an N-registered aircraft on their EASA ticket.
-            The flying is one life. The paperwork insists it&rsquo;s two. Keep it one logbook, and let each
-            authority read the same flights its own way.
+            The flying is one life. The paperwork insists it&rsquo;s two. Keep it one logbook, and read the same
+            flights under whichever authority you need &mdash; switch between them anytime.
           </>
         }
       />
@@ -75,24 +75,24 @@ export default function FaaEasaPage() {
           number you can no longer trust.
         </p>
 
-        <h2>What one logbook does with both</h2>
+        <h2>What one logbook does for two tickets</h2>
         <p>
-          You record a flight once. The app applies both the FAA&rsquo;s and EASA&rsquo;s rules to that same flight
-          and shows you where you stand under each &mdash; no second sheet, no re-entry.
+          You record a flight once. Set which authority the dashboard checks &mdash; the FAA or EASA &mdash; and it
+          applies those rules to your flights and shows you where you stand. Switch to the other in Settings
+          and the same flights are re-checked against its rules. No second sheet, no re-entry.
         </p>
         <ul>
           <li>
-            <strong>Currency under each authority.</strong> The dates that matter, tracked under Part 61
-            and under Part-FCL, and flagged amber before they lapse rather than after.
+            <strong>Currency under the authority you set.</strong> The dates that matter, tracked under
+            Part 61 or Part-FCL, and flagged amber before they lapse rather than after.
           </li>
           <li>
-            <strong>Rolling limits watching the right windows.</strong> FAR 117 and ORO.FTL periods
-            tracked side by side against the limits you actually fly, each window green until it isn&rsquo;t.
+            <strong>Rolling limits watching the right windows.</strong> FAR 117 or ORO.FTL periods
+            tracked against the limits you actually fly, each window green until it isn&rsquo;t.
           </li>
           <li>
-            <strong>Totals credited each way.</strong> Night, PIC, cross-country, instrument, multi-crew
-            &mdash; counted to the FAA&rsquo;s convention and to EASA&rsquo;s, so the total you show is the one that
-            authority expects.
+            <strong>Export in either layout.</strong> Print the record in the FAA (14 CFR 61.51) or EASA
+            (AMC1 FCL.050) column layout &mdash; whichever office is asking.
           </li>
         </ul>
 
@@ -118,8 +118,8 @@ export default function FaaEasaPage() {
         <p>
           Worth saying plainly: if one of your two credentials is dormant &mdash; an EASA licence you hold
           but don&rsquo;t currently fly on, or an FAA certificate parked while you fly in Europe &mdash; a good
-          single-authority logbook will serve you well, and you can switch the second regime on here the
-          day it comes back to life.
+          single-authority logbook will serve you well, and you can point the dashboard at that authority in
+          Settings the day it comes back to life.
         </p>
         <p>
           And none of this stands in for the regulations or for your own currency check. It tracks the
@@ -132,11 +132,11 @@ export default function FaaEasaPage() {
         items={[
           {
             q: "How is this different from logging under one authority?",
-            a: "You record each flight once and the app applies both the FAA's and EASA's rules to it, so you see currency and flight-time limits under each without keeping a separate logbook for each.",
+            a: "You record each flight once instead of keeping a file per authority. Set which authority the dashboard checks and it applies those rules to your flights; switch between the FAA and EASA anytime in Settings, and export in either's column layout — one logbook, no re-entry.",
           },
           {
-            q: "Does it handle the different ways the FAA and EASA count time?",
-            a: "Yes. Cross-country, PIC, multi-crew and instructor time can be credited to each authority's conventions, so the totals you present are the ones that authority expects rather than a single number that only fits one of them.",
+            q: "Can it print in both the FAA and EASA layouts?",
+            a: "Yes. Export a PDF in the FAA (14 CFR 61.51) or the EASA (AMC1 FCL.050) column layout from the same flights — the arrangement each office expects. These are the standard column layouts for handover, not certified filings.",
           },
           {
             q: "Which rules does it track?",

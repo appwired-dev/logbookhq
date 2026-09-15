@@ -18,7 +18,7 @@ type Stage = "idle" | "pdf" | "zip";
  * "Backup now" card — bundles the user's entire logbook into a ZIP
  * containing:
  *   - flights.csv  (round-trips through our importer)
- *   - logbook.pdf  (ATPL-style 18-column PDF)
+ *   - logbook.pdf  (comprehensive PDF logbook)
  *   - README.txt   (timestamp + counts so the user knows what's inside)
  *
  * Everything happens in the browser — no server round trip beyond loading
@@ -75,7 +75,7 @@ export default function BackupCard({
         "",
         "Contents:",
         "  flights.csv  — every flight, round-trips through Import & Export → Import",
-        "  logbook.pdf  — 18-column ATPL-style PDF, hand to a hiring office",
+        "  logbook.pdf  — comprehensive PDF logbook, hand to a hiring office",
         "",
         "Tip: drop the whole folder into Dropbox/Drive/iCloud for off-site safety.",
       ].join("\n");

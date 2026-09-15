@@ -76,8 +76,8 @@ export default function EasaPage() {
           Plenty of European pilots don&rsquo;t answer to a single regulator &mdash; an FAA certificate alongside
           the EASA licence, an N-registered aircraft, time in UK airspace where the CAA has run its own rules
           since Brexit. Instead of an EASA spreadsheet, an FAA one and a UK one kept in step by hand, you
-          record each flight once and see where you stand under EASA, the FAA and the UK CAA from the same
-          data. One logbook; each authority&rsquo;s rules applied to it.
+          record each flight once and set which authority the dashboard checks &mdash; EASA, the FAA or the UK
+          CAA &mdash; to see where you stand under its rules. Switch anytime; one logbook, no re-entry.
         </p>
 
         <h2>Bring the logbook you already keep</h2>
@@ -110,7 +110,7 @@ export default function EasaPage() {
           },
           {
             q: "I also fly under the FAA or UK CAA. Can it handle both?",
-            a: "Yes. Record each flight once and see your currency and limits under EASA, the FAA and the UK CAA from the same flights — no second logbook, no double entry.",
+            a: "Yes. Record each flight once; set your authority and see your currency and limits under its rules. Switch between EASA, the FAA and the UK CAA anytime in Settings — one logbook, no re-entry.",
           },
           {
             q: "Can I import my current EASA logbook?",

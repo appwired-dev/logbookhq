@@ -39,7 +39,7 @@ export default function MyFlightbookAlternativePage() {
           MyFlightbook is free and packs in an enormous feature set built up over many years &mdash; and if
           free-and-exhaustive is what you&rsquo;re after, it&rsquo;s a genuinely good answer. This is a different
           one: a modern, focused logbook built around three things MyFlightbook wasn&rsquo;t &mdash; an interface
-          that stays out of your way, currency and limits under several authorities at once, and an import
+          that stays out of your way, currency and limits under whichever authority you fly (switch anytime), and an import
           that checks itself before it saves. Here&rsquo;s where that lands.
         </p>
       </Article>
@@ -48,7 +48,7 @@ export default function MyFlightbookAlternativePage() {
         them="MyFlightbook"
         rows={[
           ["Interface", <Yes key="i">Built recently — quick and uncluttered</Yes>, "Dense; function over finish"],
-          ["Multi-authority currency & limits", <Yes key="a">CARs, FAR 117, EASA ORO.FTL, side by side</Yes>, "Deep, customisable — FAA-first"],
+          ["Multi-authority currency & limits", <Yes key="a">CARs, FAR 117, EASA ORO.FTL — pick yours, switch anytime</Yes>, "Deep, customisable — FAA-first"],
           ["Regulator-layout export", <Yes key="e">FAA, EASA (AMC1 FCL.050) & Transport Canada layouts</Yes>, "Exports data (CSV, and more)"],
           ["Import reconciles first", <Yes key="r">Checks totals before it saves</Yes>, "Imports logbook data"],
           ["Languages", <Yes key="l">English, 한국어, 中文, Español</Yes>, "English-first"],
@@ -106,7 +106,7 @@ export default function MyFlightbookAlternativePage() {
           },
           {
             q: "Does it handle more than one authority?",
-            a: "Yes — that's the core of it. Record each flight once and see currency and rolling flight-time limits under CARs, FAR 117 and EASA ORO.FTL side by side, and export in each authority's column layout.",
+            a: "Yes — that's the core of it. Record each flight once; set your authority and it tracks currency and rolling flight-time limits under CARs, FAR 117 or EASA ORO.FTL. Switch the authority anytime, and export in its column layout — one logbook, no re-entry.",
           },
           {
             q: "Does it run on my phone?",

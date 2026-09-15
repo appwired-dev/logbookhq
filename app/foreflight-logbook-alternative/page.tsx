@@ -8,11 +8,11 @@ export const dynamic = "force-static";
 export const metadata: Metadata = {
   title: "ForeFlight logbook alternative for multi-authority pilots",
   description:
-    "A ForeFlight logbook alternative for multi-authority pilots: one logbook on every device, currency under every regulator you fly, and your ForeFlight export read in a minute.",
+    "A ForeFlight logbook alternative for multi-authority pilots: one logbook on every device, currency under whichever regulator you fly, and your ForeFlight export read in a minute.",
   alternates: { canonical: "/foreflight-logbook-alternative" },
   openGraph: {
     title: "ForeFlight logbook alternative for multi-authority pilots",
-    description: "One logbook on every device, currency under every regulator you fly, and your ForeFlight export read in a minute.",
+    description: "One logbook on every device, currency under whichever regulator you fly, and your ForeFlight export read in a minute.",
     url: "/foreflight-logbook-alternative",
   },
 };
@@ -30,7 +30,7 @@ export default function ForeFlightAlternativePage() {
             Your logbook shouldn&rsquo;t be locked to one tablet or wired to one regulator. ForeFlight&rsquo;s
             logbook lives inside an iPad subscription built around the FAA &mdash; fine until you fly under a
             second authority or open a laptop. This is a dedicated logbook that runs on every device, tracks
-            currency under each authority you fly, and reads your ForeFlight export in about a minute.
+            currency under whichever authority you fly, and reads your ForeFlight export in about a minute.
           </>
         }
       />
@@ -49,7 +49,7 @@ export default function ForeFlightAlternativePage() {
         rows={[
           ["What it is", "A dedicated pilot logbook", "A flight bag; the logbook is one bundled feature"],
           ["Runs on", <Yes key="r">Any browser — Mac, Windows, phone, tablet</Yes>, "Primarily iPhone and iPad (Apple)"],
-          ["Track more than one authority", <Yes key="a">CARs, FAR 117, EASA ORO.FTL and more, side by side</Yes>, "Oriented around the FAA"],
+          ["Track more than one authority", <Yes key="a">CARs, FAR 117, EASA ORO.FTL and more — pick yours, switch anytime</Yes>, "Oriented around the FAA"],
           ["Import your history", <Yes key="i">Reconciles your import against your own totals first</Yes>, "Exports cleanly — easy to bring here"],
           ["Take your data out", <Yes key="e">Full spreadsheet export, anytime, no lock-in</Yes>, "Exports your logbook data"],
           ["Languages", <Yes key="l">English, 한국어, 中文, Español</Yes>, "English"],
@@ -60,13 +60,13 @@ export default function ForeFlightAlternativePage() {
       <Article>
         <h2>Currency and limits under every authority you fly</h2>
         <p>
-          This is the part a logbook built around one framework was never meant to do. Tell it which
-          authorities you fly and it runs each one&rsquo;s rules against the same flights: passenger and IFR
-          recency under each set of regulations, and the rolling flight-time windows &mdash; the last 28, 90 and
-          365 days &mdash; measured against the real limit, whether that&rsquo;s CAR 700.28, FAR 117 or EASA
-          ORO.FTL. Each window stays green until it doesn&rsquo;t, and the dates that matter turn amber before
-          they lapse, not after. Fly under the FAA and Transport Canada, or the FAA and EASA, and you see
-          both at once &mdash; no second logbook, no reconciling by hand.
+          This is the part a logbook built around one framework was never meant to do. Set the authority
+          you fly and it runs those rules against your flights: passenger and IFR recency, and the rolling
+          flight-time windows &mdash; the last 28, 90 and 365 days &mdash; measured against the real limit, whether
+          that&rsquo;s CAR 700.28, FAR 117 or EASA ORO.FTL. Each window stays green until it doesn&rsquo;t, and the
+          dates that matter turn amber before they lapse, not after. Fly under a different authority next
+          month? Switch it in Settings and the same flights are re-checked against those rules &mdash; one
+          logbook, no re-entry.
         </p>
 
         <h2>One logbook, every device</h2>
@@ -129,7 +129,7 @@ export default function ForeFlightAlternativePage() {
           },
           {
             q: "What if I fly under the FAA and Transport Canada?",
-            a: "That's exactly what it's built for. Record each flight once and see your currency and rolling flight-time limits under each authority side by side, without a second logbook.",
+            a: "That's exactly what it's built for. Record each flight once; set your authority and see your currency and rolling flight-time limits under its rules. Switch between them anytime in Settings — one logbook, no re-entry.",
           },
           {
             q: "Can I get my logbook back out later?",

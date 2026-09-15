@@ -59,27 +59,27 @@ interface Tier {
 const TIERS: Tier[] = [
   {
     name: "Free", price: "$0", cadence: "forever",
-    description: "Log up to 100 flights. Import & export. The full dashboard.",
+    description: "Log up to 100 flights with the full dashboard — every authority, all the charts.",
     cta: "Start free", href: "/signup", highlight: false, plan: null,
-    features: ["Up to 100 flights", "One authority (you pick)", "Import any layout · CSV export", "The full dashboard"],
+    features: ["Up to 100 flights", "Every authority — CA · FAA · EASA & more", "Charts, currency & cloud sync", "Import any layout · CSV export"],
   },
   {
     name: "Monthly", price: "$4.99", cadence: "/ month",
-    description: "Unlimited flights, every authority, PDF export, the charts.",
+    description: "Unlimited flights and PDF export in your regulator's column layout.",
     cta: "Go Pro", href: "/signup?plan=monthly", highlight: false, plan: "monthly",
-    features: ["Unlimited flights", "Every authority (CA · FAA · EASA · more)", "PDF export (18-column layout)", "Charts, Sankey & globe", "Cloud sync across devices", "Currency tracking per authority"],
+    features: ["Unlimited flights", "PDF export — FAA, EASA & Transport Canada layouts", "Everything in Free, uncapped", "Cancel anytime"],
   },
   {
     name: "Annual", price: "$49", cadence: "/ year",
-    description: "Everything in Pro, billed yearly. Two months free.",
+    description: "Everything in Pro, billed yearly — two months free.",
     cta: "Go Annual", href: "/signup?plan=annual", highlight: true, plan: "annual",
-    features: ["Everything in Monthly", "Two months free vs. monthly", "Priority email support"],
+    features: ["Everything in Monthly", "Two months free vs. paying monthly", "30-day money-back guarantee"],
   },
   {
     name: "Lifetime", price: "$249", cadence: "once",
     description: "Pay once. Yours forever. The clean exit from subscriptions.",
     cta: "Buy lifetime", href: "/signup?plan=lifetime", highlight: false, plan: "lifetime",
-    features: ["Everything in Pro, forever", "All future authorities included", "No recurring charges", "Founding-member badge"],
+    features: ["Unlimited flights & PDF export, forever", "Every current & future layout", "No recurring charges", "30-day money-back guarantee"],
   },
 ];
 
@@ -105,7 +105,7 @@ export default function PricingPage() {
           <div className="lp-eyebrow">Pricing</div>
           <h1 className="lp-h1 mt-4" style={{ fontSize: "clamp(36px,6vw,64px)" }}>Start free.<br />Pay once you&apos;ve moved in.</h1>
           <p className="lp-lede mt-5 max-w-xl mx-auto">
-            Import your logbook and run the whole app on the free tier. Upgrade only when you cross 100 flights.
+            Import your logbook and run the dashboard free &mdash; every authority, all the charts. Upgrade for unlimited flights and PDF export.
           </p>
         </section>
 
@@ -159,6 +159,9 @@ export default function PricingPage() {
             <Link className="lp-link inline-flex items-center min-h-[44px]" href="/foreflight-logbook-alternative">ForeFlight alternative</Link>
             <Link className="lp-link inline-flex items-center min-h-[44px]" href="/logten-pro-alternative">LogTen Pro alternative</Link>
             <Link className="lp-link inline-flex items-center min-h-[44px]" href="/transport-canada-pilot-logbook">Transport Canada logbook</Link>
+            <Link className="lp-link inline-flex items-center min-h-[44px]" href="/myflightbook-alternative">MyFlightbook alternative</Link>
+            <Link className="lp-link inline-flex items-center min-h-[44px]" href="/easa-pilot-logbook">EASA pilot logbook</Link>
+            <Link className="lp-link inline-flex items-center min-h-[44px]" href="/faa-easa-logbook">FAA + EASA logbook</Link>
           </nav>
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs" style={{ color: "var(--lp-ink-3)" }}>
             <span>© Pilot Logbook HQ · a multi-regime pilot logbook</span>

@@ -27,7 +27,7 @@ export default function LogTenAlternativePage() {
         visual={<ReconcileVisual />}
         lede={
           <>
-            A logbook that opens on every device you own, tracks currency under each authority you fly, and
+            A logbook that opens on every device you own, tracks currency under whichever authority you fly, and
             prints in your regulator&rsquo;s column layout &mdash; without an Apple device, an evening of setup, or a
             subscription that never ends. It reads your LogTen export in about a minute.
           </>
@@ -48,7 +48,7 @@ export default function LogTenAlternativePage() {
         rows={[
           ["Runs on", <Yes key="r">Any browser — Mac, Windows, phone, tablet</Yes>, "Apple only — Mac, iPad, iPhone"],
           ["Multi-authority rules", <Yes key="a">Built in — pick the regimes you fly</Yes>, "Configurable, FAA-oriented defaults"],
-          ["Currency & rolling limits", <Yes key="c">CARs, FAR 117, EASA ORO.FTL, side by side</Yes>, "Capable once configured"],
+          ["Currency & rolling limits", <Yes key="c">CARs, FAR 117, EASA ORO.FTL — pick yours, switch anytime</Yes>, "Capable once configured"],
           ["Regulator-layout export", <Yes key="e">FAA, EASA (AMC1 FCL.050) & Transport Canada layouts</Yes>, "PDF and CSV export"],
           ["Set-up", <Yes key="s">Import and go</Yes>, "Deep and configurable — rewards time spent"],
           ["Import reconciles first", <Yes key="i">Checks totals before it saves</Yes>, "Imports logbook data"],

@@ -8,11 +8,11 @@ export const dynamic = "force-static";
 export const metadata: Metadata = {
   title: "Multi-regime pilot logbook — one logbook, every authority",
   description:
-    "Fly under more than one aviation authority? Keep one logbook that tracks currency and flight-time limits under CAA, EASA, FAA, TCCA and more — instead of a spreadsheet per regulator.",
+    "Fly under more than one aviation authority? Keep one logbook that tracks currency and flight-time limits under Transport Canada, EASA, FAA, UK CAA and more — instead of a spreadsheet per regulator.",
   alternates: { canonical: "/multi-regime-pilot-logbook" },
   openGraph: {
     title: "Multi-regime pilot logbook — one logbook, every authority",
-    description: "Fly under more than one aviation authority? Keep one logbook that tracks currency and flight-time limits under CAA, EASA, FAA, TCCA and more — instead of a spreadsheet per regulator.",
+    description: "Fly under more than one aviation authority? Keep one logbook that tracks currency and flight-time limits under Transport Canada, EASA, FAA, UK CAA and more — instead of a spreadsheet per regulator.",
     url: "/multi-regime-pilot-logbook",
   },
 };
@@ -73,9 +73,9 @@ export default function MultiRegimePage() {
 
         <h2>What this logbook does instead</h2>
         <p>
-          You keep one logbook. You record a flight once. The app applies each authority&rsquo;s rules to the
-          same underlying flights and shows you where you stand under every regime you&rsquo;ve told it you
-          fly &mdash; no second sheet, no re-entry.
+          You keep one logbook. You record a flight once. Set which authority the dashboard checks and it
+          applies those rules to the same underlying flights, so you see where you stand under the one you
+          fly &mdash; then switch the authority in Settings anytime, no second sheet, no re-entry.
         </p>
         <ul>
           <li>
@@ -119,7 +119,7 @@ export default function MultiRegimePage() {
           },
           {
             q: "Do I have to enter each flight more than once?",
-            a: "No. You record a flight once. The app applies each authority's rules to the same flight data, so adding a second regime doesn't mean a second logbook.",
+            a: "No. You record a flight once. Set which authority the app checks and it applies those rules to your flights; switch the authority anytime in Settings — no second logbook, no re-entry.",
           },
           {
             q: "Can I move my existing logbook over?",

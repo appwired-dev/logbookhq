@@ -65,8 +65,8 @@ export default function TransportCanadaPage() {
         <p>
           Plenty of Canadian pilots log N-registered time, or trained in the States and kept an FAA
           certificate. Instead of a Canadian spreadsheet and an American one, you record each flight once
-          and see where you stand under Transport Canada <em>and</em> the FAA from the same data. Add EASA
-          to that if your flying reaches Europe. One logbook, each authority&rsquo;s rules applied to it.
+          and set which authority the dashboard checks &mdash; Transport Canada or the FAA &mdash; to see where you
+          stand under its rules. Add EASA if your flying reaches Europe. Switch anytime; one logbook, no re-entry.
         </p>
 
         <h2>Bring the logbook you already keep</h2>
@@ -93,7 +93,7 @@ export default function TransportCanadaPage() {
           },
           {
             q: "I fly N-registered aircraft too. Can it handle both?",
-            a: "Yes. Record each flight once and see your currency and limits under both Transport Canada and the FAA from the same flights — no second logbook, no double entry.",
+            a: "Yes. Record each flight once; set your authority and see your currency and limits under its rules. Switch between Transport Canada and the FAA anytime in Settings — one logbook, no re-entry.",
           },
           {
             q: "Can I import my current Canadian logbook?",

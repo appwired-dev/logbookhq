@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { deriveFlight } from "@/lib/derive";
 import { fetchAllFlights } from "@/lib/fetch-flights";
 import { getLocale } from "@/lib/i18n-server";
+import { isFreeTier } from "@/lib/limits";
 import ExportClient from "./ExportClient";
 
 export default async function ExportPage() {
@@ -9,7 +10,7 @@ export default async function ExportPage() {
   const { data: { user } } = await supabase.auth.getUser();
   const { data: profile } = await supabase
     .from("profiles")
-    .select("full_name, license_number, avatar_url")
+    .select("full_name, license_number, avatar_url, tier")
     .eq("id", user!.id)
     .single();
 
@@ -21,6 +22,7 @@ export default async function ExportPage() {
       defaultName={profile?.full_name ?? ""}
       defaultLicense={profile?.license_number ?? ""}
       avatarUrl={profile?.avatar_url ?? null}
+      isPaid={!isFreeTier(profile?.tier)}
       locale={locale}
     />
   );
