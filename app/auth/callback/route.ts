@@ -62,6 +62,22 @@ export async function GET(request: NextRequest) {
   const failed = new URL("/auth/auth-code-error", base);
   const destination = new URL(safeNext(params.get("next") ?? "/app"), base);
 
+  const supabase = await createClient();
+
+  // A single-use link is only *expired* if this browser has no session. When a
+  // first exchange already succeeded and a SECOND hit lands here — an OAuth
+  // return replayed by a prefetch, a reload, or the back button — the code is
+  // spent but the user is genuinely signed in. Show them the dead-end "expired"
+  // screen only when there's truly no session; otherwise send them onward.
+  // Deliberately /app, never the requested `next`: a password-reset link that
+  // fails must not drop an ordinary session onto /reset-password (that path
+  // needs a freshly minted recovery session, gated by the recovery cookie set
+  // on the success path below).
+  const onwardIfSignedIn = async (): Promise<NextResponse> => {
+    const { data } = await supabase.auth.getUser();
+    return data.user ? go(new URL("/app", base)) : go(failed);
+  };
+
   // GoTrue rejected the link before it ever reached us (expired OTP, reused
   // link, disabled signup…). It appends ?error=&error_code=&error_description=.
   const gotrueError = params.get("error") ?? params.get("error_code");
@@ -69,13 +85,11 @@ export async function GET(request: NextRequest) {
     // Truncated: this is attacker-shaped text arriving in a query string.
     // Control characters stripped: this lands in a log an incident responder reads.
     console.warn("[auth/callback] provider error:", gotrueError.replace(/[^\x20-\x7e]/g, ".").slice(0, 80));
-    return go(failed);
+    return onwardIfSignedIn();
   }
 
   const code = params.get("code");
-  if (!code) return go(failed);
-
-  const supabase = await createClient();
+  if (!code) return onwardIfSignedIn();
 
   // Route-handler cookies() is writable, so the session cookies set by this
   // call ride out on the redirect response below.
@@ -83,9 +97,10 @@ export async function GET(request: NextRequest) {
 
   if (result.error) {
     // Message is logged, never rendered: it can distinguish "expired" from
-    // "already used", which is not the browser's business.
+    // "already used", which is not the browser's business. A replayed code that
+    // already minted a session lands the user on /app rather than this screen.
     console.warn("[auth/callback] exchange failed:", result.error.message);
-    return go(failed);
+    return onwardIfSignedIn();
   }
 
   // Mark this session as recovery-minted so /reset-password will accept it.
