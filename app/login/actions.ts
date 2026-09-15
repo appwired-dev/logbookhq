@@ -6,6 +6,10 @@ import { createClient } from "@/lib/supabase/server";
 import { safeNext } from "@/app/auth/recovery";
 import { bucketKey, clientIp, underLimit } from "@/lib/rate-limit";
 
+/** Absolute base for OAuth redirect URLs. Authoritative in prod; the Google
+ *  button only renders where this is set (NEXT_PUBLIC_GOOGLE_AUTH_ENABLED). */
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/+$/, "") ?? "";
+
 /**
  * Shown when a rate-limit bucket trips. Deliberately vague and identical
  * across dimensions (IP vs email) and endpoints — it must not become an
@@ -101,4 +105,35 @@ export async function logout() {
   const supabase = await createClient();
   await supabase.auth.signOut();
   redirect("/");
+}
+
+
+/**
+ * Start Google OAuth from the SERVER (not the browser). This mirrors the
+ * password-recovery flow, which works precisely because the same server client
+ * that INITIATES the PKCE flow also COMPLETES it: signInWithOAuth here writes
+ * the `-code-verifier` cookie through the server cookie store, and
+ * /auth/callback reads that same cookie at exchange time.
+ *
+ * The previous client-initiated version (createBrowserClient in
+ * GoogleSignInButton) wrote the verifier in the browser, and the server
+ * exchange couldn't reliably match it across the OAuth round-trip / repeat
+ * clicks — GoTrue returned `flow_state_not_found` and the user was bounced to
+ * the "link expired" screen despite a valid Google login.
+ *
+ * signInWithOAuth on the server does not redirect; it returns the provider URL,
+ * which we redirect to (with the freshly-set verifier cookie riding along).
+ */
+export async function signInWithGoogle(formData: FormData) {
+  const next = safeNext(String(formData.get("next") ?? "/app"));
+  const supabase = await createClient();
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: { redirectTo: `${APP_URL}/auth/callback?next=${encodeURIComponent(next)}` },
+  });
+  if (error || !data?.url) {
+    redirect(`/login?next=${encodeURIComponent(next)}&error=google`);
+  }
+  // Redirect carries the Set-Cookie for the PKCE verifier written just above.
+  redirect(data.url);
 }
