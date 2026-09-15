@@ -1,20 +1,26 @@
 import type { Metadata } from "next";
-import { MarketingShell, PageHero, Article, Faq, CtaBand, ReconcileVisual } from "@/components/marketing/kit";
+import { MarketingShell, PageHero, Article, Faq, CtaBand, ReconcileVisual, Breadcrumb } from "@/components/marketing/kit";
 
 // Pure static content — no per-request data. Prerender at build so these
 // SEO pages are served from the CDN (instant TTFB, no serverless cost).
 export const dynamic = "force-static";
 
 export const metadata: Metadata = {
-  title: "A Transport Canada pilot logbook (CARs currency & limits)",
+  title: "Transport Canada pilot logbook (CARs currency & limits)",
   description:
     "A pilot logbook built for Canadian flying: keep your personal log, track recency under the CARs, and watch your 700-series flight-time limits — and still handle FAA time if you fly N-registered.",
   alternates: { canonical: "/transport-canada-pilot-logbook" },
+  openGraph: {
+    title: "Transport Canada pilot logbook (CARs currency & limits)",
+    description: "A pilot logbook built for Canadian flying: keep your personal log, track recency under the CARs, and watch your 700-series flight-time limits — and still handle FAA time if you fly N-registered.",
+    url: "/transport-canada-pilot-logbook",
+  },
 };
 
 export default function TransportCanadaPage() {
   return (
     <MarketingShell>
+      <Breadcrumb name="Transport Canada logbook" path="/transport-canada-pilot-logbook" />
       <PageHero
         eyebrow="For Canadian pilots"
         title={<>Built for<br />Canadian flying.</>}

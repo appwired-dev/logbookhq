@@ -49,6 +49,9 @@ export function MarketingShell({ children }: { children: ReactNode }) {
             <Link className="lp-link inline-flex items-center min-h-[44px]" href="/foreflight-logbook-alternative">ForeFlight alternative</Link>
             <Link className="lp-link inline-flex items-center min-h-[44px]" href="/logten-pro-alternative">LogTen Pro alternative</Link>
             <Link className="lp-link inline-flex items-center min-h-[44px]" href="/transport-canada-pilot-logbook">Transport Canada logbook</Link>
+            <Link className="lp-link inline-flex items-center min-h-[44px]" href="/myflightbook-alternative">MyFlightbook alternative</Link>
+            <Link className="lp-link inline-flex items-center min-h-[44px]" href="/easa-pilot-logbook">EASA pilot logbook</Link>
+            <Link className="lp-link inline-flex items-center min-h-[44px]" href="/faa-easa-logbook">FAA + EASA logbook</Link>
           </nav>
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs" style={{ color: "var(--lp-ink-3)" }}>
             <span>&copy; Pilot Logbook HQ &middot; a multi-regime pilot logbook</span>
@@ -241,6 +244,18 @@ export function CtaBand({ title, sub = "Free up to 100 flights. No card required
 /* ---------------------------------------------------------------------------
    Glyphs
    --------------------------------------------------------------------------- */
+export function Breadcrumb({ name, path }: { name: string; path: string }) {
+  const ld = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Home", item: "https://pilotlogbookhq.com" },
+      { "@type": "ListItem", position: 2, name, item: `https://pilotlogbookhq.com${path}` },
+    ],
+  };
+  return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(ld) }} />;
+}
+
 function FileGlyph() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--lp-cyan)" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden>

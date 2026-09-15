@@ -253,6 +253,9 @@ export default function LandingPage() {
             <Link className="lp-link inline-flex items-center min-h-[44px]" href="/foreflight-logbook-alternative">ForeFlight alternative</Link>
             <Link className="lp-link inline-flex items-center min-h-[44px]" href="/logten-pro-alternative">LogTen Pro alternative</Link>
             <Link className="lp-link inline-flex items-center min-h-[44px]" href="/transport-canada-pilot-logbook">Transport Canada logbook</Link>
+            <Link className="lp-link inline-flex items-center min-h-[44px]" href="/myflightbook-alternative">MyFlightbook alternative</Link>
+            <Link className="lp-link inline-flex items-center min-h-[44px]" href="/easa-pilot-logbook">EASA pilot logbook</Link>
+            <Link className="lp-link inline-flex items-center min-h-[44px]" href="/faa-easa-logbook">FAA + EASA logbook</Link>
           </nav>
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs" style={{ color: "var(--lp-ink-3)" }}>
             <span>© Pilot Logbook HQ · a multi-regime pilot logbook</span>
