@@ -27,7 +27,7 @@ export default function ExpiredLinkNotice({ locale }: { locale: Locale }) {
       <p className="text-sm text-ink-3 text-center">
         <Link
           href="/login"
-          className="text-brand hover:underline rounded-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+          className="text-brand-deep hover:underline rounded-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
         >
           {s("backToSignIn")}
         </Link>

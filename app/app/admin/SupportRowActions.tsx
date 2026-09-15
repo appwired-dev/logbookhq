@@ -21,7 +21,7 @@ export default function SupportRowActions({ id, resolved }: { id: number; resolv
       {!resolved && (
         <form action={resolveSupport}>
           <input type="hidden" name="id" value={id} />
-          <button type="submit" className={`${BTN} text-brand hover:underline`}>Resolve</button>
+          <button type="submit" className={`${BTN} text-brand-deep hover:underline`}>Resolve</button>
         </form>
       )}
 

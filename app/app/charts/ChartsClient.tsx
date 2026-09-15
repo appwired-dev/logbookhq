@@ -329,9 +329,9 @@ export default function ChartsClient({
         {rolling.length === 0 ? (
           <ChartEmpty icon={Icon.Clock} title={s.rollingEmptyTitle} body={s.rollingEmptyBody} />
         ) : (
-          <div className="h-56 min-w-0">
+          <div className="h-56 min-w-0" role="img" aria-label={s.rollingTitle}>
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={rolling} margin={{ top: 16, right: 8, bottom: 4, left: 0 }}>
+              <AreaChart accessibilityLayer data={rolling} margin={{ top: 16, right: 8, bottom: 4, left: 0 }}>
                 <defs>
                   <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" style={{ stopColor: "rgb(var(--role-fo))", stopOpacity: 0.65 }} />

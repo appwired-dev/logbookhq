@@ -69,6 +69,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <ToastProvider locale={locale}>
     <div className="app-shell min-h-screen flex flex-col relative isolate">
+      <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:rounded-control focus:bg-surface focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-ink-1 focus:shadow-pop focus:ring-2 focus:ring-brand">
+        {t("nav.skipToContent")}
+      </a>
       <CursorGlow className="app-cursor-glow" />
       <HtmlLang locale={locale} />
       <header className="sticky top-0 z-30 h-16 bg-surface-inverse/90 backdrop-blur-xl border-b border-white/10">
@@ -93,7 +96,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </div>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-[1440px] px-4 sm:px-6 py-5 sm:py-6 pb-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom)+2.5rem)] md:pb-6 flex-1">
+      <main id="main" className="mx-auto w-full max-w-[1440px] px-4 sm:px-6 py-5 sm:py-6 pb-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom)+2.5rem)] md:pb-6 flex-1">
         {children}
       </main>
       {/* Outside <header>: its backdrop-filter would otherwise become this fixed bar's containing block. */}

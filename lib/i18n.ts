@@ -27,6 +27,7 @@ export const LOCALE_LABELS: Record<Locale, string> = {
 const TRANSLATIONS = {
   // Navigation
   "nav.dashboard":  { en: "Dashboard",  ko: "대시보드", zh: "仪表板",     es: "Panel" },
+  "nav.skipToContent": { en: "Skip to content", ko: "본문으로 건너뛰기", zh: "跳到主要内容", es: "Saltar al contenido" },
   "nav.flights":    { en: "Flights",    ko: "비행",     zh: "飞行",       es: "Vuelos" },
   "nav.charts":     { en: "Charts",     ko: "차트",     zh: "图表",       es: "Gráficos" },
   "nav.documents":  { en: "Documents",  ko: "문서",     zh: "文档",       es: "Documentos" },

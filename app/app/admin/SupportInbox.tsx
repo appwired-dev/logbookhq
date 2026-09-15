@@ -38,7 +38,7 @@ export default function SupportInbox({ requests, locale }: { requests: SupportRo
                     <p className="mt-1 text-sm text-ink-2 whitespace-pre-wrap break-words">{r.message}</p>
                     <div className="mt-1">
                       {r.email
-                        ? <a className="inline-flex items-center min-h-[44px] sm:min-h-0 text-xs text-brand hover:underline break-all" href={`mailto:${r.email}?subject=Re: ${encodeURIComponent(r.subject || "your message")}`}>{r.email}</a>
+                        ? <a className="inline-flex items-center min-h-[44px] sm:min-h-0 text-xs text-brand-deep hover:underline break-all" href={`mailto:${r.email}?subject=Re: ${encodeURIComponent(r.subject || "your message")}`}>{r.email}</a>
                         : <span className="text-2xs text-ink-3">unknown sender</span>}
                       <div className="text-2xs text-ink-3">{new Date(r.created_at).toLocaleString(locale)}</div>
                     </div>
