@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { useFormStatus } from "react-dom";
+import { signInWithGoogle } from "@/app/login/actions";
 
 /**
  * "Continue with Google" — OAuth sign-in via Supabase (PKCE).
@@ -9,47 +9,25 @@ import { createClient } from "@/lib/supabase/client";
  * Self-gating: renders nothing unless NEXT_PUBLIC_GOOGLE_AUTH_ENABLED === "true".
  * That lets this ship dormant and light up only once the Google provider is
  * enabled in Supabase AND the flag is set — so users never see a button that
- * would fail. Redirects to /auth/callback (same PKCE exchange as recovery);
- * `next` is where the pilot lands after signing in.
+ * would fail.
+ *
+ * The OAuth flow is INITIATED SERVER-SIDE (the `signInWithGoogle` action), not
+ * in the browser. That keeps the PKCE code-verifier in the server cookie store
+ * for both initiation and the /auth/callback exchange — the same all-server
+ * path the recovery flow uses. A browser-initiated flow wrote the verifier
+ * client-side and the server exchange couldn't match it (GoTrue
+ * `flow_state_not_found` → "link expired"). `next` is where the pilot lands
+ * after signing in.
  */
 export function GoogleSignInButton({ next = "/app" }: { next?: string }) {
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
   if (process.env.NEXT_PUBLIC_GOOGLE_AUTH_ENABLED !== "true") return null;
-
-  async function signIn() {
-    setError(null);
-    setPending(true);
-    try {
-      const supabase = createClient();
-      const base =
-        process.env.NEXT_PUBLIC_APP_URL?.replace(/\/+$/, "") || window.location.origin;
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: { redirectTo: `${base}/auth/callback?next=${encodeURIComponent(next)}` },
-      });
-      if (error) throw error;
-      // Success: the browser is redirecting to Google; nothing else runs.
-    } catch {
-      setError("Couldn't start Google sign-in. Please try again.");
-      setPending(false);
-    }
-  }
 
   return (
     <div className="space-y-4">
-      <button
-        type="button"
-        onClick={signIn}
-        disabled={pending}
-        aria-busy={pending || undefined}
-        className="btn w-full"
-      >
-        <GoogleG />
-        {pending ? "Redirecting\u2026" : "Continue with Google"}
-      </button>
-      {error && <p className="text-sm text-bad-ink" role="alert">{error}</p>}
+      <form action={signInWithGoogle}>
+        <input type="hidden" name="next" value={next} />
+        <SubmitButton />
+      </form>
       <div className="relative">
         <div aria-hidden className="absolute inset-0 flex items-center">
           <div className="w-full border-t border-border" />
@@ -59,6 +37,22 @@ export function GoogleSignInButton({ next = "/app" }: { next?: string }) {
         </div>
       </div>
     </div>
+  );
+}
+
+/** Submit button with pending state, driven by the enclosing form's status. */
+function SubmitButton() {
+  const { pending } = useFormStatus();
+  return (
+    <button
+      type="submit"
+      disabled={pending}
+      aria-busy={pending || undefined}
+      className="btn w-full"
+    >
+      <GoogleG />
+      {pending ? "Redirecting…" : "Continue with Google"}
+    </button>
   );
 }
 
