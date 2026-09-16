@@ -17,7 +17,9 @@
     "test:limits": "tsx scripts/limits.test.ts",
     "test:auth": "tsx scripts/auth.test.ts",
     "test:rate": "tsx scripts/rate-limit.test.ts",
-    "check:client-graph": "tsx scripts/check-client-graph.ts app/app/import/ImportWizard.tsx app/app/import/StepMapping.tsx app/app/import/StepReconcile.tsx app/app/flights/FlightsClient.tsx app/app/flights/FlightForm.tsx"
+    "check:client-graph": "tsx scripts/check-client-graph.ts app/app/import/ImportWizard.tsx app/app/import/StepMapping.tsx app/app/import/StepReconcile.tsx app/app/flights/FlightsClient.tsx app/app/flights/FlightForm.tsx",
+    "test:derive": "tsx scripts/derive.test.ts",
+    "test:recency": "tsx scripts/recency.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.98.0",
