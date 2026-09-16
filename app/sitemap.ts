@@ -19,6 +19,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${base}/myflightbook-alternative`,       lastModified: "2026-09-14", changeFrequency: "monthly", priority: 0.8 },
     { url: `${base}/easa-pilot-logbook`,             lastModified: "2026-09-14", changeFrequency: "monthly", priority: 0.8 },
     { url: `${base}/faa-easa-logbook`,               lastModified: "2026-09-14", changeFrequency: "monthly", priority: 0.8 },
+    { url: `${base}/uk-caa-pilot-logbook`,         lastModified: "2026-09-15", changeFrequency: "monthly", priority: 0.8 },
+    { url: `${base}/icao-pilot-logbook`,           lastModified: "2026-09-15", changeFrequency: "monthly", priority: 0.8 },
     { url: `${base}/terms`,                           lastModified: "2026-05-19", changeFrequency: "yearly",  priority: 0.3 },
     { url: `${base}/privacy`,                         lastModified: "2026-05-19", changeFrequency: "yearly",  priority: 0.3 },
   ];

@@ -139,6 +139,8 @@ export default function MultiRegimePage() {
           { href: "/faa-easa-logbook", label: "FAA + EASA logbook" },
           { href: "/easa-pilot-logbook", label: "EASA pilot logbook" },
           { href: "/transport-canada-pilot-logbook", label: "Transport Canada logbook" },
+          { href: "/uk-caa-pilot-logbook", label: "UK CAA pilot logbook" },
+          { href: "/icao-pilot-logbook", label: "ICAO pilot logbook" },
         ]}
       />
 
