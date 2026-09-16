@@ -98,8 +98,15 @@ export async function POST(req: NextRequest) {
           .eq("id", userId)
           .single();
         if (current?.tier === "lifetime") break;
-        // Active subscription stays Pro; past_due / unpaid get downgraded.
-        const tier = ["active", "trialing"].includes(sub.status) ? tierForPlan(plan) : "free";
+        // Keep the paid tier through the dunning grace period: Stripe emits
+        // subscription.updated with status "past_due" the instant a renewal
+        // charge fails, while automatic card retries are still running and the
+        // subscription is usually recovered. Downgrading on the first past_due
+        // yanks access (and re-applies the 100-flight cap) from a customer who
+        // is still effectively subscribed. Downgrade only on terminal states;
+        // a true cancel arrives as customer.subscription.deleted.
+        const PAID_STATUSES = ["active", "trialing", "past_due"];
+        const tier = PAID_STATUSES.includes(sub.status) ? tierForPlan(plan) : "free";
         const { error, count } = await admin.from("profiles").update({ tier }, { count: "exact" }).eq("id", userId);
         if (error) throw new Error(`subscription update: ${error.message}`);
         if (!count) throw new Error(`subscription update: no profile row for ${userId}`);

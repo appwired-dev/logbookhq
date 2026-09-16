@@ -70,7 +70,11 @@ function validateFlight(input: FlightInput): { ok: true; value: FlightInput } | 
   for (const k of WRITABLE_KEYS) {
     if (k in raw) cleaned[k] = raw[k];
   }
+  // Coerce only the numeric fields the client actually sent — honoring the
+  // "absent keys stay absent" contract above, so a partial update leaves the
+  // rest untouched instead of failing Number(undefined) -> NaN.
   for (const f of numericFields) {
+    if (!(f in raw)) continue;
     const r = nonNegNumber(raw[f], f as string);
     if (typeof r === "string") return { ok: false, error: r };
     cleaned[f as string] = r;

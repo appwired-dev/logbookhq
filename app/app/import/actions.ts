@@ -10,6 +10,7 @@ import {
 } from "@/lib/import";
 import type { ParsedFlight } from "@/lib/csv";
 import { bumpTemplateUse, listTemplatesForUser, upsertUserTemplate } from "@/lib/import-templates-db";
+import { bucketKey, underLimit } from "@/lib/rate-limit";
 import {
   MAX_FILE_BYTES, isActionError as isError, isAllowedExtension, normaliseAnalysis, normaliseMapping,
   type ActionError, type ActionResult, type AnalyzeData, type CommitData, type ImportMode, type PreviewData, type SkipCount,
@@ -197,6 +198,12 @@ export async function arbitrateImportAction(formData: FormData): Promise<ActionR
   if (!process.env.ANTHROPIC_API_KEY) return { error: "AI mapping is not enabled on this server" };
   const auth = await requireUser();
   if (isError(auth)) return auth;
+  // Rate-limit the billable Anthropic call per user — the wizard can re-run it
+  // per import and per column subset, and it's the app's most direct
+  // cost-abuse vector. 30/hour is generous for legitimate multi-file imports.
+  if (!(await underLimit(bucketKey("arbitrate", "email", auth.userId), 30, 3600))) {
+    return { error: "Too many AI mapping requests. Please wait a few minutes and try again." };
+  }
   const analysis = readAnalysis(formData);
   if (!analysis) return { error: "Missing analysis." };
   const rawCols = readJson<unknown>(formData, "onlyCols");
