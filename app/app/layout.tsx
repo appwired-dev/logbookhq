@@ -13,12 +13,14 @@ import { getT, getLocale } from "@/lib/i18n-server";
 import HtmlLang from "@/components/HtmlLang";
 import CursorGlow from "@/app/CursorGlow";
 
-// Cold-start headroom for the authenticated app. Every /app/* route below
-// fetches the user's whole logbook (fetchAllFlights); on a cold serverless
-// invocation, bundle init + Supabase auth + the 6.1MB airport-DB parse can
-// occasionally cross Vercel's default 10s function cap and return a 504
-// ("Gateway Timeout"). Warm invocations finish in well under a second. 60s is
-// the Hobby-plan ceiling; this one export covers the entire /app segment.
+// Cold-start headroom for the authenticated app. Most /app/* routes fetch the
+// user's whole logbook (fetchAllFlights); on a cold serverless invocation,
+// bundle init + Supabase auth + rendering a large logbook can occasionally
+// cross Vercel's default 10s function cap and return a 504 ("Gateway
+// Timeout"). Warm invocations finish in well under a second. 60s is the
+// Hobby-plan ceiling; this one export covers the entire /app segment.
+// (The former 6.1MB airport-DB parse was charts-only and now queries Postgres
+// for just the flown codes — see lib/airports.ts.)
 export const maxDuration = 60;
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
