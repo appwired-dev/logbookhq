@@ -1,11 +1,15 @@
 /**
- * Server-side airport lookup. Loads data/airports.json once per process (Next
- * server function) and resolves ICAO/IATA codes to coordinates. Never shipped
- * to the client — the Globe component receives only the small subset that
- * matches the user's actual routes.
+ * Airport lookups for /app/charts (globe arcs + route validation).
+ *
+ * Airports live in a Postgres reference table (see migration 0020_airports).
+ * `fetchAirports` pulls ONLY the codes a user actually flew — a few hundred at
+ * most — instead of parsing the full 70k-entry data/airports.json into ~31MB of
+ * heap per server instance on this route. The validation/distance helpers are
+ * pure: they take the fetched map, so they stay trivially testable and unit-
+ * tested against a fixture (scripts/airports.test.ts). data/airports.json
+ * remains the source that seeds the table (scripts/load-airports.ts).
  */
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 export interface Airport {
   lat: number;
@@ -14,25 +18,49 @@ export interface Airport {
   country: string;
 }
 
-let cache: Record<string, Airport> | null = null;
+const norm = (code: string) => code.trim().toUpperCase();
 
-function load(): Record<string, Airport> {
-  if (cache) return cache;
-  const path = resolve(process.cwd(), "data/airports.json");
-  cache = JSON.parse(readFileSync(path, "utf8"));
-  return cache!;
+/**
+ * Fetch the given codes from the airports table. Returns a map keyed by the
+ * normalised (trimmed, upper-cased) code, containing only codes that exist.
+ * One round trip per ~800 codes; a career's worth of distinct route codes is
+ * well under that, so in practice this is a single query.
+ */
+export async function fetchAirports(
+  supabase: SupabaseClient,
+  codes: string[],
+): Promise<Record<string, Airport>> {
+  const uniq = [...new Set(codes.map(norm).filter(Boolean))];
+  const out: Record<string, Airport> = {};
+  if (uniq.length === 0) return out;
+  const CHUNK = 800;
+  for (let i = 0; i < uniq.length; i += CHUNK) {
+    const slice = uniq.slice(i, i + CHUNK);
+    const { data, error } = await supabase
+      .from("airports")
+      .select("code, lat, lon, name, country")
+      .in("code", slice);
+    if (error) throw error;
+    for (const row of data ?? []) {
+      out[row.code as string] = {
+        lat: Number(row.lat),
+        lon: Number(row.lon),
+        name: (row.name as string) ?? "",
+        country: (row.country as string) ?? "",
+      };
+    }
+  }
+  return out;
 }
 
-export function lookup(code: string): Airport | undefined {
-  return load()[code.trim().toUpperCase()];
-}
-
-/** Look up many codes; returns only the ones found in the airport DB. */
-export function lookupMany(codes: string[]): Record<string, Airport> {
-  const data = load();
+/** Subset of `data` for the given codes; skips blanks and unknown codes. */
+export function lookupMany(
+  codes: string[],
+  data: Record<string, Airport>,
+): Record<string, Airport> {
   const out: Record<string, Airport> = {};
   for (const c of codes) {
-    const k = c.trim().toUpperCase();
+    const k = norm(c);
     if (!k) continue;
     const a = data[k];
     if (a) out[k] = a;
@@ -84,20 +112,20 @@ export function haversineDistanceNm(a: Airport, b: Airport): number {
  *      basis to validate distance.
  *
  * Returns the set of plausible codes; unknown / implausible codes are
- * dropped silently.
+ * dropped silently. `data` is the airport map from `fetchAirports`.
  */
 export function validateFlightCodes(
   codes: string[],
   flightTimeHours: number,
+  data: Record<string, Airport>,
 ): Set<string> {
-  const data = load();
   const valid = new Set<string>();
 
   // Bucket: 4-letter anchors (trusted) vs 3-letter candidates (need check).
   const anchors: Airport[] = [];
   const candidates: { code: string; airport: Airport }[] = [];
   for (const raw of codes) {
-    const code = raw.trim().toUpperCase();
+    const code = norm(raw);
     const a = data[code];
     if (!a) continue;
     if (code.length === 4) {

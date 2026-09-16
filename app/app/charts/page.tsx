@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { deriveFlight } from "@/lib/derive";
 import { fetchAllFlights } from "@/lib/fetch-flights";
-import { lookupMany, validateFlightCodes } from "@/lib/airports";
+import { fetchAirports, lookupMany, validateFlightCodes } from "@/lib/airports";
 import { parseRoute } from "@/lib/routes";
 import { getLocale } from "@/lib/i18n-server";
 import type { Regime } from "@/lib/currency-rules";
@@ -19,6 +19,12 @@ export default async function ChartsPage() {
   const flights = await fetchAllFlights(supabase, { orderAsc: true });
   const derived = flights.map(deriveFlight);
 
+  // Fetch airport coordinates for ONLY the codes this pilot's routes
+  // reference (a scoped query), instead of parsing the full 70k-entry
+  // airport DB into memory. The validation/lookup helpers are pure and
+  // run against this map. See lib/airports.ts.
+  const airportData = await fetchAirports(supabase, derived.flatMap((f) => parseRoute(f.route).flat()));
+
   // Career-wide flight-route bundle for the Globe. Each route's codes are
   // validated against the flight's total time — codes that are physically
   // unreachable (likely VOR/NDB navaids sharing idents with unrelated
@@ -35,7 +41,7 @@ export default async function ChartsPage() {
     const arcs = parseRoute(f.route);
     if (arcs.length === 0) continue;
     const codes = [...new Set(arcs.flat())];
-    const valid = validateFlightCodes(codes, f.total_time);
+    const valid = validateFlightCodes(codes, f.total_time, airportData);
     perFlightValid.push({ arcs, valid });
     for (const c of codes) {
       if (valid.has(c)) {
@@ -49,7 +55,7 @@ export default async function ChartsPage() {
   const globallyPlausible = new Set(
     [...codeStatus.entries()].filter(([, s]) => s === "ok").map(([c]) => c),
   );
-  const airports = lookupMany([...globallyPlausible]);
+  const airports = lookupMany([...globallyPlausible], airportData);
 
   // Build arcs from flight legs where both endpoints are globally plausible.
   // Track each direction separately so we can label arcs correctly:
