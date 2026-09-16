@@ -4,6 +4,9 @@ import { withSentryConfig } from "@sentry/nextjs";
 const config: NextConfig = {
   reactStrictMode: true,
   experimental: {
+    // Tree-shake these barrel-exporting libs (not in Next's default list) so
+    // routes pull only the icons/charts they use.
+    optimizePackageImports: ["recharts", "lucide-react"],
     serverActions: {
       // Document vault + logbook imports; bumped past 10 MB because Numbers/
       // Excel exports of long flight histories can approach 15 MB.

@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useId, useMemo } from "react";
 import Link from "next/link";
 import {
@@ -16,7 +17,7 @@ import FlowSankey, {
   NODE_MUTED, NODE_NEUTRAL, ROLE_COLORS, type FlowLink, type FlowNode,
 } from "@/components/FlowSankey";
 import { Card, CardHeader, EmptyState, Icon, PageHeader, buttonClass } from "@/components/ui";
-import FlightGlobe from "./Globe";
+const FlightGlobe = dynamic(() => import("./Globe"), { ssr: false, loading: () => null });
 import TypeHoursChart, { type TypeHoursRow } from "./CustomBars";
 import { fmt, getChartsStrings } from "./charts-strings";
 
