@@ -307,6 +307,8 @@ export default function PrivacyPage() {
           <Link className="hover:text-slate-700" href="/myflightbook-alternative">MyFlightbook alternative</Link>
           <Link className="hover:text-slate-700" href="/easa-pilot-logbook">EASA pilot logbook</Link>
           <Link className="hover:text-slate-700" href="/faa-easa-logbook">FAA + EASA logbook</Link>
+          <Link className="hover:text-slate-700" href="/uk-caa-pilot-logbook">UK CAA pilot logbook</Link>
+          <Link className="hover:text-slate-700" href="/icao-pilot-logbook">ICAO pilot logbook</Link>
         </div>
       </footer>
     </div>

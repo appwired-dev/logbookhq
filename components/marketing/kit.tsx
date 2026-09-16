@@ -52,6 +52,8 @@ export function MarketingShell({ children }: { children: ReactNode }) {
             <Link className="lp-link inline-flex items-center min-h-[44px]" href="/myflightbook-alternative">MyFlightbook alternative</Link>
             <Link className="lp-link inline-flex items-center min-h-[44px]" href="/easa-pilot-logbook">EASA pilot logbook</Link>
             <Link className="lp-link inline-flex items-center min-h-[44px]" href="/faa-easa-logbook">FAA + EASA logbook</Link>
+            <Link className="lp-link inline-flex items-center min-h-[44px]" href="/uk-caa-pilot-logbook">UK CAA pilot logbook</Link>
+            <Link className="lp-link inline-flex items-center min-h-[44px]" href="/icao-pilot-logbook">ICAO pilot logbook</Link>
           </nav>
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs" style={{ color: "var(--lp-ink-3)" }}>
             <span>&copy; Pilot Logbook HQ &middot; a multi-regime pilot logbook</span>
