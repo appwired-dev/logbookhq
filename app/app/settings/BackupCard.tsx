@@ -2,15 +2,13 @@
 
 import { useState } from "react";
 import JSZip from "jszip";
-import { pdf } from "@react-pdf/renderer";
-import { LogbookPDF } from "@/lib/pdf/LogbookPDF";
 import { exportFlightsCsv } from "@/lib/csv-export";
 import { deriveFlight, computeTotals } from "@/lib/derive";
 import type { Locale } from "@/lib/i18n";
-import type { Flight } from "@/lib/types";
 import { Alert, Button, Card, CardHeader, Icon } from "@/components/ui";
 import { useToast } from "@/components/ui/toast";
 import { settingsStrings } from "./settings-strings";
+import { getBackupFlights } from "./backup-actions";
 
 type Stage = "idle" | "pdf" | "zip";
 
@@ -26,9 +24,9 @@ type Stage = "idle" | "pdf" | "zip";
  * scheduled auto-upload is Phase 2.
  */
 export default function BackupCard({
-  flights, defaultName, defaultLicense, avatarUrl, locale,
+  flightCount, defaultName, defaultLicense, avatarUrl, locale,
 }: {
-  flights: Flight[];
+  flightCount: number;
   defaultName: string;
   defaultLicense: string;
   avatarUrl: string | null;
@@ -40,15 +38,23 @@ export default function BackupCard({
   const [err, setErr] = useState<string | null>(null);
   const [lastBackup, setLastBackup] = useState<string | null>(null);
   const busy = stage !== "idle";
-  const empty = flights.length === 0;
+  const empty = flightCount === 0;
 
   async function downloadBackup() {
     setErr(null);
     try {
       setStage("pdf");
+      // Fetch the logbook only now (on click), not on every Settings visit.
+      const flights = await getBackupFlights();
       const csv = exportFlightsCsv(flights);
       const derived = flights.map(deriveFlight);
       const totals = computeTotals(derived);
+      // Lazy-load the PDF toolchain (~400KB gzip) only when a backup is
+      // actually generated, so it stays out of the Settings initial bundle.
+      const [{ pdf }, { LogbookPDF }] = await Promise.all([
+        import("@react-pdf/renderer"),
+        import("@/lib/pdf/LogbookPDF"),
+      ]);
       const pdfBlob = await pdf(
         <LogbookPDF
           flights={derived}
@@ -120,7 +126,7 @@ export default function BackupCard({
         <Button variant="primary" className="h-11 sm:h-10" loading={busy} disabled={empty} onClick={downloadBackup}>
           {busy ? buttonLabel : <><Icon.Download size={16} strokeWidth={1.75} aria-hidden />{buttonLabel}</>}
         </Button>
-        <span className="text-xs text-ink-3 num">{s("flightsCount", { n: flights.length.toLocaleString() })}</span>
+        <span className="text-xs text-ink-3 num">{s("flightsCount", { n: flightCount.toLocaleString() })}</span>
         {lastBackup && (
           <span role="status" className="flex items-center gap-1 text-xs font-medium text-good-ink">
             <Icon.Check size={14} strokeWidth={2} aria-hidden />{s("lastBackup", { time: lastBackup })}

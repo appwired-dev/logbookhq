@@ -7,7 +7,7 @@ import {
   type FlightTimeRuleSet, type FlightTimeWindow, type Regime,
 } from "@/lib/currency-rules";
 import { fetchAllFlights } from "@/lib/fetch-flights";
-import AircraftRoleSankey from "@/components/AircraftRoleSankey";
+import AircraftRoleSankey from "@/components/AircraftRoleSankeyLazy";
 import { getT, getLocale } from "@/lib/i18n-server";
 import CalendarHeatmapCard, { type HeatDay } from "@/components/CalendarHeatmapCard";
 import type { Locale, TranslationKey } from "@/lib/i18n";

@@ -2,8 +2,7 @@
 
 import { useId, useMemo, useState } from "react";
 import Link from "next/link";
-import { pdf } from "@react-pdf/renderer";
-import { LogbookPDF, type PdfLayout } from "@/lib/pdf/LogbookPDF";
+import type { PdfLayout } from "@/lib/pdf/LogbookPDF";
 import { exportFlightsCsv } from "@/lib/csv-export";
 import { computeTotals } from "@/lib/derive";
 import { makeT, type Locale } from "@/lib/i18n";
@@ -71,6 +70,12 @@ export default function ExportClient({ flights, defaultName, defaultLicense, ava
         const win = window.open("", "_blank");
         let blob: Blob;
         try {
+          // Lazy-load the PDF toolchain only when generating a PDF; keeps
+          // ~400KB gzip out of the Export route's initial bundle.
+          const [{ pdf }, { LogbookPDF }] = await Promise.all([
+            import("@react-pdf/renderer"),
+            import("@/lib/pdf/LogbookPDF"),
+          ]);
           blob = await pdf(
             <LogbookPDF
               flights={filtered}

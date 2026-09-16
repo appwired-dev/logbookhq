@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getLocale } from "@/lib/i18n-server";
-import { fetchAllFlights } from "@/lib/fetch-flights";
 import { openBillingPortal } from "@/app/app/billing/actions";
 import { stripe } from "@/lib/stripe";
 import { Card, CardHeader, Icon, Pill, buttonClass } from "@/components/ui";
@@ -43,7 +42,11 @@ export default async function SettingsPage() {
     .eq("id", user!.id)
     .single();
   const locale = await getLocale();
-  const flights = await fetchAllFlights(supabase, { orderAsc: true });
+  // Only the count is needed to render the backup card's empty state; the
+  // full logbook is fetched on demand when the user clicks "Backup now".
+  const { count: flightCount } = await supabase
+    .from("flights")
+    .select("id", { count: "exact", head: true });
   const hasStripeCustomer = !!profile?.stripe_customer_id;
   const receipts = await fetchReceipts(profile?.stripe_customer_id);
 
@@ -55,7 +58,7 @@ export default async function SettingsPage() {
       billing={<BillingCard tier={profile?.tier ?? "free"} hasStripeCustomer={hasStripeCustomer} receipts={receipts} locale={locale} />}
       backup={
         <BackupCard
-          flights={flights}
+          flightCount={flightCount ?? 0}
           defaultName={profile?.full_name ?? ""}
           defaultLicense={profile?.license_number ?? ""}
           avatarUrl={profile?.avatar_url ?? null}

@@ -5,12 +5,14 @@ import * as Sentry from "@sentry/nextjs";
 
 Sentry.init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
-  // Browser performance traces — light sample rate to stay under the free
-  // quota. Bump up later once paid plan is in place.
-  tracesSampleRate: 0.1,
   // No-op in local dev; only ship from prod/preview deployments.
   enabled: process.env.NODE_ENV === "production",
-  integrations: [Sentry.browserTracingIntegration()],
+  // Error capture only. browserTracingIntegration was dropped so the tracing
+  // code tree-shakes out of the client bundle that loads on the static
+  // marketing/conversion pages (a top Core Web Vitals lever for a tiny SaaS).
+  // Web Vitals are still covered by Vercel Analytics. Re-add
+  // Sentry.browserTracingIntegration() + tracesSampleRate to restore traces.
+  integrations: [],
 });
 
 // Required so Next.js's client-side navigation transitions get linked to the
