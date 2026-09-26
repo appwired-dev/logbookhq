@@ -125,6 +125,7 @@ const EXPECTED_REASON_SHAPES = [
   "hours column without a header — flight time is taken from column •",
   "no header and no recognisable shape",
   "no suitable target",
+  "row total of columns • — importing it would count those hours twice",
   'unrecognised header "•"',
   "• already comes from column •",
 ];
@@ -391,6 +392,7 @@ const REASON_SAMPLES: { key: ReasonKey; reason: string }[] = [
   { key: "coveredActualHood", reason: "covered by the actual/hood columns" },
   { key: "blockTime", reason: 'block time — flight time comes from "Gesamtflugzeit"' },
   { key: "duplicateHeader", reason: 'duplicate header "PIC" (also column D)' },
+  { key: "rowSubtotal", reason: "row total of columns I + K — importing it would count those hours twice" },
 ];
 
 test("every reason pattern has a sample and matches the right key", () => {

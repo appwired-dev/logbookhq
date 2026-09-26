@@ -13,13 +13,14 @@
  * of columns may be time buckets.
  */
 import type {
-  CanonicalTarget, ColumnAssignment, ColumnMapping, FieldTarget, Grid, HeaderBand, HeaderPath, ImportTemplate,
+  CanonicalTarget, Cell, ColumnAssignment, ColumnMapping, FieldTarget, Grid, HeaderBand, HeaderPath, ImportTemplate,
   TimeCategory, TimeCondition, TimeRole,
 } from "./types";
 import { facetsOf, facetsOfPath, hasInheritableFacets, isGenericTimeLeaf, isUnitLeaf, normaliseSegment, type Facets } from "./synonyms";
 import { columnStats, shapeScore, type ColumnStats } from "./shape";
 import { templateAssignments } from "./templates";
-import { TOTAL_ROW_RE } from "./util";
+import { TOTAL_ROW_RE, parseTimeValue } from "./util";
+import { hasDateCell, isDateLikeCell } from "./headers";
 import {
   CATEGORIES, CONDITIONS, FIELDS, IGNORE, ROLES, SUMMABLE_FIELDS, allTargetKeys, field, parseTargetKey, sameTarget, targetKey, time,
 } from "./targets";
@@ -437,6 +438,14 @@ export function mapColumns(
     }
   }
 
+  // 7. Row subtotals: a time column that is, on every dated row, the sum of other category × role
+  //    columns (a "Total Dual" = I + K formula column, often headed only "Dual" beside a merged group
+  //    it was never part of) would count those hours a second time — it yields to its parts.
+  for (const { a, parts } of rowSubtotals(grid, dataStart, [...assigned.values()], isAuto)) {
+    const cols = parts.map(colLetter).join(" + ");
+    assigned.set(a.col, { ...a, target: IGNORE, confidence: 0.85, reason: `row total of columns ${cols} — importing it would count those hours twice` });
+  }
+
   const columns = [...assigned.values()].sort((a, b) => a.col - b.col);
   return { columns, conventions: detectConventions(columns, grid, dataStart, contexts, opts.template?.mapping.conventions) };
 }
@@ -456,6 +465,88 @@ function dominantHoursCol(grid: Grid, dataStart: number, cols: number[], maxRows
   let best = cols[0];
   for (const c of cols) if ((dom.get(c) ?? 0) >= (dom.get(best) ?? 0)) best = c;
   return best;
+}
+
+/** Cells are logged to 0.1 h: a sum within this of the column still matches it. */
+const SUBTOTAL_EPS = 0.051;
+/** Non-zero rows a column needs before a sum can be told from coincidence. */
+const SUBTOTAL_MIN_ROWS = 3;
+
+type TimeTarget = Extract<CanonicalTarget, { kind: "time" }>;
+
+/** Hours in a cell for the subtotal check: numbers as-is, duration text ("1:30") parsed, anything else 0. */
+function looseHours(cell: Cell | undefined): number {
+  if (!cell) return 0;
+  const v = cell.kind === "number" ? cell.value : cell.kind === "text" ? parseTimeValue(cell.value) : 0;
+  return Number.isFinite(v) && v > 0 ? v : 0;
+}
+
+/**
+ * Parts that leave a column nothing of its own: two or more category × role columns that name every
+ * facet the column names (dropping it loses no day/night or role split), or one exact copy of it.
+ * Overlay columns — "Day", "Night", "PIC" with no category — never qualify: "SEL" = Day + Night on
+ * every row is how those logbooks are meant to read, not a double count.
+ */
+function coversSubtotal(x: TimeTarget, parts: TimeTarget[]): boolean {
+  if (parts.length === 1) return sameTarget(x, parts[0]);
+  return parts.length >= 2 && parts.every((p) =>
+    p.category !== "any" && p.role !== "any" && (x.condition === "any" || p.condition !== "any"));
+}
+
+/**
+ * Time columns that are row subtotals of other time columns: on every dated row the value equals the
+ * sum of one fixed set of other time columns, each never larger than it. Scanned right-to-left, so a
+ * total sitting right of its parts yields and, of two identical columns, the left-most original
+ * survives; a column found to be a subtotal is never a part of another.
+ */
+function rowSubtotals(
+  grid: Grid, dataStart: number, columns: ColumnAssignment[], canDrop: (a: ColumnAssignment) => boolean,
+): { a: ColumnAssignment; parts: number[] }[] {
+  const timeCols = columns
+    .filter((a): a is ColumnAssignment & { target: TimeTarget } => a.target.kind === "time")
+    .sort((a, b) => b.col - a.col);
+  if (timeCols.length < 2) return [];
+  const dateCol = columns.find((a) => a.target.kind === "field" && a.target.field === "date")?.col;
+  // Dated rows only: footer totals and blank template rows below the data say nothing about a column.
+  const rows = grid.rows.slice(dataStart).filter((row) => {
+    if (!row) return false;
+    if (dateCol == null) return hasDateCell(row);
+    const d = row[dateCol];
+    return d != null && isDateLikeCell(d);
+  });
+  const hours = new Map(timeCols.map((a) => [a.col, rows.map((row) => looseHours(row[a.col]))]));
+
+  const found: { a: ColumnAssignment; parts: number[] }[] = [];
+  const dropped = new Set<number>();
+  for (const x of timeCols) {
+    if (!canDrop(x)) continue;
+    const xs = hours.get(x.col)!;
+    if (xs.filter((v) => v > 0).length < SUBTOTAL_MIN_ROWS) continue;
+    const parts = timeCols.filter((p) => {
+      if (p.col === x.col || dropped.has(p.col)) return false;
+      const ps = hours.get(p.col)!;
+      let shared = false;
+      for (let i = 0; i < rows.length; i++) {
+        if (ps[i] > xs[i] + SUBTOTAL_EPS) return false;
+        if (ps[i] > 0 && xs[i] > 0) shared = true;
+      }
+      return shared;
+    });
+    if (!coversSubtotal(x.target, parts.map((p) => p.target))) continue;
+    let checked = 0;
+    let off = 0;
+    for (let i = 0; i < rows.length; i++) {
+      const sum = parts.reduce((t, p) => t + hours.get(p.col)![i], 0);
+      if (xs[i] === 0 && sum === 0) continue;
+      checked++;
+      if (Math.abs(xs[i] - sum) > SUBTOTAL_EPS) off++;
+    }
+    // A formula column matches everywhere; a hand-typed total may carry the odd slip.
+    if (checked < SUBTOTAL_MIN_ROWS || off > Math.floor(checked * 0.02)) continue;
+    dropped.add(x.col);
+    found.push({ a: x, parts: parts.map((p) => p.col).sort((m, n) => m - n) });
+  }
+  return found;
 }
 
 function round2(x: number): number { return Math.round(x * 100) / 100; }
