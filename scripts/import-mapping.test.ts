@@ -22,6 +22,7 @@
  *   R34  a bare "IFR" column yields to an explicit Actual / Hood column
  *   R35  "Aeroplane" over hours is aeroplane time, not a type
  *   R36  duplicate headers stay mapped, the second one flagged for review
+ *   R37  a row-total column ("Total Dual" = I + K) yields to its parts; overlays (SEL = Day + Night) stay
  */
 import assert from "node:assert/strict";
 import { analyzeWorkbook, applyMapping, readWorkbook, targetKey, type Analysis, type Cell, type Grid } from "../lib/import";
@@ -466,6 +467,49 @@ test("R6b: a block-time column yields to an explicit flight-time column (Blockze
   const lone = analyse("block-only.csv", ["Datum,Kennzeichen,Flugzeugtyp,Blockzeit", "05.03.2024,D-EABC,C172,1.6"]);
   const b = lone.mapping.columns.find((c) => c.col === lone.header.paths.find((x) => x.label === "Blockzeit")!.col)!;
   assert.ok(b.target.kind === "time" || targetKey(b.target) === "field:total_time", `lone Blockzeit → ${targetKey(b.target)}`);
+});
+
+// ---------------------------------------------------------------------------
+// R37 — row subtotals
+// ---------------------------------------------------------------------------
+
+test("R37: 'Dual'/'PIC' total columns right of a Single-Engine group are ignored, so every hour counts once", () => {
+  // The group label spreads into the two total columns (G = C + E, H = D + F on every row), exactly as a
+  // real logbook whose "Single-Engine" merge ends at column F reads — they must not become night time.
+  const { analysis: a, applied } = pipeline("se-with-row-totals.csv", [
+    "Date,Aircraft,Single-Engine,,,,,",
+    ",,Day,,Night,,,",
+    ",,Dual,PIC,Dual,PIC,Dual,PIC",
+    "2024-09-21,C172,0.9,,,,0.9,0",
+    "2024-09-24,C172,1.1,,,,1.1,0",
+    "2024-10-01,C172,,1.3,,,0,1.3",
+    "2024-10-05,C172,,,0.8,,0.8,0",
+    "2024-10-09,C172,,1.2,,0.4,0,1.6",
+    "2024-10-12,C172,,1,,,0,1",
+    "2024-10-15,C172,1,,,,1,0",
+  ]);
+  assert.equal(targetKey(assignmentAt(a, 6).target), "ignore");
+  assert.equal(targetKey(assignmentAt(a, 7).target), "ignore");
+  assert.match(assignmentAt(a, 6).reason ?? "", /^row total of columns C \+ E — /);
+  assert.match(assignmentAt(a, 7).reason ?? "", /^row total of columns D \+ F — /);
+  for (const col of [2, 3, 4, 5]) assert.notEqual(targetKey(assignmentAt(a, col).target), "ignore", `part ${col} stays mapped`);
+  const r1 = (n: number) => Math.round(n * 10) / 10;
+  assert.equal(r1(applied.flights.reduce((t, f) => t + f.day_time + f.night_time, 0)), 7.7, "each hour counted once");
+  assert.equal(r1(applied.flights.reduce((t, f) => t + f.night_time, 0)), 1.2, "night is only the Night columns");
+});
+
+test("R37: overlay columns stay mapped — SEL equal to Day + Night on every row is not a subtotal", () => {
+  const a = analyse("sel-day-night.csv", [
+    "Date,Aircraft,SEL,Day,Night",
+    "2024-01-01,C172,1.5,1.5,",
+    "2024-01-02,C172,1.2,0.7,0.5",
+    "2024-01-03,C172,1,1,",
+    "2024-01-04,C172,0.8,,0.8",
+  ]);
+  for (const label of ["SEL", "Day", "Night"]) {
+    assert.notEqual(targetKey(assignment(a, label).target), "ignore", `${label} stays mapped`);
+    assert.doesNotMatch(assignment(a, label).reason ?? "", /row total/);
+  }
 });
 
 // ---------------------------------------------------------------------------

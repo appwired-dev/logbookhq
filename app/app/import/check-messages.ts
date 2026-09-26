@@ -792,6 +792,7 @@ export const REASON = {
   coveredActualHood: { en: "covered by the actual/hood columns", ko: "실제/후드 열에 포함됨", zh: "已由实际/遮蔽列覆盖", es: "cubierta por las columnas real/capucha" },
   blockTime: { en: 'block time — flight time comes from "{label}"', ko: '블록 시간 — 비행 시간은 "{label}"에서 가져옵니다', zh: "轮挡时间——飞行时间来自“{label}”", es: 'tiempo de calzos — el tiempo de vuelo proviene de "{label}"' },
   duplicateHeader: { en: 'duplicate header "{label}" (also column {col})', ko: '중복 머리글 "{label}" ({col} 열에도 있음)', zh: "重复表头“{label}”（列 {col} 也是）", es: 'encabezado duplicado "{label}" (también la columna {col})' },
+  rowSubtotal: { en: "row total of columns {cols} — importing it would count those hours twice", ko: "{cols} 열의 행 합계 — 가져오면 해당 시간이 두 번 계산됩니다", zh: "{cols} 列的行合计——导入会把这些小时重复计算", es: "total de fila de las columnas {cols} — importarla contaría esas horas dos veces" },
 } satisfies Record<string, Entry>;
 
 export type ReasonKey = keyof typeof REASON;
@@ -856,6 +857,7 @@ export const REASON_PATTERNS: { re: RegExp; key: ReasonKey; vars: readonly strin
   { re: /^covered by the actual\/hood columns$/, key: "coveredActualHood", vars: [] },
   { re: /^block time — flight time comes from "(.+)"$/, key: "blockTime", vars: ["label"] },
   { re: /^duplicate header "(.+)" \(also column ([A-Z]+)\)$/, key: "duplicateHeader", vars: ["label", "col"] },
+  { re: /^row total of columns ([A-Z]+(?: \+ [A-Z]+)*) — importing it would count those hours twice$/, key: "rowSubtotal", vars: ["cols"] },
 ];
 
 /** English target name (describeTarget) → its stable target key, built once. */
