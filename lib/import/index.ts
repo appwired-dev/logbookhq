@@ -10,7 +10,7 @@
  *   fingerprint(headerPaths)                         → string
  */
 export * from "./types";
-export type { ApplyResultExt } from "./types-ext";
+export type { ApplyResultExt, DeclaredTotalExt } from "./types-ext";
 export { readWorkbook } from "./grid";
 export { detectHeaderBand } from "./headers";
 export { mapColumns, CANONICAL_OPTIONS, describeTarget, targetKey, parseTargetKey } from "./mapping";
