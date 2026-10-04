@@ -1,4 +1,5 @@
 import Link from "next/link";
+import StatsOptOut from "@/components/StatsOptOut";
 
 export const metadata = {
   title: "Privacy Policy — Pilot Logbook HQ",
@@ -30,7 +31,10 @@ export default function PrivacyPage() {
       <main className="flex-1 px-6 pb-16">
         <article className="mx-auto max-w-3xl py-10 text-slate-800 leading-relaxed">
           <h1 className="text-4xl font-bold text-slate-900 tracking-tight">Privacy Policy</h1>
-          <p className="text-sm text-slate-500 mt-2">Last updated: May 18, 2026</p>
+          <p className="text-sm text-slate-500 mt-2">Last updated: October 4, 2026</p>
+          <p className="text-sm text-slate-500 mt-1">
+            Changes to sections 1, 2, 3, 4, 6, 7 and 8 take effect on October 18, 2026.
+          </p>
 
           <p className="mt-6">
             <strong>1425652 B.C. LTD.</strong> (&ldquo;<strong>we</strong>&rdquo;, &ldquo;<strong>us</strong>&rdquo;,
@@ -72,8 +76,19 @@ export default function PrivacyPage() {
 
             <h3 className="font-bold text-slate-900 mt-4">Technical information</h3>
             <ul className="list-disc pl-5 mt-2 space-y-1.5">
-              <li>IP address, browser type, device type (used for security and to prevent abuse)</li>
-              <li>Pages visited, referrer, approximate location at country/region level (via Vercel Analytics &mdash; no cookies, no individual user profiles)</li>
+              <li>IP address, browser type, device type (used for security and to prevent abuse &mdash; for example,
+                limiting repeated sign-in and password-reset attempts)</li>
+              <li>Usage statistics. For our public pages (not the pages inside your account) we count, ourselves: the
+                page viewed, the website that referred you (its domain only, not the full address), campaign tags in
+                the link (<code className="text-xs">utm_source</code>, <code className="text-xs">utm_campaign</code> or{" "}
+                <code className="text-xs">ref</code>), your country (worked out by our host from your IP address), and
+                whether you&rsquo;re on a phone, tablet or computer. These are stored only as daily totals &mdash; we
+                never store your IP address, your browser&rsquo;s user-agent, or a record of your individual visit.
+                Vercel Analytics also records page views for us across the whole site, including pages inside your
+                account, with the referring address your browser sends and your approximate region. Neither uses
+                cookies or stores an identifier on your device, and shared-logbook links are recorded without their
+                private token. If your browser sends a Global Privacy Control or Do Not Track signal, or you use the
+                opt-out in section 8, your visit isn&rsquo;t counted by us or by Vercel Analytics.</li>
               <li>Error and performance data when something fails</li>
             </ul>
           </Section>
@@ -82,6 +97,7 @@ export default function PrivacyPage() {
             <p>We use your information to:</p>
             <ul className="list-disc pl-5 mt-2 space-y-1.5">
               <li>Provide, maintain, and improve the Service (storing flights, computing currency, generating PDFs)</li>
+              <li>Understand, in aggregate, how people find and use our public pages, so we can improve them</li>
               <li>Process payments and manage subscriptions through Stripe</li>
               <li>Authenticate you and keep your account secure</li>
               <li>Send transactional emails &mdash; signup confirmation, password resets, payment receipts, important
@@ -103,7 +119,8 @@ export default function PrivacyPage() {
             <ul className="list-disc pl-5 mt-2 space-y-1.5">
               <li><strong>Performance of a contract</strong> &mdash; to deliver the Service you signed up for</li>
               <li><strong>Your consent</strong> &mdash; given when you create an account and agree to these terms</li>
-              <li><strong>Our legitimate interests</strong> &mdash; security, fraud prevention, service improvement</li>
+              <li><strong>Our legitimate interests</strong> &mdash; security, fraud prevention, service improvement,
+                and cookieless aggregate usage statistics (you can object at any time &mdash; see section 8)</li>
               <li><strong>Compliance with legal obligations</strong> &mdash; tax records, lawful requests</li>
             </ul>
           </Section>
@@ -125,7 +142,7 @@ export default function PrivacyPage() {
                 <tbody className="text-slate-700">
                   <tr className="border-b border-slate-100">
                     <td className="py-2 pr-3">Supabase, Inc.</td>
-                    <td className="py-2 pr-3">Database, authentication, file storage</td>
+                    <td className="py-2 pr-3">Database, authentication, file storage, aggregate usage statistics</td>
                     <td className="py-2">United States (us-east-1)</td>
                   </tr>
                   <tr className="border-b border-slate-100">
@@ -179,7 +196,11 @@ export default function PrivacyPage() {
               <li><strong>Authentication cookies</strong> (Supabase) &mdash; keep you signed in. Essential.</li>
               <li><strong>Locale preference cookie</strong> (<code className="text-xs">logbookhq.locale</code>) &mdash;
                 remembers your chosen language. Essential.</li>
-              <li><strong>No third-party advertising cookies.</strong> Vercel Analytics is cookieless.</li>
+              <li><strong>Statistics opt-out flag</strong> (<code className="text-xs">lhq.stats.optout</code>, local
+                storage) &mdash; set only if you choose &ldquo;Don&rsquo;t count my visits&rdquo; in section 8, so we can
+                honour that choice. Essential.</li>
+              <li><strong>No third-party advertising cookies.</strong> Vercel Analytics and our own usage statistics are
+                cookieless and store no identifier on your device.</li>
             </ul>
             <p className="mt-3">
               You can clear cookies in your browser at any time; doing so will sign you out and reset your locale to
@@ -195,8 +216,15 @@ export default function PrivacyPage() {
                 backups containing your data are purged on our backup-rotation schedule (up to 90 days).</li>
               <li><strong>Payment and tax records</strong> &mdash; retained as required by Canadian tax law (typically
                 six years from the end of the tax year they relate to).</li>
-              <li><strong>Security and fraud records</strong> &mdash; retained as long as needed to investigate or
-                resolve an incident.</li>
+              <li><strong>Security and fraud records</strong>, including our administrator activity log (no passwords or
+                message contents) &mdash; kept for 13 months, or longer only while needed to investigate or resolve an
+                incident.</li>
+              <li><strong>Sign-in and password-reset rate-limit records</strong> (an IP address or email address with an
+                attempt count) &mdash; deleted within 2 days.</li>
+              <li><strong>Usage statistics</strong> &mdash; daily totals with no IP address or visitor identifier; deleted
+                after 13 months.</li>
+              <li><strong>Support requests</strong> &mdash; kept while open; deleted automatically 12 months after
+                they&rsquo;re resolved (or sooner if you ask).</li>
             </ul>
           </Section>
 
@@ -209,10 +237,21 @@ export default function PrivacyPage() {
               <li><strong>Delete</strong> your account and information &mdash; contact us through the Support form in Settings or by email and we&rsquo;ll erase it.</li>
               <li><strong>Withdraw consent</strong> &mdash; by closing your account. Note that this may end your ability
                 to use the Service.</li>
+              <li><strong>Object to usage statistics</strong> &mdash; turn on Global Privacy Control or Do Not Track in
+                your browser, or use the switch below, and your visits won&rsquo;t be counted. Because we keep only daily
+                totals with no identifier, we can&rsquo;t single out or delete an individual&rsquo;s past visits.</li>
               <li><strong>Complain</strong> to a data protection regulator &mdash; in Canada, the{" "}
                 <a className="text-sky-700 hover:underline" href="https://www.priv.gc.ca">Office of the Privacy
                 Commissioner of Canada</a>; in the EU/UK, your local data protection authority.</li>
             </ul>
+            {/* Client island: the page stays force-static; the switch reads/writes only this browser's local storage. */}
+            <StatsOptOut
+              className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-2"
+              label="Don’t count my visits on this browser"
+              onText="Your visits on this browser aren’t counted."
+              offText="Your visits on this browser are counted."
+              signalText="Your browser’s privacy signal (Global Privacy Control or Do Not Track) is on, so your visits aren’t counted."
+            />
             <p className="mt-3">
               To exercise any of these rights, email{" "}
               <a className="text-sky-700 hover:underline" href="mailto:support@pilotlogbookhq.com">

@@ -872,6 +872,9 @@ svg:has(.lp-ribbon:hover) .lp-ribbon { fill-opacity: 0.2; }
   fill-opacity: 0.52 !important;
   filter: drop-shadow(0 2px 5px rgb(15 23 42 / 0.16));
 }
+/* A focused Sankey (admin Traffic) dims the other ribbons; hovering one must not re-light it. */
+.lp-ribbon.lp-dim,
+.lp-ribbon.lp-dim:hover { fill-opacity: 0.06 !important; filter: none; }
 @media (prefers-reduced-motion: reduce) { .lp-ribbon { transition: none; } }
 
 /* ============================================================================
