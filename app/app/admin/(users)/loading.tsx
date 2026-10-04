@@ -4,11 +4,15 @@ import LoadingStatus from "@/components/ui/LoadingStatus";
 const ROW_WIDTHS = ["72%", "58%", "66%", "48%", "80%", "62%", "70%", "54%"];
 
 /**
- * Admin loading state. Mirrors AdminClient: page header with the primary
- * button, four compact stat tiles, the search field, then the users table
- * card — header row (h-9) and eight rows (h-12).
+ * Admin · Users loading state. Mirrors AdminClient: page header with the
+ * primary button, four compact stat tiles, the search field, then the users
+ * table card — header row (h-9) and eight rows (h-12).
+ *
+ * Lives in the (users) route group so it only wraps the Users tab; the admin
+ * layout's tab bar stays visible above it, and the other tabs have their own
+ * skeletons.
  */
-export default function AdminLoading() {
+export default function AdminUsersLoading() {
   return (
     <div className="space-y-4" aria-busy="true">
       <LoadingStatus />

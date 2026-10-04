@@ -1,49 +1,87 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { requireAdmin } from "./admin-gate";
+import { logAdminAction } from "./audit";
+
+/*
+ * Every server action here re-verifies that the caller is an admin via
+ * requireAdmin() (admin-gate.ts). Don't trust the client; the page-level
+ * check is just UX.
+ *
+ * Each successful change writes a best-effort audit row (audit.ts) carrying
+ * ids and small scalars only — never an email, a name, message text or a
+ * password.
+ *
+ * Support actions revalidate the whole /app/admin layout so the Support tab's
+ * open-count badge refreshes along with the inbox. User actions keep
+ * revalidating the Users page only.
+ */
 
 /**
- * Admin gate — every server action here re-verifies that the caller is an
- * admin. Don't trust the client; the page-level check is just UX.
+ * Result of the user-management actions. `error` is declared on both arms so
+ * AdminClient can keep testing `r?.error` directly.
  */
-async function requireAdmin() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Not signed in." as const };
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("is_admin")
-    .eq("id", user.id)
-    .single();
-  if (!profile?.is_admin) return { error: "Forbidden — admin required." as const };
-  return { ok: true as const };
+type ActionResult = { ok: true; error?: undefined } | { ok?: undefined; error: string };
+
+/** Support ids are bigint identities; reject anything else (Number(null) is 0). */
+function supportId(formData: FormData): number | null {
+  const id = Number(formData.get("id"));
+  return Number.isSafeInteger(id) && id > 0 ? id : null;
 }
 
-/** Mark a support request resolved (admin only). Form action → returns void. */
+/**
+ * Mark a support request resolved (admin only). Form action → returns void.
+ * Only an unresolved row is updated, so a double submit can't push
+ * resolved_at forward (retention counts from it) or log twice.
+ */
 export async function resolveSupport(formData: FormData): Promise<void> {
   const gate = await requireAdmin();
   if (!("ok" in gate)) return;
-  const id = Number(formData.get("id"));
-  if (!Number.isFinite(id)) return;
+  const id = supportId(formData);
+  if (id === null) return;
   const admin = createAdminClient();
-  await admin.from("support_requests").update({ status: "resolved" }).eq("id", id);
-  revalidatePath("/app/admin");
+  const { data, error } = await admin
+    .from("support_requests")
+    .update({ status: "resolved", resolved_at: new Date().toISOString() })
+    .eq("id", id)
+    .neq("status", "resolved")
+    .select("id");
+  if (!error && data?.length) await logAdminAction(gate.userId, "support.resolve", String(id));
+  revalidatePath("/app/admin", "layout");
+}
+
+/** Reopen a resolved support request (admin only). Form action → void. */
+export async function reopenSupport(formData: FormData): Promise<void> {
+  const gate = await requireAdmin();
+  if (!("ok" in gate)) return;
+  const id = supportId(formData);
+  if (id === null) return;
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("support_requests")
+    .update({ status: "open", resolved_at: null })
+    .eq("id", id)
+    .eq("status", "resolved")
+    .select("id");
+  if (!error && data?.length) await logAdminAction(gate.userId, "support.reopen", String(id));
+  revalidatePath("/app/admin", "layout");
 }
 
 /** Permanently delete a support request (admin only). Form action → void. */
 export async function deleteSupport(formData: FormData): Promise<void> {
   const gate = await requireAdmin();
   if (!("ok" in gate)) return;
-  const id = Number(formData.get("id"));
-  if (!Number.isFinite(id)) return;
+  const id = supportId(formData);
+  if (id === null) return;
   const admin = createAdminClient();
-  await admin.from("support_requests").delete().eq("id", id);
-  revalidatePath("/app/admin");
+  const { data, error } = await admin.from("support_requests").delete().eq("id", id).select("id");
+  if (!error && data?.length) await logAdminAction(gate.userId, "support.delete", String(id));
+  revalidatePath("/app/admin", "layout");
 }
 
-export async function updateUserTier(userId: string, tier: "free" | "pro" | "lifetime") {
+export async function updateUserTier(userId: string, tier: "free" | "pro" | "lifetime"): Promise<ActionResult> {
   const gate = await requireAdmin();
   if (!("ok" in gate)) return gate;
   if (!["free", "pro", "lifetime"].includes(tier)) return { error: "Invalid tier." };
@@ -51,11 +89,12 @@ export async function updateUserTier(userId: string, tier: "free" | "pro" | "lif
   const admin = createAdminClient();
   const { error } = await admin.from("profiles").update({ tier }).eq("id", userId);
   if (error) return { error: error.message };
+  await logAdminAction(gate.userId, "user.tier", userId, { tier });
   revalidatePath("/app/admin");
   return { ok: true };
 }
 
-export async function updateUserName(userId: string, fullName: string) {
+export async function updateUserName(userId: string, fullName: string): Promise<ActionResult> {
   const gate = await requireAdmin();
   if (!("ok" in gate)) return gate;
   // null out empty strings so the dashboard greeting falls back gracefully.
@@ -64,17 +103,19 @@ export async function updateUserName(userId: string, fullName: string) {
   const admin = createAdminClient();
   const { error } = await admin.from("profiles").update({ full_name: value }).eq("id", userId);
   if (error) return { error: error.message };
+  await logAdminAction(gate.userId, "user.name", userId); // the name itself is never logged
   revalidatePath("/app/admin");
   return { ok: true };
 }
 
-export async function toggleUserAdmin(userId: string, makeAdmin: boolean) {
+export async function toggleUserAdmin(userId: string, makeAdmin: boolean): Promise<ActionResult> {
   const gate = await requireAdmin();
   if (!("ok" in gate)) return gate;
 
   const admin = createAdminClient();
   const { error } = await admin.from("profiles").update({ is_admin: makeAdmin }).eq("id", userId);
   if (error) return { error: error.message };
+  await logAdminAction(gate.userId, "user.admin", userId, { admin: makeAdmin });
   revalidatePath("/app/admin");
   return { ok: true };
 }
@@ -112,6 +153,11 @@ export async function createUserAccount(input: {
   });
   if (createErr) return { error: `Create failed: ${createErr.message}` };
   if (!created.user) return { error: "Create failed: no user returned." };
+
+  // Audited as soon as the sign-in exists (it does even if the profile write
+  // below fails). Also feeds the Traffic tab's "created by an admin" note.
+  // Never the email, name or temp password.
+  await logAdminAction(gate.userId, "user.create", created.user.id, { tier: input.tier });
 
   // Upsert the profile row. Supabase's `handle_new_user` trigger inserts the
   // row synchronously when the auth user is created, so `update` works today;
@@ -159,6 +205,7 @@ export async function resetUserPassword(
   const admin = createAdminClient();
   const { error } = await admin.auth.admin.updateUserById(userId, { password: tempPassword });
   if (error) return { error: `Reset failed: ${error.message}` };
+  await logAdminAction(gate.userId, "user.password_reset", userId); // never the password
   return { ok: true as const, tempPassword };
 }
 
@@ -178,10 +225,8 @@ export async function deleteUserAccount(
   const gate = await requireAdmin();
   if (!("ok" in gate)) return gate;
 
-  // Protect against self-deletion.
-  const supabase = await createClient();
-  const { data: { user: caller } } = await supabase.auth.getUser();
-  if (caller?.id === userId) {
+  // Protect against self-deletion (the gate already resolved the caller).
+  if (gate.userId === userId) {
     return { error: "You can't delete your own admin account from this page." };
   }
 
@@ -211,6 +256,7 @@ export async function deleteUserAccount(
   const { error } = await admin.auth.admin.deleteUser(userId);
   if (error) return { error: `Delete failed: ${error.message}` };
 
+  await logAdminAction(gate.userId, "user.delete", userId);
   revalidatePath("/app/admin");
   return { ok: true as const };
 }

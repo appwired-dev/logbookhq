@@ -15,5 +15,7 @@ export {
   LogOut, CreditCard, Languages, User, RotateCcw, Download, Upload, Clock, CalendarDays, Globe2, Search,
   // phase 2 (flights table/form, import wizard)
   Pencil, ArrowLeft, CircleCheck, CircleX, CloudUpload, FileSpreadsheet, Sparkles,
+  // admin tabs, traffic, maintenance
+  Users, Inbox, Activity, Wrench, Trash2, Database, History, Waypoints, RefreshCw,
 } from "lucide-react";
 export type { LucideIcon } from "lucide-react";

@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono, Barlow_Condensed } from "next/font/google";
-import { Analytics } from "@vercel/analytics/next";
+import SiteStats from "@/components/SiteStats";
 import "./globals.css";
 
 // Self-hosted by next/font — no runtime request to Google.
@@ -77,9 +77,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(SITE_LD) }} />
         {children}
-        {/* Vercel Analytics — no cookies, no PII, country-level only. Enabled
-            in Vercel Dashboard → project → Analytics. Privacy disclosed in /privacy. */}
-        <Analytics />
+        {/* Vercel Analytics (share tokens redacted, GPC/DNT honoured) + first-party
+            cookieless counts; disclosed in /privacy §1, §6, §7, §8. Client-only and
+            pathname-based, so this layout stays free of dynamic APIs and the
+            marketing pages stay static. */}
+        <SiteStats />
       </body>
     </html>
   );
