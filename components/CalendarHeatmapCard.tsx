@@ -56,7 +56,7 @@ export default function CalendarHeatmapCard({ days, locale }: { days: HeatDay[];
       {/* The heatmap SVG scales with its container; cap the width so the day
           squares stay ~14px on wide monitors, and let it scroll on phones
           instead of shrinking the squares to nothing. */}
-      <div className="overflow-x-auto">
+      <div className="relative overflow-x-auto">
         <div className="min-w-[720px] max-w-4xl text-xs">
           <CalendarHeatmap
             startDate={startDate}

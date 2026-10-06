@@ -7,7 +7,7 @@
  *   1. Every regime's DEFAULT rule set carries the audited windows + citations,
  *      and `REGIME_RULES[r].flightTimeWindows` still mirrors `ruleSets[0]`
  *      (the charts page reads the top-level field).
- *   2. Canada's rule-set switch: CAR 700.28 is the default (1,000 h / 365 d),
+ *   2. Canada's rule-set switch: CAR 700.27 is the default (1,000 h / 365 d),
  *      the superseded CARs 700.15 set is NOT offered.
  *   3. Rolling windows over a synthetic flight list. Window semantics:
  *      BOTH ENDS INCLUSIVE — a `days: 28` window ending 2026-03-15 starts
@@ -101,13 +101,13 @@ function windowWithMax(regime: Regime, today: Date, max: number, ruleSetId?: str
 
 /** regime → [expected default windows, citation substring every window carries] */
 const EXPECTED: Record<Regime, { rows: Row[]; cite: string }> = {
-  // CAR 700.28: 1,000 / 365 d, 300 / 90 d, 112 / 28 d.
-  CA:    { rows: [[365, 1000, "rolling-days", undefined], [90, 300, "rolling-days", undefined], [28, 112, "rolling-days", undefined]], cite: "700.28" },
+  // CAR 700.27(1): 1,000 / 365 d (c), 300 / 90 d (b), 112 / 28 d (a).
+  CA:    { rows: [[365, 1000, "rolling-days", undefined], [90, 300, "rolling-days", undefined], [28, 112, "rolling-days", undefined]], cite: "700.27" },
   // Annex 6 Part I 4.10 sets no numbers — typical State limits only.
   ICAO:  { rows: [[365, 1000, "rolling-days", undefined], [28, 100, "rolling-days", undefined]], cite: "Annex 6" },
   // §117.23(b): 100 / 672 consecutive hours (= 28 days), 1,000 / 365 days.
   FAA:   { rows: [[28, 100, "rolling-days", undefined], [365, 1000, "rolling-days", undefined]], cite: "117.23" },
-  // ORO.FTL.210(a): 100 / 28 d, 900 / calendar year, 1,000 / 12 calendar months.
+  // ORO.FTL.210(b): 100 / 28 d, 900 / calendar year, 1,000 / 12 calendar months.
   EASA:  { rows: [[28, 100, "rolling-days", undefined], [365, 900, "calendar-year", undefined], [365, 1000, "calendar-months", 12]], cite: "ORO.FTL.210" },
   UKCAA: { rows: [[28, 100, "rolling-days", undefined], [365, 900, "calendar-year", undefined], [365, 1000, "calendar-months", 12]], cite: "ORO.FTL.210" },
   // UAE CAR-OPS 1 Subpart Q: 100 / 28 d, 1,000 / 12 calendar months.
@@ -158,13 +158,13 @@ test("ICAO is presented as typical State limits, not a hard rule", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 2. Canada: 700.28 default, 700.15 legacy — and yearlyCeiling
+// 2. Canada: 700.27 default, 700.15 legacy — and yearlyCeiling
 // ---------------------------------------------------------------------------
 
-test("CA offers only the current CAR 700.28 set; the superseded 700.15 rules are gone", () => {
+test("CA offers only the current CAR 700.27 set; the superseded 700.15 rules are gone", () => {
   const sets = ruleSetsFor("CA");
   assert.equal(sets.length, 1, "only the current rule set is offered");
-  assert.equal(sets[0].reference, "CAR 700.28");
+  assert.equal(sets[0].reference, "CAR 700.27");
   assert.deepEqual(
     sets[0].flightTimeWindows.map((w) => [w.days, w.max]),
     [[365, 1000], [90, 300], [28, 112]],
@@ -175,11 +175,11 @@ test("CA offers only the current CAR 700.28 set; the superseded 700.15 rules are
   assert.ok(!all.some((w) => w.max === 1200), "no 1,200 h ceiling");
 });
 
-test("yearlyCeiling: CA = 1,000 h (700.28), and an unknown set id falls back to the default", () => {
+test("yearlyCeiling: CA = 1,000 h (700.27), and an unknown set id falls back to the default", () => {
   const ca = yearlyCeiling("CA");
   assert.equal(ca.max, 1000);
   assert.equal(ca.days, 365);
-  assert.match(ca.reference, /700\.28/);
+  assert.match(ca.reference, /700\.27\(1\)\(c\)/);
   // A stale id persisted in a browser must not resurrect old numbers.
   assert.equal(yearlyCeiling("CA", "cars-700-15").max, 1000);
 });
@@ -196,10 +196,10 @@ test("yearlyCeiling: annual cap per regime", () => {
 });
 
 test("resolveRuleSet falls back to the default for unknown/absent ids", () => {
-  assert.equal(resolveRuleSet("CA").reference, "CAR 700.28");
-  assert.equal(resolveRuleSet("CA", "nope").reference, "CAR 700.28");
+  assert.equal(resolveRuleSet("CA").reference, "CAR 700.27");
+  assert.equal(resolveRuleSet("CA", "nope").reference, "CAR 700.27");
   // CA has a single set, so it resolves through the synthesized default like every other single-set regime.
-  assert.equal(resolveRuleSet("CA", "cars-700-15").reference, "CAR 700.28", "a stale id resolves to the current set");
+  assert.equal(resolveRuleSet("CA", "cars-700-15").reference, "CAR 700.27", "a stale id resolves to the current set");
   assert.equal(resolveRuleSet("EASA", "cars-700-15").id, ruleSetsFor("EASA")[0].id);
 });
 
@@ -267,7 +267,7 @@ test("365-day window: the 365th day back counts, the 366th does not", () => {
   assert.equal(w.used, 3);
 });
 
-test("CA 700.28 caps: 1,000 / 300 / 112 over the same flight list", () => {
+test("CA 700.27 caps: 1,000 / 300 / 112 over the same flight list", () => {
   const today = day("2026-03-15");
   const flights = [
     flight("2026-03-10", 10), // inside 28 / 90 / 365
@@ -392,6 +392,14 @@ function windowWithMaxOn(flights: Flight[], regime: Regime, today: Date, max: nu
   assert.ok(w, `no window with max ${max} for ${regime}`);
   return w;
 }
+
+test("citations: TC flight time is CAR 700.27(1)(a-c); EASA/UK flight time is ORO.FTL.210(b), not (a) (duty)", () => {
+  const ca = ruleSetsFor("CA")[0].flightTimeWindows.map((w) => [w.days, w.citation]);
+  assert.deepEqual(ca, [[365, "CAR 700.27(1)(c)"], [90, "CAR 700.27(1)(b)"], [28, "CAR 700.27(1)(a)"]]);
+  for (const r of ["EASA", "UKCAA"] as const) {
+    for (const w of ruleSetsFor(r)[0].flightTimeWindows) assert.match(w.citation ?? "", /^ORO\.FTL\.210\(b\)\([123]\)/, `${r} ${w.label}`);
+  }
+});
 
 console.log(`\n${passed + failed} test(s) — ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exitCode = 1;

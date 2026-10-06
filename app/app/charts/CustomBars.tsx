@@ -198,7 +198,7 @@ export default function TypeHoursChart({
         </div>
       )}
 
-      <div className={showTable ? "overflow-x-auto -mx-1" : "sr-only"}>
+      <div className={showTable ? "relative overflow-x-auto -mx-1" : "sr-only"}>
         <table id={tableId} className="w-full text-sm">
           <caption className="sr-only">{title}</caption>
           <thead>

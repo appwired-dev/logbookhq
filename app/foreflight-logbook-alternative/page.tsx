@@ -64,8 +64,8 @@ export default function ForeFlightAlternativePage() {
         <p>
           This is the part a logbook built around one framework was never meant to do. Set the authority
           you fly and it runs those rules against your flights: passenger and IFR recency, and the rolling
-          flight-time windows &mdash; the last 28, 90 and 365 days &mdash; measured against the real limit, whether
-          that&rsquo;s CAR 700.28, FAR 117 or EASA ORO.FTL. Each window stays green until it doesn&rsquo;t, and the
+          flight-time windows each rule actually uses &mdash; 28, 90 and 365 days under CAR 700.27, 672 hours
+          and 365 days under FAR 117, 28 days, the calendar year and 12 months under EASA ORO.FTL. Each window stays green until it doesn&rsquo;t, and the
           dates that matter turn amber before they lapse, not after. Fly under a different authority next
           month? Switch it in Settings and the same flights are re-checked against those rules &mdash; one
           logbook, no re-entry.

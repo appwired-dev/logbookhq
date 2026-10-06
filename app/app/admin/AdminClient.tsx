@@ -191,7 +191,7 @@ export default function AdminClient({ users, locale }: { users: AdminUser[]; loc
         />
       </div>
 
-      <Card padding="none" className="overflow-x-auto scrollbar-always">
+      <Card padding="none" className="relative overflow-x-auto scrollbar-always">
         <table className="data-table w-full min-w-[960px] text-sm">
           <thead>
             <tr>

@@ -89,8 +89,8 @@ export default function LandingPage() {
       <main>
         {/* ---- hero ---- */}
         <section className="mx-auto max-w-6xl px-5 pt-16 sm:pt-24 pb-8">
-          <div className="grid lg:grid-cols-[1.05fr_0.95fr] gap-12 lg:gap-10 items-center">
-            <div>
+          <div className="grid grid-cols-[minmax(0,1fr)] lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] gap-12 lg:gap-10 items-center">
+            <div className="min-w-0">
               <div className="lp-eyebrow lp-rise" style={{ animationDelay: "0ms" }}>Import · any layout · any language</div>
               <h1 className="lp-h1 lp-h1-3d mt-4">
                 Bring the logbook<br />you already have.
@@ -102,16 +102,16 @@ export default function LandingPage() {
                 Then your limits and currency follow you across every authority you fly under.
               </p>
               <div className="mt-8 flex flex-wrap items-center gap-3 lp-rise" style={{ animationDelay: "140ms" }}>
-                <Link className="lp-btn lp-btn-primary lp-btn-sheen" href="/signup">Import your logbook free</Link>
+                <Link className="lp-btn lp-btn-primary lp-btn-sheen" href="/signup">Check your logbook free</Link>
                 <Link className="lp-btn lp-btn-ghost" href="/pricing">See pricing</Link>
               </div>
               <p className="lp-mono mt-4 text-xs lp-rise" style={{ color: "var(--lp-ink-3)", animationDelay: "180ms" }}>
-                Free up to 100 flights · no card · $4.99/mo after
+                Map and check a logbook of any size free · keep 100 flights free · then from $4.99/mo · no card
               </p>
             </div>
 
             {/* the thesis, made visual: a file → reconciled to green checks */}
-            <div className="lp-rise" style={{ animationDelay: "120ms" }}>
+            <div className="lp-rise min-w-0" style={{ animationDelay: "120ms" }}>
               <ReconcileCard />
             </div>
           </div>
@@ -164,7 +164,7 @@ export default function LandingPage() {
         <Showcase
           eyebrow="Every authority"
           title="Your limits and currency follow you."
-          lede="Rolling flight-time limits and recency under the rules you actually fly — CAR 700.28 here, or FAR 117, ORO.FTL and more — each window green until it isn't."
+          lede="Rolling flight-time limits and recency under the rules you actually fly — CAR 700.27 here, or FAR 117, ORO.FTL and more — each window green until it isn't."
           src={limitsShot}
           alt="Flight-time-limit bars for the last 365, 90 and 28 days, a calendar heatmap of flying days, and IFR and passenger recency cards, all showing current."
         />
@@ -221,30 +221,15 @@ export default function LandingPage() {
           </p>
         </section>
 
-        {/* ---- founder ---- */}
-        <section className="mx-auto max-w-6xl px-5 py-16">
-          <div className="lp-panel p-7 sm:p-9 flex flex-col sm:flex-row sm:items-center gap-6">
-            <div className="shrink-0">
-              <div className="lp-num text-xs" style={{ color: "var(--lp-ink-3)" }}>PIC · CYVR</div>
-              <div className="lp-h2 mt-1" style={{ fontSize: "clamp(22px,3vw,30px)" }}>Built by a working pilot</div>
-            </div>
-            <p className="lp-lede sm:border-l sm:pl-6" style={{ borderColor: "var(--lp-line)" }}>
-              I fly the line out of Vancouver. I built this because the logbooks I could buy treated
-              Canadian and international pilots as an afterthought, and the free ones looked a decade old.
-              It&apos;s the same tool I use to track my own hours — 5,200 flights and counting.
-            </p>
-          </div>
-        </section>
-
         {/* ---- final CTA ---- */}
         <section className="mx-auto max-w-3xl px-5 pb-24 pt-6 text-center">
           <h2 className="lp-h2">Bring your logbook.<br /><span className="lp-amber-text">We&apos;ll read every column.</span></h2>
           <div className="mt-7 flex justify-center">
             <Link className="lp-btn lp-btn-primary lp-btn-sheen" style={{ height: 52, padding: "0 28px", fontSize: 16 }} href="/signup">
-              Import your logbook free
+              Check your logbook free
             </Link>
           </div>
-          <p className="lp-mono mt-4 text-xs" style={{ color: "var(--lp-ink-3)" }}>Free up to 100 flights · no card required</p>
+          <p className="lp-mono mt-4 text-xs" style={{ color: "var(--lp-ink-3)" }}>Keep 100 flights free · no card required</p>
         </section>
       </main>
 
@@ -290,12 +275,12 @@ function ReconcileCard() {
   return (
     <div className="lp-panel lp-panel-glow p-5 sm:p-6" role="img" aria-label="An imported logbook reconciled: every check green, 5,334 flights.">
       {/* file chip */}
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <div className="grid place-items-center rounded-lg shrink-0" style={{ width: 38, height: 38, background: "rgba(86,199,222,.10)", border: "1px solid var(--lp-line-2)" }}>
           <FileGlyph />
         </div>
         <div className="min-w-0">
-          <div className="lp-mono text-sm truncate" style={{ color: "var(--lp-ink)" }}>Michael&nbsp;Logbook.numbers</div>
+          <div className="lp-mono text-sm truncate" style={{ color: "var(--lp-ink)" }}>logbook_1999-2026.numbers</div>
           <div className="lp-mono text-xs" style={{ color: "var(--lp-ink-3)" }}>Apple Numbers · 3-header layout</div>
         </div>
         <span className="lp-chip ml-auto shrink-0" style={{ borderColor: "rgba(58,210,154,.4)", color: "var(--lp-good)" }}>

@@ -277,7 +277,12 @@ export async function commitImportAction(formData: FormData): Promise<ActionResu
     }
     if (current + flights.length > FREE_FLIGHT_LIMIT) {
       const over = mode !== "replace" && current > 0 ? ` on top of your ${current}` : "";
-      return { error: `Importing ${flights.length.toLocaleString()} flights${over} would exceed the free plan's ${FREE_FLIGHT_LIMIT}-flight limit. Upgrade to import your full logbook.` };
+      return {
+        error: `Importing ${flights.length.toLocaleString()} flights${over} would exceed the free plan's ${FREE_FLIGHT_LIMIT}-flight limit. Upgrade to import your full logbook.`,
+        code: "free_cap",
+        flights: flights.length,
+        current,
+      };
     }
   }
 

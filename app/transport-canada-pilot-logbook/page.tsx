@@ -30,7 +30,7 @@ export default function TransportCanadaPage() {
         lede={
           <>
             Most logbook software is written to FAA defaults and treats Canadian flying as a checkbox.
-            This one is built by a Canadian line pilot, so the CARs aren&rsquo;t an afterthought &mdash; and if
+            This one starts from Canadian flying, so the CARs aren&rsquo;t an afterthought &mdash; and if
             you also fly an N-registered aircraft, it counts that time too, without a second logbook.
           </>
         }
@@ -58,7 +58,7 @@ export default function TransportCanadaPage() {
           </li>
           <li>
             <strong>700-series flight-time limits.</strong> Rolling windows &mdash; the last 28, 90 and 365
-            days &mdash; watched against the limits you actually fly under, including CAR 700.28, each window
+            days &mdash; watched against the limits you actually fly under, including CAR 700.27, each window
             green until it isn&rsquo;t.
           </li>
         </ul>
@@ -91,7 +91,7 @@ export default function TransportCanadaPage() {
         items={[
           {
             q: "Does it follow the Canadian Aviation Regulations?",
-            a: "It's built around them. Recency and rolling flight-time limits are modelled on the CARs — including the 700-series and CAR 700.28 — rather than adapted from FAA defaults. You confirm which rules apply to your flying and the app tracks against those.",
+            a: "It's built around them. Recency and rolling flight-time limits are modelled on the CARs — including the 700-series and the CAR 700.27 flight-time limits — rather than adapted from FAA defaults. You confirm which rules apply to your flying and the app tracks against those.",
           },
           {
             q: "I fly N-registered aircraft too. Can it handle both?",
@@ -103,7 +103,7 @@ export default function TransportCanadaPage() {
           },
           {
             q: "Is it a Canadian company?",
-            a: "It's built and run by a working Canadian line pilot who uses it for their own logbook. Canadian flying is the starting point, not a bolt-on.",
+            a: "Yes. Pilot Logbook HQ is operated by 1425652 B.C. Ltd. in British Columbia, Canada. Canadian flying is the starting point, not a bolt-on.",
           },
         ]}
       />

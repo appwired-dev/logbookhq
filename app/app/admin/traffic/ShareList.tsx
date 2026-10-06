@@ -60,7 +60,7 @@ export default function ShareList({
       <div className="px-4 pt-4 pb-3">
         <CardHeader flush title={title} meta={meta} actions={actions} />
       </div>
-      <div className={`overflow-x-auto ${scrollClassName}`}>
+      <div className={`relative overflow-x-auto ${scrollClassName}`}>
         <table
           className={`data-table w-full text-sm ${scrolls ? "[&_th]:sticky [&_th]:top-0 [&_th]:z-[1] [&_th]:bg-surface-2" : ""}`}
         >

@@ -76,13 +76,13 @@ export function MarketingShell({ children }: { children: ReactNode }) {
  * punchy — lp-h1 is a large uppercase display face, so long sentences belong in
  * the lede, not the headline.
  */
-export function PageHero({ eyebrow, title, lede, visual, cta = "Import your logbook free", href = "/signup" }: {
+export function PageHero({ eyebrow, title, lede, visual, cta = "Check your logbook free", href = "/signup" }: {
   eyebrow: string; title: ReactNode; lede: ReactNode; visual?: ReactNode; cta?: string; href?: string;
 }) {
   return (
     <section className="mx-auto max-w-6xl px-5 pt-16 sm:pt-24 pb-8">
-      <div className={`grid ${visual ? "lg:grid-cols-[1.05fr_0.95fr]" : ""} gap-12 lg:gap-10 items-center`}>
-        <div>
+      <div className={`grid grid-cols-[minmax(0,1fr)] ${visual ? "lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]" : ""} gap-12 lg:gap-10 items-center`}>
+        <div className="min-w-0">
           {/* The target query IS the eyebrow; promote it to the page H1 (visual
               unchanged via .lp-eyebrow) and render the punchy tagline as a
               styled paragraph, so the H1 carries the keyword. */}
@@ -94,10 +94,10 @@ export function PageHero({ eyebrow, title, lede, visual, cta = "Import your logb
             <Link className="lp-btn lp-btn-ghost" href="/pricing">See pricing</Link>
           </div>
           <p className="lp-mono mt-4 text-xs lp-rise" style={{ color: "var(--lp-ink-3)", animationDelay: "180ms" }}>
-            Free up to 100 flights &middot; no card &middot; $4.99/mo after
+            Map and check a logbook of any size free &middot; keep 100 flights free &middot; then from $4.99/mo &middot; no card
           </p>
         </div>
-        {visual && <div className="lp-rise" style={{ animationDelay: "120ms" }}>{visual}</div>}
+        {visual && <div className="lp-rise min-w-0" style={{ animationDelay: "120ms" }}>{visual}</div>}
       </div>
     </section>
   );
@@ -118,12 +118,12 @@ export function ReconcileVisual() {
   ];
   return (
     <div className="lp-panel lp-panel-glow p-5 sm:p-6" role="img" aria-label="An imported logbook reconciled: every check green, 5,334 flights.">
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <div className="grid place-items-center rounded-lg shrink-0" style={{ width: 38, height: 38, background: "rgba(86,199,222,.10)", border: "1px solid var(--lp-line-2)" }}>
           <FileGlyph />
         </div>
         <div className="min-w-0">
-          <div className="lp-mono text-sm truncate" style={{ color: "var(--lp-ink)" }}>Michael&nbsp;Logbook.numbers</div>
+          <div className="lp-mono text-sm truncate" style={{ color: "var(--lp-ink)" }}>logbook_1999-2026.numbers</div>
           <div className="lp-mono text-xs" style={{ color: "var(--lp-ink-3)" }}>Apple Numbers &middot; 3-header layout</div>
         </div>
         <span className="lp-chip ml-auto shrink-0" style={{ borderColor: "rgba(58,210,154,.4)", color: "var(--lp-good)" }}>
@@ -174,7 +174,7 @@ export function CompareTable({ them, rows }: { them: string; rows: [string, Reac
   return (
     <section className="mx-auto max-w-3xl px-5 py-6">
       <div className="lp-panel" style={{ overflow: "hidden" }}>
-        <div className="overflow-x-auto">
+        <div className="relative overflow-x-auto">
           <table className="w-full text-sm" style={{ borderCollapse: "collapse", minWidth: 460 }}>
             <thead>
               <tr style={{ borderBottom: "1px solid var(--lp-line)" }}>
@@ -255,7 +255,7 @@ export function CtaBand({ title, sub = "Free up to 100 flights. No card required
       </h2>
       <div className="mt-6 flex justify-center">
         <Link className="lp-btn lp-btn-primary lp-btn-sheen" style={{ height: 52, padding: "0 28px", fontSize: 16 }} href="/signup">
-          Import your logbook free
+          Check your logbook free
         </Link>
       </div>
       <p className="lp-mono mt-4 text-xs" style={{ color: "var(--lp-ink-3)" }}>{sub}</p>

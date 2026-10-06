@@ -208,7 +208,7 @@ export default function StepMapping({
         ))}
       </div>
 
-      <div className="hidden sm:block overflow-x-auto rounded-control border border-border">
+      <div className="hidden sm:block relative overflow-x-auto rounded-control border border-border">
         <table className="import-table w-full min-w-[640px] text-sm">
           <thead>
             <tr>

@@ -18,8 +18,40 @@ import FlowSankey, {
 } from "@/components/FlowSankey";
 import { Card, CardHeader, EmptyState, Icon, PageHeader, buttonClass } from "@/components/ui";
 const FlightGlobe = dynamic(() => import("./Globe"), { ssr: false, loading: () => null });
+
+/** What the map card shows when the globe can't run: the busiest routes, as a list. */
+function RoutesFallback({ arcs, strings, locale }: {
+  arcs: Array<{ from: string; to: string; count: number }>;
+  strings: GlobeStrings;
+  locale: Locale;
+}) {
+  const top = [...arcs].sort((a, b) => b.count - a.count).slice(0, 8);
+  const max = top[0]?.count || 1;
+  return (
+    <div className="mt-2 space-y-3" role="status">
+      <p className="text-sm text-ink-2">{strings.unavailable}</p>
+      <div className="text-2xs font-semibold uppercase tracking-[0.1em] text-ink-3">{strings.topRoutes}</div>
+      <ul className="space-y-2">
+        {top.map((a) => (
+          <li key={`${a.from}-${a.to}`}>
+            <div className="flex justify-between gap-3 text-sm">
+              <span className="mono text-ink-1">{a.from} → {a.to}</span>
+              <span className="num text-ink-2">{a.count.toLocaleString(locale)}</span>
+            </div>
+            <div className="mt-1 h-1 rounded-pill bg-surface-2 overflow-hidden">
+              <div className="h-full rounded-pill bg-brand" style={{ width: `${(a.count / max) * 100}%` }} />
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 import TypeHoursChart, { type TypeHoursRow } from "./CustomBars";
-import { fmt, getChartsStrings } from "./charts-strings";
+import { fmt, getChartsStrings, type GlobeStrings } from "./charts-strings";
+import { GlobeBoundary } from "@/components/WebGLGate";
+
+const noop = () => {};
 
 const r1 = (n: number) => Math.round(n * 10) / 10;
 function iso(d: Date) {
@@ -250,7 +282,11 @@ export default function ChartsClient({
         {globeArcs.length === 0 ? (
           <ChartEmpty icon={Icon.Map} title={s.mapEmptyTitle} body={s.mapEmptyBody} />
         ) : (
-          <FlightGlobe airports={globeAirports} arcs={globeArcs} strings={s.globe} locale={locale} />
+          // The globe is a 2D canvas (no WebGL needed); the boundary still keeps
+          // any unexpected throw inside it from taking the whole page down.
+          <GlobeBoundary onError={noop} fallback={<RoutesFallback arcs={globeArcs} strings={s.globe} locale={locale} />}>
+            <FlightGlobe airports={globeAirports} arcs={globeArcs} strings={s.globe} locale={locale} />
+          </GlobeBoundary>
         )}
       </Card>
 

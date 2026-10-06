@@ -63,7 +63,7 @@ export default function MultiRegimePage() {
             authority tells you very little about the other.
           </li>
           <li>
-            <strong>Where your limits sit.</strong> Rolling flight-time limits &mdash; CAR 700.28, FAR 117,
+            <strong>Where your limits sit.</strong> Rolling flight-time limits &mdash; CAR 700.27, FAR 117,
             ORO.FTL &mdash; watch different windows and cut off at different numbers. You can be comfortably
             legal under one and over the line under another on the same day.
           </li>
@@ -85,8 +85,9 @@ export default function MultiRegimePage() {
             each set of rules and flagged amber before they lapse rather than after.
           </li>
           <li>
-            <strong>Rolling limits that watch the right windows.</strong> The last 28, 90 and 365 days
-            under the actual regulation you fly, each window green until it isn&rsquo;t.
+            <strong>Rolling limits that watch the right windows.</strong> The windows the regulation you fly
+            actually uses &mdash; 28, 90 and 365 days under the CARs, 672 hours and 365 days under FAR 117, 28 days,
+            the calendar year and 12 months under ORO.FTL &mdash; each green until it isn&rsquo;t.
           </li>
           <li>
             <strong>Totals credited your way.</strong> Night, PIC, cross-country, instrument, multi-engine
