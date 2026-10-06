@@ -1,10 +1,10 @@
 import Link from "next/link";
 import Image, { type StaticImageData } from "next/image";
 import CursorGlow from "./CursorGlow";
+import RouteGlobe from "@/components/marketing/RouteGlobe";
 import dashboardShot from "@/public/marketing/dashboard.png";
 import limitsShot from "@/public/marketing/limits.png";
 import sankeyShot from "@/public/marketing/sankey.png";
-import globeShot from "@/public/marketing/globe.png";
 import transferShot from "@/public/marketing/transfer.png";
 
 /**
@@ -156,9 +156,8 @@ export default function LandingPage() {
           dark
           eyebrow="The map"
           title="Every route you've flown, on a living globe."
-          lede="Spun up from the airports in your own logbook — 147 routes across 97 airports here — with your busiest legs ranked beside it. Drag to spin, scroll to zoom."
-          src={globeShot}
-          alt="An interactive 3D globe of flown routes over North America, arcs weighted by number of flights, with a top-routes panel."
+          lede="Your logbook's airports become great-circle routes on a night globe, with the busiest flying and the night side shaded live from the sun. Hover a route for its distance, click one to fly there, or draw a route of your own."
+          visual={<RouteGlobe />}
         />
 
         <Showcase
@@ -334,8 +333,10 @@ function Feature({ eyebrow, title, body, children }: { eyebrow: string; title: s
    Product showcase — real app captures as compact tiles beside the copy,
    sides alternating down the page. No browser chrome.
    --------------------------------------------------------------------------- */
-function Showcase({ eyebrow, title, lede, src, alt, dark = false, flip = false }: {
-  eyebrow: string; title: string; lede: React.ReactNode; src: StaticImageData; alt: string; dark?: boolean; flip?: boolean;
+function Showcase({ eyebrow, title, lede, src, alt = "", visual, dark = false, flip = false }: {
+  eyebrow: string; title: string; lede: React.ReactNode; src?: StaticImageData; alt?: string;
+  /** A live component instead of a screenshot (the route globe). */
+  visual?: React.ReactNode; dark?: boolean; flip?: boolean;
 }) {
   const text = (
     <div key="t">
@@ -344,11 +345,13 @@ function Showcase({ eyebrow, title, lede, src, alt, dark = false, flip = false }
       <p className="lp-lede mt-3" style={{ fontSize: 14 }}>{lede}</p>
     </div>
   );
-  const shot = (
+  const shot = visual ? (
+    <div key="s" className="min-w-0">{visual}</div>
+  ) : src ? (
     <figure key="s" className={`lp-shot${dark ? " lp-shot-frame-dark" : ""}`}>
       <Image src={src} alt={alt} sizes="(max-width: 1024px) 100vw, 880px" placeholder="blur" className="lp-shot-img" />
     </figure>
-  );
+  ) : null;
   // The tile always takes the wider column (~62%); copy the narrower.
   const cols = flip
     ? "lg:grid-cols-[minmax(0,1.25fr)_minmax(0,0.75fr)]"
