@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono, Barlow_Condensed } from "next/font/google";
 import SiteStats from "@/components/SiteStats";
+import { THEME_SCRIPT } from "@/lib/theme";
 import "./globals.css";
 
 // Self-hosted by next/font — no runtime request to Google.
@@ -43,8 +44,12 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  // Matches --surface-inverse (the app header) so the browser chrome blends in.
-  themeColor: "#0b1f3a",
+  // Browser chrome follows the device theme (the app's own toggle can differ;
+  // the dark value matches the marketing site and the Night-ops canvas).
+  themeColor: [
+    { media: "(prefers-color-scheme: dark)", color: "#070B12" },
+    { media: "(prefers-color-scheme: light)", color: "#F5F7FA" },
+  ],
 };
 
 // Site-wide identity graph — emitted on every page so Organization + WebSite
@@ -73,7 +78,12 @@ const SITE_LD = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${sans.variable} ${mono.variable} ${display.variable}`}>
+    // data-theme defaults to dark in the static HTML; THEME_SCRIPT corrects it
+    // from the saved preference before first paint (hence suppressHydrationWarning).
+    <html lang="en" data-theme="dark" suppressHydrationWarning className={`${sans.variable} ${mono.variable} ${display.variable}`}>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+      </head>
       <body>
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(SITE_LD) }} />
         {children}

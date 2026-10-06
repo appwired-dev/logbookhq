@@ -8,14 +8,15 @@ export default function Brand({
   size = "md", tone = "light", href = "/app", subtitle,
 }: {
   size?: "sm" | "md";
-  tone?: "light" | "dark";
+  /** "auto" follows the theme tokens (app header); "light" = white text on a fixed dark surface. */
+  tone?: "light" | "dark" | "auto";
   href?: string;
   subtitle?: React.ReactNode;
 }) {
   const box = size === "sm" ? "w-8 h-8 rounded-lg" : "w-9 h-9 rounded-xl";
   const word = size === "sm" ? "text-sm" : "text-md";
   const text = tone === "light" ? "text-white" : "text-ink-1";
-  const accent = tone === "light" ? "text-brand-glow" : "text-brand-deep";
+  const accent = tone === "light" ? "text-brand-glow" : tone === "auto" ? "text-warn-ink" : "text-brand-deep";
   const ring = tone === "light"
     ? "focus-visible:ring-white/70 focus-visible:ring-offset-surface-inverse"
     : "focus-visible:ring-brand/60 focus-visible:ring-offset-canvas";

@@ -2,21 +2,21 @@ import Link from "next/link";
 
 export function AuthShell({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="app-shell relative isolate min-h-screen flex flex-col">
       <header className="px-6 py-5">
         <Link href="/" className="inline-flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg bg-gradient-cyan flex items-center justify-center">
             <PlaneIcon />
           </div>
-          <div className="font-bold text-slate-900 text-[15px] tracking-tight">
-            Pilot Logbook <span className="text-sky-600">HQ</span>
+          <div className="font-bold text-ink-1 text-[15px] tracking-tight">
+            Pilot Logbook <span className="text-warn-ink">HQ</span>
           </div>
         </Link>
       </header>
       <main className="flex-1 flex items-center justify-center px-6 pb-16">
         <div className="w-full max-w-md card p-8 animate-fade-up">
-          <h1 className="text-2xl font-bold text-slate-900 mb-1">{title}</h1>
-          <p className="text-sm text-slate-500 mb-6">{subtitle}</p>
+          <h1 className="text-2xl font-bold text-ink-1 mb-1">{title}</h1>
+          <p className="text-sm text-ink-2 mb-6">{subtitle}</p>
           {children}
         </div>
       </main>

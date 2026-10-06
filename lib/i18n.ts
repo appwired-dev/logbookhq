@@ -36,6 +36,13 @@ const TRANSLATIONS = {
   "nav.settings":   { en: "Settings",   ko: "설정",     zh: "设置",       es: "Ajustes" },
   "nav.admin":      { en: "Admin",      ko: "관리자",   zh: "管理员",     es: "Admin" },
   "nav.signOut":    { en: "Sign out",   ko: "로그아웃", zh: "退出登录",   es: "Cerrar sesión" },
+  "theme.appearance": { en: "Appearance", ko: "화면 테마", zh: "外观", es: "Apariencia" },
+  "theme.hint":       { en: "Night-ops is easiest on the eyes in a dark cockpit; Day suits bright rooms. Saved on this device.", ko: "어두운 조종실에서는 나이트 옵스가, 밝은 곳에서는 데이 테마가 보기 편합니다. 이 기기에 저장됩니다.", zh: "夜间模式适合昏暗的驾驶舱，日间模式适合明亮环境。保存在此设备上。", es: "Night-ops descansa la vista en una cabina a oscuras; Día va mejor con mucha luz. Se guarda en este dispositivo." },
+  "theme.dark":       { en: "Night-ops", ko: "나이트 옵스", zh: "夜间", es: "Night-ops" },
+  "theme.light":      { en: "Day",       ko: "데이",       zh: "日间", es: "Día" },
+  "theme.system":     { en: "Match device", ko: "기기 설정 따르기", zh: "跟随设备", es: "Según el dispositivo" },
+  "theme.toDark":     { en: "Switch to the dark theme",  ko: "어두운 테마로 전환", zh: "切换到深色主题", es: "Cambiar al tema oscuro" },
+  "theme.toLight":    { en: "Switch to the light theme", ko: "밝은 테마로 전환",   zh: "切换到浅色主题", es: "Cambiar al tema claro" },
 
   // Dashboard
   "dash.welcome":          { en: "Welcome back, {name}.",  ko: "다시 오신 것을 환영합니다, {name}님.", zh: "欢迎回来,{name}。", es: "Bienvenido de vuelta, {name}." },

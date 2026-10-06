@@ -12,6 +12,7 @@ import { ToastProvider } from "@/components/ui/toast";
 import { getT, getLocale } from "@/lib/i18n-server";
 import HtmlLang from "@/components/HtmlLang";
 import CursorGlow from "@/app/CursorGlow";
+import { ThemeHeaderButton } from "@/components/ThemeToggle";
 
 // Cold-start headroom for the authenticated app. Most /app/* routes fetch the
 // user's whole logbook (fetchAllFlights); on a cold serverless invocation,
@@ -76,10 +77,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       </a>
       <CursorGlow className="app-cursor-glow" />
       <HtmlLang locale={locale} />
-      <header className="sticky top-0 z-30 h-16 bg-surface-inverse/90 backdrop-blur-xl border-b border-white/10">
+      <header className="sticky top-0 z-30 h-16 bg-canvas/70 backdrop-blur-xl backdrop-saturate-150 border-b border-border">
         <div className="mx-auto h-full max-w-[1440px] px-4 sm:px-6 flex items-center gap-4">
           <Brand
-            tone="light"
+            tone="auto"
             subtitle={
               <span className="mt-0.5 inline-flex">
                 <Pill variant="inverse">{regime} · {tier}</Pill>
@@ -88,6 +89,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           />
           <NavTabs items={items} locale={locale} />
           <div className="ml-auto flex items-center gap-2 shrink-0">
+            <ThemeHeaderButton toDark={t("theme.toDark")} toLight={t("theme.toLight")} />
             <LocaleSwitcher current={locale} />
             <UserMenu
               email={profile?.email ?? user.email ?? ""}

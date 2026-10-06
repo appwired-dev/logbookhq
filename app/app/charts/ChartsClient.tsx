@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import { useId, useMemo } from "react";
 import Link from "next/link";
 import {
-  Area, AreaChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis,
+  Area, AreaChart, CartesianGrid, ReferenceArea, ReferenceDot, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
 import type { FlightDerived, Role } from "@/lib/types";
 import type { Airport } from "@/lib/airports";
@@ -69,9 +69,11 @@ function iso(d: Date) {
  */
 const TOOLTIP_STYLE = {
   borderRadius: "var(--r-control)",
-  border: "1px solid rgb(var(--border))",
+  border: "1px solid rgb(var(--glass-line) / calc(var(--glass-line-a) * 2))",
   boxShadow: "var(--shadow-pop)",
-  background: "rgb(var(--surface))",
+  background: "rgb(var(--surface) / 0.86)",
+  backdropFilter: "blur(10px)",
+  WebkitBackdropFilter: "blur(10px)",
   padding: "8px 12px",
   fontSize: 12,
 } as const;
@@ -255,6 +257,7 @@ export default function ChartsClient({
   }
 
   const peakRolling = rolling.reduce((m, p) => Math.max(m, p.hours), 0);
+  const peakPoint = rolling.reduce<(typeof rolling)[number] | null>((best, p) => (!best || p.hours > best.hours ? p : best), null);
   const yMax = Math.max(peakRolling, ceiling) * 1.1;
   const ceilingLabel = fmt(s.ceilingLabel, { reference: annual.reference, ceiling: nf0(ceiling) });
   const typeTotal = typeRows.reduce((sum, t) => sum + t.hours, 0);
@@ -366,16 +369,19 @@ export default function ChartsClient({
         {rolling.length === 0 ? (
           <ChartEmpty icon={Icon.Clock} title={s.rollingEmptyTitle} body={s.rollingEmptyBody} />
         ) : (
-          <div className="h-56 min-w-0" role="img" aria-label={s.rollingTitle}>
+          <div className="h-64 min-w-0" role="img" aria-label={s.rollingTitle}>
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart accessibilityLayer data={rolling} margin={{ top: 16, right: 8, bottom: 4, left: 0 }}>
+              <AreaChart accessibilityLayer data={rolling} margin={{ top: 22, right: 12, bottom: 4, left: 0 }}>
                 <defs>
                   <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" style={{ stopColor: "rgb(var(--role-fo))", stopOpacity: 0.65 }} />
-                    <stop offset="100%" style={{ stopColor: "rgb(var(--role-fo))", stopOpacity: 0.04 }} />
+                    <stop offset="0%" style={{ stopColor: "rgb(var(--chart-area))", stopOpacity: 0.42 }} />
+                    <stop offset="60%" style={{ stopColor: "rgb(var(--chart-area))", stopOpacity: 0.1 }} />
+                    <stop offset="100%" style={{ stopColor: "rgb(var(--chart-area))", stopOpacity: 0 }} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="2 4" vertical={false} />
+                <CartesianGrid strokeDasharray="2 6" vertical={false} />
+                {/* caution band: the last 10% below the ceiling */}
+                <ReferenceArea y1={ceiling * 0.9} y2={ceiling} ifOverflow="extendDomain" style={{ fill: "rgb(var(--warn))", fillOpacity: 0.12 }} />
                 <XAxis dataKey="date" minTickGap={40} axisLine={false} tickLine={false} />
                 <YAxis
                   domain={[0, yMax]}
@@ -399,11 +405,22 @@ export default function ChartsClient({
                 <Area
                   type="monotone"
                   dataKey="hours"
-                  stroke="rgb(var(--role-fo))"
-                  strokeWidth={2.5}
+                  className="glow-line"
+                  stroke="rgb(var(--chart-area))"
+                  strokeWidth={2.25}
                   fill={`url(#${gradientId})`}
+                  activeDot={{ r: 5, strokeWidth: 2 }}
                   isAnimationActive={!reduceMotion}
                 />
+                {peakPoint && peakPoint.hours > 0 && (
+                  <ReferenceDot
+                    x={peakPoint.date}
+                    y={peakPoint.hours}
+                    r={4.5}
+                    style={{ fill: "rgb(var(--chart-area))", stroke: "rgb(var(--surface))", strokeWidth: 2 }}
+                    label={{ value: `${nf0(peakPoint.hours)} ${s.hoursUnit}`, position: "top", offset: 10, className: "text-2xs font-semibold" }}
+                  />
+                )}
               </AreaChart>
             </ResponsiveContainer>
           </div>

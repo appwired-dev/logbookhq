@@ -11,6 +11,7 @@ const config: Config = {
       colors: {
         canvas: v("canvas"),
         surface: v("surface"),
+        field: v("field"),
         "surface-2": v("surface-2"),
         "surface-inverse": v("surface-inverse"),
         border: v("border"),
@@ -52,6 +53,8 @@ const config: Config = {
       fontFamily: {
         sans: ["var(--font-sans)", "ui-sans-serif", "system-ui", "-apple-system", "Segoe UI", "Roboto", "sans-serif"],
         mono: ["var(--font-mono)", "ui-monospace", "SFMono-Regular", "Menlo", "Consolas", "monospace"],
+        /** Barlow Condensed — numerals on stat tiles and readouts (the instrument voice). */
+        display: ["var(--font-display)", "Barlow Condensed", "ui-sans-serif", "system-ui", "sans-serif"],
       },
       fontSize: {
         "2xs": ["11px", { lineHeight: "16px" }],

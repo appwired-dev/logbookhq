@@ -1,17 +1,10 @@
 "use client";
 
 /**
- * Infographic-style 3D bars for Recharts, plus the "Hours per aircraft type"
- * card that uses them.
- *
- *   ArrowBar3DHorizontal  — horizontal bar (flat right edge) for per-type charts.
- *   TypeHoursChart        — card: horizontal bars + a table alternative.
- *
- * Colours come from the `--chart-n` tokens. The light and dark faces of each
- * bar are mixed from the base token and the surface / ink tokens with
- * `color-mix()`, so a theme swap re-shades every bar without a palette table.
- * The drop shadow is the bar silhouette, offset so bar N's shadow lands in
- * the band of bar N+1, blurred with a CSS filter.
+ * "Hours per aircraft type" — horizontal bars in the instrument style of the
+ * route globe: each bar fills from a faint full-width track, brightens toward
+ * its end and finishes in a lit cap; in the dark theme it carries a soft glow.
+ * Colours come from the --chart-1 token, so the theme swap re-colours it.
  */
 
 import { useId, useState } from "react";
@@ -24,86 +17,30 @@ import { ChartBar, Table2 } from "lucide-react";
 import { Card, CardHeader, buttonClass } from "@/components/ui";
 import { useReducedMotion } from "@/lib/use-reduced-motion";
 
-const CHART_TOKENS = ["chart-1", "chart-2", "chart-3", "chart-4", "chart-5", "chart-6", "chart-7", "chart-8"] as const;
-
-/** Light / mid / dark faces for chart series `i` (cycles through --chart-1..8). */
-export function paletteForIndex(i: number) {
-  const base = `rgb(var(--${CHART_TOKENS[((i % CHART_TOKENS.length) + CHART_TOKENS.length) % CHART_TOKENS.length]}))`;
-  return {
-    lite: `color-mix(in srgb, ${base} 55%, rgb(var(--surface)))`,
-    mid: base,
-    dark: `color-mix(in srgb, ${base} 72%, rgb(var(--ink-1)))`,
-  };
-}
-
-/** Single faded-blue face — the Sankey's PIC blue (--role-pic), so the per-type
- *  bars read as the same family as the career flow above. */
-function neutralPalette() {
-  const base = "rgb(var(--role-pic))";
-  return {
-    lite: `color-mix(in srgb, ${base} 34%, rgb(var(--surface)))`,
-    mid: `color-mix(in srgb, ${base} 86%, rgb(var(--surface)))`,
-    dark: `color-mix(in srgb, ${base} 66%, rgb(var(--ink-1)))`,
-  };
-}
-
-// Soft, light contact shadow — a hint stronger than a flat drop.
-const SHADOW = { fill: "rgb(var(--ink-3))", fillOpacity: 0.3, filter: "blur(2px)" } as const;
-const HIGHLIGHT = { stroke: "rgb(var(--surface) / 0.5)" } as const;
-
 interface ShapeProps {
   x?: number;
   y?: number;
   width?: number;
   height?: number;
   index?: number;
-  fill?: string;
-  colored?: boolean;
-  /** Force the single slate palette (matches the Sankey aircraft nodes). */
-  neutral?: boolean;
+  /** Set by Recharts while the pointer is over this row. */
+  isActive?: boolean;
+  gradientId?: string;
 }
 
-/** Horizontal 3D bar — grows rightward, flat right edge. */
-export function ArrowBar3DHorizontal(props: ShapeProps) {
-  const { x = 0, y = 0, width = 0, height = 0, index = 0, colored = false, neutral = false } = props;
+/** A slim rounded bar with a gradient body and a lit end cap. */
+function GlowBar({ x = 0, y = 0, width = 0, height = 0, gradientId }: ShapeProps) {
   if (height <= 0 || width <= 0) return null;
-
-  const pal = neutral ? neutralPalette() : paletteForIndex(colored ? index : 0);
-  const depth = Math.min(height * 0.42, 9);
-  const id = `harr-${Math.round(x)}-${Math.round(y)}-${Math.round(width)}-${index}`;
-
-  // Soft contact shadow — a short drop, not a full bar-height away.
-  const shDx = 4;
-  const shDy = Math.round(height * 0.5);
-
-  const front = [`M ${x},${y}`, `L ${x + width},${y}`, `L ${x + width},${y + height}`, `L ${x},${y + height}`, "Z"].join(" ");
-  const top = [`M ${x},${y}`, `L ${x + width},${y}`, `L ${x + width + depth},${y - depth}`, `L ${x + depth},${y - depth}`, "Z"].join(" ");
-  // Right side face — fills the wedge between the bar's right edge and its
-  // extruded back-right corner. Without this the bar end looks hollow.
-  const side = [`M ${x + width},${y}`, `L ${x + width + depth},${y - depth}`, `L ${x + width + depth},${y + height - depth}`, `L ${x + width},${y + height}`, "Z"].join(" ");
-
+  const r = Math.min(height / 2, 6);
+  const capX = x + width;
   return (
-    <g>
-      <defs>
-        <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" style={{ stopColor: pal.lite }} />
-          <stop offset="50%" style={{ stopColor: pal.mid }} />
-          <stop offset="100%" style={{ stopColor: pal.dark }} />
-        </linearGradient>
-      </defs>
-      <path d={front} transform={`translate(${shDx} ${shDy})`} style={SHADOW} />
-      <path d={side} opacity="0.82" style={{ fill: pal.dark }} />
-      <path d={top} opacity="0.85" style={{ fill: pal.lite }} />
-      <path d={front} fill={`url(#${id})`} />
-      {/* Specular highlight along the top edge */}
-      <path d={`M ${x + 0.5},${y + 0.5} L ${x + width - 1},${y + 0.5}`} strokeWidth="1" strokeLinecap="round" style={HIGHLIGHT} />
+    <g className="glow-bar">
+      <rect x={x} y={y} width={width} height={height} rx={r} fill={`url(#${gradientId})`} />
+      {/* top sheen: a hairline of light along the upper edge */}
+      <rect x={x + r} y={y + 0.5} width={Math.max(0, width - 2 * r)} height={1} rx={0.5} style={{ fill: "rgb(255 255 255 / 0.28)" }} />
+      {width > 10 && <circle cx={capX - r} cy={y + height / 2} r={Math.max(1.6, height * 0.22)} className="glow-bar-cap" style={{ fill: "rgb(var(--chart-1))" }} />}
     </g>
   );
-}
-
-/** Single slate face — matches the aircraft nodes in the career Sankey. */
-export function ArrowBar3DHorizontalNeutral(props: ShapeProps) {
-  return <ArrowBar3DHorizontal {...props} neutral />;
 }
 
 // ---------------------------------------------------------------------------
@@ -120,9 +57,11 @@ export type TypeHoursStrings = {
 
 const TOOLTIP_STYLE = {
   borderRadius: "var(--r-control)",
-  border: "1px solid rgb(var(--border))",
+  border: "1px solid rgb(var(--glass-line) / calc(var(--glass-line-a) * 2))",
   boxShadow: "var(--shadow-pop)",
-  background: "rgb(var(--surface))",
+  background: "rgb(var(--surface) / 0.86)",
+  backdropFilter: "blur(10px)",
+  WebkitBackdropFilter: "blur(10px)",
   padding: "8px 12px",
   fontSize: 12,
 } as const;
@@ -151,8 +90,9 @@ export default function TypeHoursChart({
   const [mode, setMode] = useState<"chart" | "table">("chart");
   const reduceMotion = useReducedMotion();
   const tableId = useId();
+  const gradientId = `tb-${useId().replace(/:/g, "")}`;
   const total = rows.reduce((s, r) => s + r.hours, 0) || 1;
-  const height = Math.max(200, rows.length * 34 + 30);
+  const height = Math.max(200, rows.length * 36 + 30);
   const nf = (n: number) => n.toLocaleString(locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
   const showTable = mode === "table";
 
@@ -180,8 +120,15 @@ export default function TypeHoursChart({
       {!showTable && (
         <div className="min-w-0" style={{ height }}>
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={rows} layout="vertical" margin={{ top: 8, right: 56, bottom: 4, left: 0 }} barCategoryGap="28%">
-              <CartesianGrid horizontal={false} strokeDasharray="2 4" />
+            <BarChart data={rows} layout="vertical" margin={{ top: 8, right: 64, bottom: 4, left: 0 }} barCategoryGap="38%">
+              <defs>
+                <linearGradient id={gradientId} x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" style={{ stopColor: "rgb(var(--chart-1))", stopOpacity: 0.18 }} />
+                  <stop offset="70%" style={{ stopColor: "rgb(var(--chart-1))", stopOpacity: 0.7 }} />
+                  <stop offset="100%" style={{ stopColor: "rgb(var(--chart-1))", stopOpacity: 1 }} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid horizontal={false} strokeDasharray="2 6" />
               <XAxis type="number" axisLine={false} tickLine={false} />
               <YAxis type="category" dataKey="name" width={132} interval={0} axisLine={false} tickLine={false} tickFormatter={ellipsis} />
               <Tooltip
@@ -190,8 +137,14 @@ export default function TypeHoursChart({
                 itemStyle={{ color: "rgb(var(--ink-1))", fontWeight: 600 }}
                 formatter={(v: unknown) => [`${nf(Number(v))} ${hoursUnit}`, strings.colHours]}
               />
-              <Bar dataKey="hours" shape={<ArrowBar3DHorizontalNeutral />} isAnimationActive={!reduceMotion}>
-                <LabelList dataKey="hours" position="right" offset={14} className="num" formatter={(v: unknown) => nf(Number(v))} />
+              <Bar
+                dataKey="hours"
+                shape={<GlowBar gradientId={gradientId} />}
+                background={{ fill: "rgb(var(--ink-1) / 0.05)", radius: 6 }}
+                isAnimationActive={!reduceMotion}
+                animationDuration={700}
+              >
+                <LabelList dataKey="hours" position="right" offset={12} className="mono" fill="rgb(var(--ink-2))" fontSize={12} formatter={(v: unknown) => nf(Number(v))} />
               </Bar>
             </BarChart>
           </ResponsiveContainer>
