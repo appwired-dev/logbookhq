@@ -108,7 +108,7 @@ export default function LocaleSwitcher({ current }: { current: Locale }) {
         type="button"
         onClick={() => setOpen((v) => !v)}
         onKeyDown={onTriggerKeys}
-        className="inline-flex h-9 items-center gap-1.5 rounded-control px-2.5 text-xs text-white/85 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 cursor-pointer transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-inverse"
+        className="inline-flex h-9 items-center gap-1.5 rounded-control px-2.5 text-xs text-ink-2 hover:text-ink-1 bg-surface-2/50 hover:bg-surface-2 border border-border cursor-pointer transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}

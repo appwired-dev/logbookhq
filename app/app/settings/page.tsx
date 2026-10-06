@@ -9,6 +9,8 @@ import SettingsForm from "./SettingsForm";
 import BackupCard from "./BackupCard";
 import SupportCard from "./SupportCard";
 import AccountSecurityCard from "./AccountSecurityCard";
+import { ThemeChoice } from "@/components/ThemeToggle";
+import { makeT } from "@/lib/i18n";
 
 /** One past payment, flattened from a Stripe charge for the billing card. */
 type Receipt = { id: string; created: number; amount: number; currency: string; status: string; url: string | null };
@@ -66,7 +68,19 @@ export default async function SettingsPage() {
         />
       }
       support={<SupportCard locale={locale} />}
+      appearance={<AppearanceCard locale={locale} />}
     />
+  );
+}
+
+/** Theme choice — saved per device (localStorage), applied before first paint. */
+function AppearanceCard({ locale }: { locale: Locale }) {
+  const t = makeT(locale);
+  return (
+    <Card id="appearance" padding="md" className="scroll-mt-20">
+      <CardHeader title={t("theme.appearance")} meta={t("theme.hint")} />
+      <ThemeChoice legend={t("theme.appearance")} dark={t("theme.dark")} light={t("theme.light")} system={t("theme.system")} />
+    </Card>
   );
 }
 

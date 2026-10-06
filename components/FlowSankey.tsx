@@ -55,12 +55,12 @@ function NodeShape({ x = 0, y = 0, width = 0, height = 0, payload, fmt, mode, la
     <g>
       <rect className="lp-snode" x={x} y={y} width={width} height={Math.max(height, 2)} rx={3} style={{ fill: payload?.color ?? NODE_NEUTRAL }} />
       {compact ? (
-        <text x={lx} y={y + height / 2} textAnchor={anchor} dominantBaseline="middle" className="text-2xs fill-ink-1">
+        <text x={lx} y={y + height / 2} textAnchor={anchor} dominantBaseline="middle" className="text-2xs fill-ink-1 sk-label">
           <tspan fontWeight={600}>{name}</tspan>
           {!nameOnly && <tspan className="mono text-2xs fill-ink-3">{`  ${value}`}</tspan>}
         </text>
       ) : (
-        <text x={lx} y={y + height / 2} textAnchor={anchor} className="text-xs fill-ink-1">
+        <text x={lx} y={y + height / 2} textAnchor={anchor} className="text-xs fill-ink-1 sk-label">
           <tspan x={lx} dy="-0.2em" fontWeight={600}>{name}</tspan>
           <tspan x={lx} dy="1.3em" className="mono text-2xs fill-ink-3">{value}</tspan>
         </text>

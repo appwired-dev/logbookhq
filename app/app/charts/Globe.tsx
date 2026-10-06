@@ -402,11 +402,11 @@ export default function FlightGlobe({ airports, arcs: rawArcs, strings, locale, 
         if (sp > 0.01) {
           const dx = spx / sp, dy = spy / sp, f = Math.max(0, Math.min(1, (1 - sx) / 2));
           const gn = ctx.createLinearGradient(cx - dx * R, cy - dy * R, cx + dx * R, cy + dy * R);
-          gn.addColorStop(0, "rgba(2,6,14,0.55)"); gn.addColorStop(Math.max(0, f - 0.07), "rgba(2,6,14,0.55)");
+          gn.addColorStop(0, "rgba(2,6,14,0.4)"); gn.addColorStop(Math.max(0, f - 0.07), "rgba(2,6,14,0.4)");
           gn.addColorStop(Math.min(1, f + 0.07), "rgba(2,6,14,0)"); gn.addColorStop(1, "rgba(2,6,14,0)");
           ctx.fillStyle = gn; ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fill();
         } else if (sx < 0) {
-          ctx.fillStyle = "rgba(2,6,14,0.55)"; ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = "rgba(2,6,14,0.4)"; ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fill();
         }
       }
 
@@ -425,7 +425,7 @@ export default function FlightGlobe({ airports, arcs: rawArcs, strings, locale, 
         for (let b = 0; b < 15; b++) {
           const d = b % 5, state = (b / 5) | 0;
           // day: cyan land · twilight: dimmer · night: faint warm "city lights"
-          ctx.fillStyle = state === 0 ? rgba(pal.dots, DOT_A[d]) : state === 1 ? rgba(pal.dots, DOT_A[d] * 0.55) : rgba(pal.trail, DOT_A[d] * 0.3);
+          ctx.fillStyle = state === 0 ? rgba(pal.dots, DOT_A[d]) : state === 1 ? rgba(pal.dots, DOT_A[d] * 0.7) : rgba(pal.trail, DOT_A[d] * 0.55);
           const z = DOT_S[d] * zs, hz = z / 2, X = bx[b], Y = by[b];
           for (let j = 0; j < X.length; j++) ctx.fillRect(X[j] - hz, Y[j] - hz, z, z);
         }

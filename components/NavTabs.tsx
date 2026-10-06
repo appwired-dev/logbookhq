@@ -61,7 +61,7 @@ function isActive(item: NavItem, pathname: string): boolean {
 const stripPlus = (s: string) => s.replace(/^\+\s*/, "");
 
 const FOCUS_RING_INVERSE =
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-inverse";
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas";
 
 /**
  * Desktop/tablet tab strip. Lives inside the app header.
@@ -172,10 +172,10 @@ function DesktopStrip({
           const active = isActive(item, pathname);
           const Cmp = iconFor(item.icon);
           const colour = active
-            ? "text-white"
+            ? "text-ink-1"
             : item.tone === "accent"
-              ? "text-warn hover:bg-white/10"
-              : "text-white/70 hover:text-white hover:bg-white/10";
+              ? "text-warn-ink hover:bg-surface-2/70"
+              : "text-ink-2 hover:text-ink-1 hover:bg-surface-2/70";
           return (
             <Link
               key={item.href}
@@ -211,7 +211,7 @@ function DesktopStrip({
 /* ------------------------------------------------------------------------ */
 
 const SLOT =
-  "relative flex h-full w-full flex-col items-center justify-center gap-1 rounded-control cursor-pointer select-none transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/70";
+  "relative flex h-full w-full flex-col items-center justify-center gap-1 rounded-control cursor-pointer select-none transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand/60";
 
 function ActiveDot() {
   return <span aria-hidden className="absolute top-1.5 left-1/2 -translate-x-1/2 h-1 w-1 rounded-full bg-brand-glow" />;
@@ -224,7 +224,7 @@ function Slot({ item, pathname }: { item: NavItem; pathname: string }) {
     <Link
       href={item.href}
       aria-current={active ? "page" : undefined}
-      className={`${SLOT} ${active ? "text-white" : "text-white/60 hover:text-white"}`}
+      className={`${SLOT} ${active ? "text-ink-1" : "text-ink-3 hover:text-ink-1"}`}
     >
       {active && <ActiveDot />}
       <Cmp size={20} strokeWidth={1.75} aria-hidden />
@@ -312,7 +312,7 @@ function BottomBar({
   return (
     <nav
       aria-label={labels.nav}
-      className="fixed inset-x-0 bottom-0 z-30 md:hidden bg-surface-inverse/95 backdrop-blur-xl border-t border-white/10 pb-[env(safe-area-inset-bottom)]"
+      className="fixed inset-x-0 bottom-0 z-30 md:hidden bg-canvas/80 backdrop-blur-xl backdrop-saturate-150 border-t border-border pb-[env(safe-area-inset-bottom)]"
     >
       {open && (
         <div
@@ -321,16 +321,16 @@ function BottomBar({
           role="menu"
           aria-label={labels.morePages}
           onKeyDown={onSheetKeys}
-          className="absolute bottom-full right-2 mb-2 w-56 rounded-card border border-white/10 bg-surface-inverse text-white p-2 shadow-pop animate-fade-up"
+          className="absolute bottom-full right-2 mb-2 w-56 rounded-card border border-border bg-surface text-ink-1 p-2 shadow-pop animate-fade-up"
         >
           {more.map((item) => {
             const active = isActive(item, pathname);
             const Cmp = iconFor(item.icon);
             const colour = active
-              ? "bg-white/10 text-white"
+              ? "bg-surface-2 text-ink-1"
               : item.tone === "accent"
-                ? "text-warn hover:bg-white/10"
-                : "text-white/85 hover:bg-white/10 hover:text-white";
+                ? "text-warn-ink hover:bg-surface-2"
+                : "text-ink-2 hover:bg-surface-2 hover:text-ink-1";
             return (
               <Link
                 key={item.href}
@@ -339,7 +339,7 @@ function BottomBar({
                 tabIndex={-1}
                 aria-current={active ? "page" : undefined}
                 onClick={() => setOpen(false)}
-                className={`flex items-center gap-2.5 rounded-control px-2.5 py-2 text-sm font-medium cursor-pointer transition-colors duration-fast focus-visible:outline-none focus-visible:bg-white/10 focus-visible:text-white ${colour}`}
+                className={`flex items-center gap-2.5 rounded-control px-2.5 py-2 text-sm font-medium cursor-pointer transition-colors duration-fast focus-visible:outline-none focus-visible:bg-surface-2 focus-visible:text-ink-1 ${colour}`}
               >
                 <Cmp size={16} strokeWidth={1.75} aria-hidden />
                 <span className="truncate">{item.label}</span>
@@ -358,7 +358,7 @@ function BottomBar({
             href={newFlight.href}
             aria-label={stripPlus(newFlight.label)}
             title={stripPlus(newFlight.label)}
-            className="-mt-6 grid h-14 w-14 place-items-center rounded-full bg-gradient-aviation text-white shadow-glow ring-4 ring-surface-inverse cursor-pointer hover:brightness-110 active:scale-95 transition-[filter,transform] duration-fast focus-visible:outline-none focus-visible:ring-white/70"
+            className="-mt-6 grid h-14 w-14 place-items-center rounded-full bg-gradient-aviation text-white shadow-glow ring-4 ring-canvas cursor-pointer hover:brightness-110 active:scale-95 transition-[filter,transform] duration-fast focus-visible:outline-none focus-visible:ring-brand/60"
           >
             <Icon.Plus size={24} strokeWidth={2} aria-hidden />
           </Link>
@@ -373,7 +373,7 @@ function BottomBar({
           aria-expanded={open}
           aria-controls={open ? sheetId : undefined}
           onClick={() => setOpen((v) => !v)}
-          className={`${SLOT} ${open || moreActive ? "text-white" : "text-white/60 hover:text-white"}`}
+          className={`${SLOT} ${open || moreActive ? "text-ink-1" : "text-ink-3 hover:text-ink-1"}`}
         >
           {moreActive && <ActiveDot />}
           <Icon.Ellipsis size={20} strokeWidth={1.75} aria-hidden />

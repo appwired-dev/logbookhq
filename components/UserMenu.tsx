@@ -27,7 +27,7 @@ const STR: Record<"account" | "accountMenu" | "billing", Strings> = {
 };
 
 const TRIGGER =
-  "inline-flex h-9 items-center gap-2 rounded-control px-2.5 text-xs text-white/85 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 cursor-pointer transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-inverse";
+  "inline-flex h-9 items-center gap-2 rounded-control px-2.5 text-xs text-ink-2 hover:text-ink-1 bg-surface-2/50 hover:bg-surface-2 border border-border cursor-pointer transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas";
 
 const ITEM =
   "flex w-full items-center gap-2.5 px-3 py-2 text-sm text-ink-1 text-left cursor-pointer transition-colors duration-fast hover:bg-surface-2 focus-visible:outline-none focus-visible:bg-surface-2";

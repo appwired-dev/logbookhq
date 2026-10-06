@@ -76,10 +76,80 @@
 
   /* layout */
   --bottom-nav-h: 64px;
+
+  /* form fields + glass surfaces */
+  --field: 255 255 255;
+  --glass-a: 0.72;                       /* card fill opacity over the shell backdrop */
+  --glass-edge: 255 255 255;             /* inner top highlight */
+  --glass-edge-a: 0.7;
+  --glass-line: 15 23 42;                /* outer hairline */
+  --glass-line-a: 0.07;
+  --glass-blur: 16px;
+  --pin-bg: 250 251 253;                 /* opaque stand-in for a glass card (sticky table column) */
+  color-scheme: light;
 }
 
+/* ============================================================================
+   Night-ops — the dark theme. A value swap of the same tokens (the marketing
+   site's .lp palette), so every component re-themes without its own rules.
+   Set on <html data-theme> before first paint by the script in app/layout.tsx.
+   ========================================================================== */
 [data-theme="dark"] {
-  /* Night-ops theme lands in a later phase — override tokens here only. */
+  color-scheme: dark;
+  --canvas: 7 11 18;
+  --surface: 17 25 37;
+  --surface-2: 26 37 51;
+  --surface-inverse: 226 234 242;          /* inverse = light on the dark theme (selected segments) */
+  --border: 39 54 75;
+  --border-strong: 58 78 102;
+  --field: 11 17 26;
+
+  --ink-1: 234 240 246;
+  --ink-2: 165 177 192;
+  --ink-3: 139 152 170;
+  --ink-inverse: 4 19 26;
+
+  --brand: 86 199 222;
+  --brand-deep: 127 214 232;              /* text / links on dark; a light cyan */
+  --brand-glow: 86 199 222;
+
+  --good: 58 210 154;   --good-ink: 110 231 183;
+  --warn: 240 166 46;   --warn-ink: 248 201 118;
+  --bad: 240 97 74;     --bad-ink: 252 165 150;
+
+  --role-pic: 96 165 250;    --role-pic-ink: 147 197 253;
+  --role-dual: 240 166 46;   --role-dual-ink: 248 201 118;
+  --role-fo: 52 211 153;     --role-fo-ink: 110 231 183;
+  --role-sic: 167 139 250;   --role-sic-ink: 196 181 253;
+  --role-check: 232 121 249; --role-check-ink: 240 171 252;
+  --cat-se: 148 163 184;     --cat-se-ink: 203 213 225;
+  --cat-me: 129 140 248;     --cat-me-ink: 165 180 252;
+  --cat-heli: 45 212 191;    --cat-heli-ink: 94 234 212;
+  --cat-sim: 251 113 133;    --cat-sim-ink: 253 164 175;
+
+  --chart-1: 86 199 222;
+  --chart-2: 58 210 154;
+  --chart-3: 240 166 46;
+  --chart-4: 167 139 250;
+  --chart-5: 251 113 133;
+  --chart-6: 45 212 191;
+  --chart-7: 129 140 248;
+  --chart-8: 148 163 184;
+  --chart-grid: 58 78 102;
+  --chart-area: 86 199 222;
+  --chart-ceiling: 240 97 74;
+
+  --shadow-card: 0 1px 0 rgb(255 255 255 / 0.04) inset, 0 18px 40px -18px rgb(0 0 0 / 0.6);
+  --shadow-card-hover: 0 1px 0 rgb(255 255 255 / 0.06) inset, 0 24px 48px -16px rgb(0 0 0 / 0.7);
+  --shadow-pop: 0 24px 60px rgb(0 0 0 / 0.55), 0 0 0 1px rgb(255 255 255 / 0.06);
+  --shadow-glow: 0 6px 22px rgb(86 199 222 / 0.28);
+
+  --glass-a: 0.52;
+  --glass-edge: 255 255 255;
+  --glass-edge-a: 0.06;
+  --glass-line: 148 196 230;
+  --glass-line-a: 0.1;
+  --pin-bg: 13 20 30;
 }
 
 @layer base {
@@ -153,7 +223,7 @@
 
   /* ---- fields ---- */
   .input {
-    @apply block w-full rounded-control border border-border bg-surface
+    @apply block w-full rounded-control border border-border bg-field
            px-3 h-11 sm:h-10 text-sm text-ink-1 placeholder:text-ink-3
            focus:outline-none focus:ring-4 focus:ring-brand/15 focus:border-brand
            transition-[border-color,box-shadow] duration-fast ease-out;
@@ -165,7 +235,18 @@
   .label { @apply block text-2xs font-semibold uppercase tracking-[0.08em] text-ink-2 mb-1.5; }
 
   /* ---- surfaces ---- */
-  .card { @apply rounded-card border border-border bg-surface shadow-card; }
+  /* Glass: a translucent surface over the shell backdrop (blurred), a light
+     inner top edge and a hairline — so instruments like the night globe sit
+     in the page instead of on a white sheet. Opaque fallback without
+     backdrop-filter, and for people who ask for less transparency. */
+  .card {
+    @apply rounded-card border shadow-card;
+    background-color: rgb(var(--surface) / var(--glass-a));
+    border-color: rgb(var(--glass-line) / var(--glass-line-a));
+    box-shadow: inset 0 1px 0 rgb(var(--glass-edge) / var(--glass-edge-a)), var(--shadow-card);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+    backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+  }
   .card-interactive {
     @apply transition-[box-shadow,transform] duration-med ease-out
            hover:shadow-card-hover hover:-translate-y-0.5 cursor-pointer
@@ -207,7 +288,7 @@
   .pill-warn      { @apply pill bg-warn/10 text-warn-ink border-warn/30; }
   .pill-bad       { @apply pill bg-bad/10 text-bad-ink border-bad/30; }
   .pill-neutral   { @apply pill bg-surface-2 text-ink-2 border-border; }
-  .pill-inverse   { @apply pill bg-white/10 text-white/85 border-white/15; }
+  .pill-inverse   { @apply pill bg-ink-1/5 text-ink-2 border-border; }
 }
 
 /* iOS Safari zooms the whole page when a focused form control renders text
@@ -261,13 +342,16 @@
   box-shadow: var(--shadow-card);
 }
 
-/* ---- calendar heatmap ---- */
-.react-calendar-heatmap text { font-size: 7px; fill: rgb(var(--ink-3)); }
-.react-calendar-heatmap .color-empty { fill: rgb(var(--surface-2)); }
-.react-calendar-heatmap .color-scale-1 { fill: rgb(var(--chart-1) / 0.3); }
-.react-calendar-heatmap .color-scale-2 { fill: rgb(var(--chart-1) / 0.55); }
-.react-calendar-heatmap .color-scale-3 { fill: rgb(var(--chart-1) / 0.8); }
-.react-calendar-heatmap .color-scale-4 { fill: rgb(var(--brand-deep)); }
+/* ---- calendar heatmap ----
+   The library's own stylesheet (imported by the component, so it loads after
+   this file) paints .color-empty #eee at equal specificity; the `svg` prefix
+   keeps the theme tokens winning in both themes. */
+svg.react-calendar-heatmap text { font-size: 7px; fill: rgb(var(--ink-3)); }
+svg.react-calendar-heatmap .color-empty { fill: rgb(var(--surface-2)); }
+svg.react-calendar-heatmap .color-scale-1 { fill: rgb(var(--chart-1) / 0.3); }
+svg.react-calendar-heatmap .color-scale-2 { fill: rgb(var(--chart-1) / 0.55); }
+svg.react-calendar-heatmap .color-scale-3 { fill: rgb(var(--chart-1) / 0.8); }
+svg.react-calendar-heatmap .color-scale-4 { fill: rgb(var(--brand-deep)); }
 .react-calendar-heatmap rect { rx: 1.5; }
 .react-calendar-heatmap rect:hover { stroke: rgb(var(--ink-1)); stroke-width: 1.5px; }
 
@@ -325,7 +409,7 @@
 }
 @keyframes flightSavedPulseCard {
   0%, 45% { background-color: rgb(var(--brand) / 0.12); }
-  100% { background-color: rgb(var(--surface)); }
+  100% { background-color: rgb(var(--pin-bg)); }
 }
 .row-saved { animation: flightSavedPulse 1.6s var(--ease-out) both; }
 .card.row-saved { animation-name: flightSavedPulseCard; }
@@ -360,10 +444,10 @@ tr.row-focus:focus-visible > td:last-child {
 .col-pin {
   position: sticky;
   left: 0;
-  background-color: rgb(var(--surface));
+  background-color: rgb(var(--pin-bg));
   box-shadow: inset -1px 0 0 0 rgb(var(--border));
 }
-tbody tr:hover > .col-pin { background-color: rgb(var(--canvas)); }
+tbody tr:hover > .col-pin { background-color: rgb(var(--surface-2)); }
 tr.row-focus:focus-visible > .col-pin {
   background-image: linear-gradient(rgb(var(--brand) / 0.05), rgb(var(--brand) / 0.05));
 }
@@ -371,7 +455,7 @@ tr.row-focus:focus-visible > .col-pin {
 @media (prefers-reduced-motion: reduce) {
   .row-saved > .col-pin {
     animation: none;
-    background-color: rgb(var(--surface));
+    background-color: rgb(var(--pin-bg));
     background-image: linear-gradient(rgb(var(--brand) / 0.12), rgb(var(--brand) / 0.12));
   }
 }
@@ -814,13 +898,30 @@ tr.row-focus:focus-visible > .col-pin {
    sheen, and an interactive / 3D Sankey. Scoped to the logged-in app.
    ========================================================================== */
 
-/* subtle depth gradient behind the app shell (was a flat canvas) */
-.app-shell {
+/* The shell backdrop the glass cards blur: a fixed layer (not
+   background-attachment: fixed, which iOS ignores and which repaints on
+   scroll). Day = soft daylight; Night-ops = a deep sky with faint aurora and
+   a dot graticule, the same world as the route globe. */
+.app-shell { background: rgb(var(--canvas)); }
+.app-shell::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
   background:
-    radial-gradient(1150px 540px at 50% -10%, rgb(var(--brand) / 0.06), transparent 60%),
-    radial-gradient(900px 520px at 94% 2%, rgb(var(--chart-4) / 0.05), transparent 58%),
+    radial-gradient(1150px 560px at 50% -12%, rgb(var(--brand) / 0.10), transparent 60%),
+    radial-gradient(900px 540px at 96% 4%, rgb(var(--chart-4) / 0.08), transparent 58%),
+    radial-gradient(800px 600px at 0% 100%, rgb(var(--chart-2) / 0.06), transparent 60%),
     linear-gradient(180deg, #F8FAFD 0%, #EDF1F7 100%);
-  background-attachment: fixed;
+}
+[data-theme="dark"] .app-shell::before {
+  background:
+    radial-gradient(rgb(150 226 240 / 0.07) 1px, transparent 1.2px) 0 0 / 26px 26px,
+    radial-gradient(1200px 620px at 50% -14%, rgb(86 199 222 / 0.16), transparent 62%),
+    radial-gradient(900px 560px at 100% 8%, rgb(167 139 250 / 0.10), transparent 60%),
+    radial-gradient(900px 640px at -6% 100%, rgb(58 210 154 / 0.07), transparent 62%),
+    linear-gradient(180deg, #0A111C 0%, #070B12 100%);
 }
 
 /* pointer light — a soft brand-tinted shade that eases to the cursor and
@@ -843,6 +944,7 @@ tr.row-focus:focus-visible > .col-pin {
   will-change: transform;
 }
 .app-cursor-glow.is-on { opacity: 1; }
+[data-theme="dark"] .app-cursor-glow { mix-blend-mode: screen; background: radial-gradient(circle, rgb(var(--brand) / 0.10) 0%, rgb(var(--brand) / 0.04) 38%, transparent 68%); }
 @media (prefers-reduced-motion: reduce) { .app-cursor-glow { display: none; } }
 @media (hover: none) { .app-cursor-glow { display: none; } }
 
@@ -917,3 +1019,39 @@ svg:has(.lp-ribbon:hover) .lp-ribbon { fill-opacity: 0.2; }
   background: rgba(255,255,255,.05); border: 1px solid var(--lp-line);
   border-radius: 5px; padding: 1px 5px; color: var(--lp-ink);
 }
+
+/* ============================================================================
+   Night-ops adjustments that a token swap alone can't express.
+   ========================================================================== */
+/* Primary actions: the aviation gradient starts at --brand-deep, which is a
+   light cyan in the dark theme — so dark primaries are solid cyan with ink. */
+[data-theme="dark"] .btn-primary,
+[data-theme="dark"] .bg-gradient-aviation {
+  background-image: linear-gradient(180deg, #7FD6E8, #4FBBD3);
+  color: #04131A;
+}
+[data-theme="dark"] .bg-gradient-cyan { background-image: linear-gradient(135deg, #38BDF8, #0891B2); }
+[data-theme="dark"] .bar-track { box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.4); }
+[data-theme="dark"] .skeleton::after { background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.06), transparent); }
+[data-theme="dark"] .lp-ribbon, [data-theme="dark"] .lp-snode { filter: none; }
+/* The route globe floats on its glass card in the dark; on the day theme it
+   keeps its own night "screen". */
+[data-theme="dark"] .globe-stage {
+  background: radial-gradient(ellipse at 50% 46%, rgb(86 199 222 / 0.07), transparent 62%);
+}
+
+/* Less transparency when asked, and an opaque fallback where blur is missing. */
+@media (prefers-reduced-transparency: reduce) {
+  .card { --glass-a: 0.97; -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .card { --glass-a: 0.96; }
+}
+
+/* ---- charts in the instrument style ---- */
+.glow-bar-cap { filter: drop-shadow(0 0 3px rgb(var(--chart-1) / 0.8)); }
+[data-theme="dark"] .glow-bar > rect:first-child { filter: drop-shadow(0 0 6px rgb(var(--chart-1) / 0.32)); }
+[data-theme="dark"] .glow-line .recharts-area-curve { filter: drop-shadow(0 0 6px rgb(var(--chart-area) / 0.55)); }
+/* Sankey labels keep a halo where they cross ribbons. */
+.sk-label { paint-order: stroke; stroke: rgb(var(--canvas) / 0.9); stroke-width: 3px; stroke-linejoin: round; }
+@media (prefers-reduced-motion: reduce) { .glow-bar-cap { filter: none; } }
