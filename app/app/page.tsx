@@ -226,7 +226,7 @@ export default async function DashboardPage() {
     set,
     windows: i === 0 ? currency.windows : computeCurrencyForRegime(all, regime, now, set.id).windows,
   }));
-  /** "CAR 700.28 · 1,000 / 300 / 112 hrs" */
+  /** "CAR 700.27 · 1,000 / 300 / 112 hrs" */
   const setSummary = (s: FlightTimeRuleSet) =>
     `${s.reference} · ${s.flightTimeWindows.map((w) => w.max.toLocaleString()).join(" / ")} ${hrs}`;
   /** Rolling windows read "Last 90 Days"; calendar-anchored ones say so. */

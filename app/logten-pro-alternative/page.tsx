@@ -73,7 +73,7 @@ export default function LogTenAlternativePage() {
         <p>
           Being legal under the FAA tells you nothing certain about EASA, and a passenger-currency window
           under one authority isn&rsquo;t the same window under another. This tracks currency and rolling
-          flight-time limits &mdash; the last 28, 90 and 365 days under CARs, FAR 117 and ORO.FTL &mdash; for each
+          flight-time limits &mdash; in the windows each rule uses under the CARs, FAR 117 and ORO.FTL &mdash; for each
           authority you fly, from one set of flights, and turns a window amber before it lapses rather than
           after. The regimes arrive already built; you don&rsquo;t spend an evening wiring them up.
         </p>

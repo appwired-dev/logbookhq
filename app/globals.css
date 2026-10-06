@@ -411,6 +411,17 @@ tr.row-focus:focus-visible > .col-pin {
   --globe-light: 255 255 255;
   --globe-light-sky: 230 240 255;
   --globe-light-ground: 11 26 51;
+
+  /* Charts route globe (canvas 2D, app/app/charts/Globe.tsx): a night globe of
+     land dots with great-circle routes. Read at runtime like the set above. */
+  --globe-night-1: 24 57 90;
+  --globe-night-2: 14 30 49;
+  --globe-night-3: 6 11 19;
+  --globe-glow: 86 199 222;
+  --globe-dots: 150 226 240;
+  --globe-route: 86 199 222;
+  --globe-trail: 248 201 118;
+  --globe-plane: 255 230 179;
 }
 .globe-stage {
   background: radial-gradient(ellipse at 50% 42%,

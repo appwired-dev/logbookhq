@@ -68,14 +68,36 @@ test("FAA day PAX: below threshold is not current", () => {
   assert.equal(d.current, false, "not current at 2/3");
 });
 
-test("FAA night PAX: min asymmetry, day currency independent", () => {
+test("FAA night PAX: min asymmetry; night landings also count toward day PAX (61.57(a))", () => {
   const flights = [
     flight("2026-06-10", { takeoffs_night: 3, landings_night: 1 }), // min 1
     flight("2026-06-05", { takeoffs_night: 2, landings_night: 2 }), // min 2
   ];
   assert.equal(rec(flights, "pax-night").achieved, 3, "night achieved");
   assert.equal(rec(flights, "pax-night").current, true, "night current");
-  assert.equal(rec(flights, "pax-day").achieved, 0, "day achieved 0");
+  assert.equal(rec(flights, "pax-day").achieved, 3, "day PAX counts night take-offs/landings too");
+  assert.equal(rec(flights, "pax-day").current, true, "day current");
+});
+
+test("Day PAX sums day + night per flight before taking the min", () => {
+  const flights = [
+    flight("2026-06-10", { takeoffs_day: 1, landings_night: 1 }),           // min(1, 1) = 1
+    flight("2026-06-05", { takeoffs_day: 1, takeoffs_night: 1, landings_day: 2 }), // min(2, 2) = 2
+  ];
+  assert.equal(rec(flights, "pax-day").achieved, 3, "achieved 3");
+  assert.equal(rec(flights, "pax-night").achieved, 0, "night needs night landings");
+});
+
+test("TC day PAX (CAR 401.05(2)(b)): 5 in 6 months, day or night", () => {
+  const flights = [
+    flight("2026-06-01", { takeoffs_night: 3, landings_night: 3 }),
+    flight("2026-03-01", { takeoffs_day: 2, landings_day: 2 }),
+  ];
+  const r = computeCurrencyForRegime(flights, "CA", TODAY).recency.find((x) => x.key === "pax-day");
+  assert.ok(r);
+  assert.equal(r.required, 5, "required");
+  assert.equal(r.achieved, 5, "3 night + 2 day = 5");
+  assert.equal(r.current, true, "current");
 });
 
 test("Out-of-window landings never count", () => {

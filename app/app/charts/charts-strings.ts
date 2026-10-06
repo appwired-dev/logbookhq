@@ -36,6 +36,8 @@ export type GlobeStrings = {
   /** Legend on coarse pointers once the globe is armed. */
   legendTouchArmed: string;
   loading: string;
+  /** Shown in place of the globe if it fails to render. */
+  unavailable: string;
 };
 
 type LocalStrings = {
@@ -122,6 +124,7 @@ const LOCAL: Record<Locale, LocalStrings> = {
       legendTouch: "Arc width = flights · dot size = traffic",
       legendTouchArmed: "Drag to spin · pinch to zoom",
       loading: "Loading globe…",
+      unavailable: "The map couldn't be drawn in this browser, so here are your top routes instead.",
     },
   },
   ko: {
@@ -171,6 +174,7 @@ const LOCAL: Record<Locale, LocalStrings> = {
       legendTouch: "호 두께 = 비행 횟수 · 점 크기 = 교통량",
       legendTouchArmed: "드래그로 회전 · 핀치로 확대",
       loading: "지구본 불러오는 중…",
+      unavailable: "이 브라우저에서 지도를 그릴 수 없어 주요 항로를 대신 보여 드립니다.",
     },
   },
   zh: {
@@ -220,6 +224,7 @@ const LOCAL: Record<Locale, LocalStrings> = {
       legendTouch: "弧线粗细 = 飞行次数 · 圆点大小 = 流量",
       legendTouchArmed: "拖动旋转 · 双指缩放",
       loading: "正在加载地球仪…",
+      unavailable: "此浏览器无法绘制地图，改为显示你的热门航线。",
     },
   },
   es: {
@@ -269,6 +274,7 @@ const LOCAL: Record<Locale, LocalStrings> = {
       legendTouch: "Grosor del arco = vuelos · tamaño del punto = tráfico",
       legendTouchArmed: "Arrastra para girar · pellizca para acercar",
       loading: "Cargando globo…",
+      unavailable: "No se pudo dibujar el mapa en este navegador; aquí tienes tus rutas principales.",
     },
   },
 };

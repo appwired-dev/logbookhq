@@ -44,7 +44,14 @@ export interface CommitData {
   templateSaved: boolean;
 }
 
-export type ActionError = { error: string };
+export type ActionError = {
+  error: string;
+  /** "free_cap": the free plan's flight limit blocked the save — the wizard offers an upgrade instead of a bare error. */
+  code?: "free_cap";
+  /** free_cap only: flights in this file, and flights already saved (append mode). */
+  flights?: number;
+  current?: number;
+};
 export type ActionResult<T> = T | ActionError;
 
 export function isActionError<T>(r: ActionResult<T>): r is ActionError {

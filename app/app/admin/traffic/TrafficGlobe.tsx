@@ -2,14 +2,15 @@
 
 import {
   useId,
-  Component, useCallback, useEffect, useMemo, useRef, useState,
-  type KeyboardEvent, type ReactNode,
+  useCallback, useEffect, useMemo, useRef, useState,
+  type KeyboardEvent,
 } from "react";
 import dynamic from "next/dynamic";
 import * as THREE from "three";
 import type { GlobeMethods } from "react-globe.gl";
 import type { Locale } from "@/lib/i18n";
 import { iso2ForFeatureName } from "@/lib/country-features";
+import { GlobeBoundary, webglAvailable } from "@/components/WebGLGate";
 import { useReducedMotion } from "@/lib/use-reduced-motion";
 import { Icon } from "@/components/ui";
 import { adminOpsStrings } from "../admin-ops-strings";
@@ -123,32 +124,6 @@ function ringCentre(geometry: Geometry): { lat: number; lng: number; extent: num
 
 const escapeHtml = (s: string) =>
   s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] ?? c);
-
-function webglAvailable(): boolean {
-  try {
-    const canvas = document.createElement("canvas");
-    const gl = (canvas.getContext("webgl2") ?? canvas.getContext("webgl")) as WebGLRenderingContext | null;
-    if (!gl) return false;
-    gl.getExtension("WEBGL_lose_context")?.loseContext(); // give the probe context back
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/** A throw inside react-globe.gl / three.js must not take the Traffic tab down. */
-class GlobeBoundary extends Component<{ onError: () => void; children: ReactNode }, { failed: boolean }> {
-  state = { failed: false };
-  static getDerivedStateFromError() {
-    return { failed: true };
-  }
-  componentDidCatch() {
-    this.props.onError();
-  }
-  render() {
-    return this.state.failed ? null : this.props.children;
-  }
-}
 
 const HOME_ALT = 1.8;
 const NUDGE_DEG = 6;

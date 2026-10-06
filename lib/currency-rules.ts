@@ -2,14 +2,14 @@
  * Per-regime currency rules. Two distinct currency families:
  *
  *  1. Flight-time limits (rolling-window hour caps) — used by airline-style
- *     operators to enforce duty/rest. CAR 700.28, 14 CFR §117.23, ORO.FTL.210…
+ *     operators to enforce duty/rest. CAR 700.27, 14 CFR §117.23, ORO.FTL.210…
  *
  *  2. Recency requirements (IFR + day/night PAX) — what every pilot needs
  *     to legally carry passengers or fly IFR after a layoff. Counted against
  *     the recent flight history.
  *
  * Sources (flight-time limits — audited 2026-09):
- *   CA    — CAR 700.28 (SOR/2018-269; in force 12 Dec 2020 for 705 operators,
+ *   CA    — CAR 700.27(1) (SOR/2018-269; in force 12 Dec 2020 for 705 operators,
  *           12 Dec 2022 for 703/704). The superseded CARs 700.15 numbers are
  *           deliberately NOT offered — a repealed ceiling sitting beside the
  *           current one is something a pilot could plan against by mistake.
@@ -18,7 +18,7 @@
  *           State limits" and must not be read as a hard rule.
  *   FAA   — 14 CFR §117.23(b) (Part 121 passenger flightcrew). §121.471(a)
  *           (domestic, non-117 e.g. all-cargo) is offered as a second set.
- *   EASA  — ORO.FTL.210(a) (CAT operators).
+ *   EASA  — ORO.FTL.210(b) (CAT operators). (a) is the DUTY-hour limits.
  *   CN    — CCAR-121-R7 第121.487条(b) (第P章), verified against the CAAC text:
  *           100 h / calendar month, 900 h / calendar year. The (c) figures are
  *           flight DUTY period, not flight time, and are not listed.
@@ -87,8 +87,13 @@ export interface RecencyRule {
   windowDays: number;
   required: number;
   citation: string;
-  /** What to count off each flight to add toward `achieved`. */
-  count: "approaches" | "day-takeoffs+landings" | "night-takeoffs+landings";
+  /**
+   * What to count off each flight to add toward `achieved`. Day-passenger
+   * currency counts take-offs and landings made by day OR night (CAR
+   * 401.05(2)(b)(i)(A), FAR 61.57(a), FCL.060(b)(1)); only night currency is
+   * restricted to night ones.
+   */
+  count: "approaches" | "takeoffs+landings" | "night-takeoffs+landings";
 }
 
 export interface RegimeRules {
@@ -110,25 +115,25 @@ export interface RegimeRules {
 
 const FAA_RECENCY: RecencyRule[] = [
   { key: "ifr",       label: "IFR Currency",   windowDays: 180, required: 6, citation: "FAR 61.57(c)", count: "approaches" },
-  { key: "pax-day",   label: "Day PAX",        windowDays: 90,  required: 3, citation: "FAR 61.57(a)", count: "day-takeoffs+landings" },
+  { key: "pax-day",   label: "Day PAX",        windowDays: 90,  required: 3, citation: "FAR 61.57(a)", count: "takeoffs+landings" },
   { key: "pax-night", label: "Night PAX",      windowDays: 90,  required: 3, citation: "FAR 61.57(b)", count: "night-takeoffs+landings" },
 ];
 
 const TCCA_RECENCY: RecencyRule[] = [
   { key: "ifr",       label: "IFR Currency",   windowDays: 180, required: 6, citation: "CARs 401.05",  count: "approaches" },
-  { key: "pax-day",   label: "Day PAX",        windowDays: 180, required: 5, citation: "CARs 401.05",  count: "day-takeoffs+landings" },
+  { key: "pax-day",   label: "Day PAX",        windowDays: 180, required: 5, citation: "CARs 401.05",  count: "takeoffs+landings" },
   { key: "pax-night", label: "Night PAX",      windowDays: 180, required: 5, citation: "CARs 401.05",  count: "night-takeoffs+landings" },
 ];
 
 const EASA_RECENCY: RecencyRule[] = [
   { key: "ifr",       label: "IFR Currency",   windowDays: 365, required: 6, citation: "Part-FCL.060", count: "approaches" },
-  { key: "pax-day",   label: "Day PAX",        windowDays: 90,  required: 3, citation: "Part-FCL.060", count: "day-takeoffs+landings" },
+  { key: "pax-day",   label: "Day PAX",        windowDays: 90,  required: 3, citation: "Part-FCL.060", count: "takeoffs+landings" },
   { key: "pax-night", label: "Night PAX",      windowDays: 90,  required: 3, citation: "Part-FCL.060", count: "night-takeoffs+landings" },
 ];
 
 const ICAO_RECENCY: RecencyRule[] = [
   { key: "ifr",       label: "IFR Currency",   windowDays: 180, required: 6, citation: "ICAO Annex 1", count: "approaches" },
-  { key: "pax-day",   label: "Day PAX",        windowDays: 90,  required: 3, citation: "ICAO Annex 1", count: "day-takeoffs+landings" },
+  { key: "pax-day",   label: "Day PAX",        windowDays: 90,  required: 3, citation: "ICAO Annex 1", count: "takeoffs+landings" },
   { key: "pax-night", label: "Night PAX",      windowDays: 90,  required: 3, citation: "ICAO Annex 1", count: "night-takeoffs+landings" },
 ];
 
@@ -137,18 +142,18 @@ const ICAO_RECENCY: RecencyRule[] = [
 // ============================================================
 
 /**
- * Canada, current rules. CAR 700.28 replaced CARs 700.15 for commercial air
- * services (705 operators from 12 Dec 2020, 703/704 from 12 Dec 2022).
- * Paragraph lettering below follows SOR/2018-269 as published; only the
- * section number (700.28) is asserted in the citations.
+ * Canada, current rules. CAR 700.27(1) "Maximum flight time" replaced CARs
+ * 700.15 for commercial air services (705 operators from 12 Dec 2020, 703/704
+ * from 12 Dec 2022). Checked against the consolidated SOR/96-433 text: 700.27
+ * is flight time; 700.28 is the flight DUTY period, which is not modelled.
  */
-const CA_700_28: FlightTimeWindow[] = [
-  // 700.28 (a) — 1,000 h flight time in any 365 consecutive days.
-  { label: "Last 365 Days", days: 365, max: 1000, citation: "CAR 700.28" },
-  // 700.28 (b) — 300 h flight time in any 90 consecutive days.
-  { label: "Last 90 Days",  days: 90,  max: 300,  citation: "CAR 700.28" },
-  // 700.28 (c) — 112 h flight time in any 28 consecutive days.
-  { label: "Last 28 Days",  days: 28,  max: 112,  citation: "CAR 700.28" },
+const CA_700_27: FlightTimeWindow[] = [
+  // 700.27(1)(c) — 1,000 h flight time in any 365 consecutive days.
+  { label: "Last 365 Days", days: 365, max: 1000, citation: "CAR 700.27(1)(c)" },
+  // 700.27(1)(b) — 300 h flight time in any 90 consecutive days.
+  { label: "Last 90 Days",  days: 90,  max: 300,  citation: "CAR 700.27(1)(b)" },
+  // 700.27(1)(a) — 112 h flight time in any 28 consecutive days.
+  { label: "Last 28 Days",  days: 28,  max: 112,  citation: "CAR 700.27(1)(a)" },
 ];
 
 /**
@@ -182,30 +187,31 @@ const FAA_121_DOMESTIC: FlightTimeWindow[] = [
 ];
 
 /**
- * EASA ORO.FTL.210(a) — flight times for CAT operators. The "60 h / 7 days"
- * entry that used to live here is ORO.FTL.210(b), a DUTY limit (60 duty hours
- * in 7 consecutive days), not flight time, and has been removed.
+ * EASA ORO.FTL.210(b) — flight times for CAT operators. ORO.FTL.210(a) is the
+ * DUTY-hour limits (60 duty hours in 7 consecutive days, 110 in 14, 190 in
+ * 28); the "60 h / 7 days" entry that used to live here was one of those and
+ * has been removed.
  */
 const EASA_FTL_210: FlightTimeWindow[] = [
-  // (a)(1) — 100 flight hours in any 28 consecutive days.
-  { label: "Last 28 Days",   days: 28,  max: 100,  citation: "ORO.FTL.210(a)(1)" },
-  // (a)(2) — 900 flight hours in any CALENDAR YEAR.
-  { label: "Calendar Year",  days: 365, max: 900,  basis: "calendar-year",   citation: "ORO.FTL.210(a)(2)" },
-  // (a)(3) — 1,000 flight hours in any 12 consecutive CALENDAR MONTHS.
-  { label: "Last 12 Months", days: 365, max: 1000, basis: "calendar-months", months: 12, citation: "ORO.FTL.210(a)(3)" },
+  // (b)(1) — 100 flight hours in any 28 consecutive days.
+  { label: "Last 28 Days",   days: 28,  max: 100,  citation: "ORO.FTL.210(b)(1)" },
+  // (b)(2) — 900 flight hours in any CALENDAR YEAR.
+  { label: "Calendar Year",  days: 365, max: 900,  basis: "calendar-year",   citation: "ORO.FTL.210(b)(2)" },
+  // (b)(3) — 1,000 flight hours in any 12 consecutive CALENDAR MONTHS.
+  { label: "Last 12 Months", days: 365, max: 1000, basis: "calendar-months", months: 12, citation: "ORO.FTL.210(b)(3)" },
 ];
 
 /** UK CAA: retained ORO.FTL.210 — numerically identical to EASA. */
 const UK_FTL_210: FlightTimeWindow[] = [
-  { label: "Last 28 Days",   days: 28,  max: 100,  citation: "ORO.FTL.210(a)(1) (UK retained)" },
-  { label: "Calendar Year",  days: 365, max: 900,  basis: "calendar-year",   citation: "ORO.FTL.210(a)(2) (UK retained)" },
-  { label: "Last 12 Months", days: 365, max: 1000, basis: "calendar-months", months: 12, citation: "ORO.FTL.210(a)(3) (UK retained)" },
+  { label: "Last 28 Days",   days: 28,  max: 100,  citation: "ORO.FTL.210(b)(1) (UK retained)" },
+  { label: "Calendar Year",  days: 365, max: 900,  basis: "calendar-year",   citation: "ORO.FTL.210(b)(2) (UK retained)" },
+  { label: "Last 12 Months", days: 365, max: 1000, basis: "calendar-months", months: 12, citation: "ORO.FTL.210(b)(3) (UK retained)" },
 ];
 
 /**
  * UAE GCAA CAR-OPS 1 Subpart Q. UNVERIFIED against a primary GCAA source —
  * the two caps below are the ones the UAE scheme is generally quoted as
- * carrying. A calendar-year cap (900 h, as in EU-OPS 1.1265 / ORO.FTL.210(a)(2))
+ * carrying. A calendar-year cap (900 h, as in EU-OPS 1.1265 / ORO.FTL.210(b)(2))
  * may also apply; it is deliberately NOT modelled rather than invented.
  */
 const GCAA_SUBPART_Q: FlightTimeWindow[] = [
@@ -289,8 +295,8 @@ export const REGIME_RULES: Record<Regime, RegimeRules> = {
     code: "CA",
     name: "Canada",
     authority: "Transport Canada",
-    reference: "CAR 700.28",
-    flightTimeWindows: CA_700_28,
+    reference: "CAR 700.27",
+    flightTimeWindows: CA_700_27,
     // One set only: CARs 700.15 was superseded by the 2018 FDT overhaul
     // (705 operators Dec 2020, 703/704 Dec 2022) and is deliberately not
     // offered — showing a repealed ceiling next to the current one invites
@@ -493,9 +499,13 @@ function tallyRecency(
       case "approaches":
         inc = Number(f.ifr_approaches) || 0;
         break;
-      case "day-takeoffs+landings":
-        // Count whichever is smaller — both are required for currency.
-        inc = Math.min(Number(f.takeoffs_day) || 0, Number(f.landings_day) || 0);
+      case "takeoffs+landings":
+        // Day or night both count. Whichever of take-offs / landings is
+        // smaller — both are required for currency.
+        inc = Math.min(
+          (Number(f.takeoffs_day) || 0) + (Number(f.takeoffs_night) || 0),
+          (Number(f.landings_day) || 0) + (Number(f.landings_night) || 0),
+        );
         break;
       case "night-takeoffs+landings":
         inc = Math.min(Number(f.takeoffs_night) || 0, Number(f.landings_night) || 0);

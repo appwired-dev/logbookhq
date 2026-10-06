@@ -8,6 +8,9 @@ import { makeT, type Locale } from "@/lib/i18n";
 import type { Analysis, CheckStatus, ReconcileCheck } from "@/lib/import/types";
 import { checkLabel, skipReasonLabel, type ImportStringKey, type ImportStrings } from "./import-strings";
 import { explanationFor } from "./check-messages";
+import { startCheckoutFromForm } from "@/app/app/billing/actions";
+import { FREE_FLIGHT_LIMIT } from "@/lib/limits";
+import { buttonClass } from "@/components/ui/button-class";
 import type { ImportMode, PreviewData } from "./wizard-types";
 
 const STATUS: Record<CheckStatus, { icon: LucideIcon; cls: string; key: ImportStringKey }> = {
@@ -28,7 +31,7 @@ const fmtDelta = (d: number) => `${d > 0 ? "+" : "−"}${fmtNum(Math.abs(d))}`;
 export default function StepReconcile({
   s, locale, analysis, preview, augHalfCredit, autoApplied, onReviewMapping, onBack,
   mode, onMode, saveTemplate, onSaveTemplate, templateName, onTemplateName,
-  onImport, importBusy, error, headingRef,
+  onImport, importBusy, error, cap, headingRef,
 }: {
   s: ImportStrings;
   locale: Locale;
@@ -47,6 +50,8 @@ export default function StepReconcile({
   onImport: () => void;
   importBusy: boolean;
   error: string | null;
+  /** The free plan's flight limit blocked the save (see ImportWizard). */
+  cap: { flights: number; current: number } | null;
   headingRef: RefObject<HTMLHeadingElement | null>;
 }) {
   const t = makeT(locale);
@@ -149,7 +154,7 @@ export default function StepReconcile({
           {preview.sampleFlights.length > 0 && (
             <div>
               <h3 className="text-2xs font-semibold uppercase tracking-[0.08em] text-ink-2 mb-1.5">{s("previewTitle")}</h3>
-              <div className="overflow-x-auto rounded-control border border-border">
+              <div className="relative overflow-x-auto rounded-control border border-border">
                 <table className="import-table w-full min-w-[520px] text-sm">
                   <thead>
                     <tr>
@@ -265,7 +270,7 @@ export default function StepReconcile({
       )}
 
       {n === 0 && <Alert variant="warn">{s("nothingToImport")}</Alert>}
-      {error && <Alert variant="bad">{error}</Alert>}
+      {cap ? <UpgradePanel s={s} cap={cap} /> : error && <Alert variant="bad">{error}</Alert>}
 
       <CardFooter className="justify-between">
         <Button variant="ghost" onClick={onBack} disabled={importBusy}>
@@ -294,6 +299,39 @@ export default function StepReconcile({
 }
 
 // ---------------------------------------------------------------------------
+
+/**
+ * Shown in place of the error when the free plan's limit blocks the save. The
+ * reconcile result stays on screen above it, so the pilot sees what they would
+ * be paying to keep; each plan posts straight to Stripe checkout.
+ */
+function UpgradePanel({ s, cap }: { s: ImportStrings; cap: { flights: number; current: number } }) {
+  const plans = [
+    { plan: "monthly", label: s("capMonthly") },
+    { plan: "annual", label: s("capAnnual") },
+    { plan: "lifetime", label: s("capLifetime") },
+  ] as const;
+  return (
+    <section role="status" aria-live="polite" className="rounded-card border border-brand/30 bg-brand/5 p-4 sm:p-5 space-y-3">
+      <h3 className="text-md font-semibold text-ink-1">{s("capTitle", { n: cap.flights.toLocaleString() })}</h3>
+      <p className="text-sm text-ink-2">
+        {cap.current > 0
+          ? s("capBodyAppend", { current: cap.current.toLocaleString(), limit: FREE_FLIGHT_LIMIT })
+          : s("capBody", { limit: FREE_FLIGHT_LIMIT })}
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {plans.map((p) => (
+          <form key={p.plan} action={startCheckoutFromForm}>
+            <input type="hidden" name="plan" value={p.plan} />
+            <button type="submit" className={buttonClass(p.plan === "annual" ? "primary" : "default")}>{p.label}</button>
+          </form>
+        ))}
+        <Link href="/pricing" className={buttonClass("ghost")}>{s("capCompare")}</Link>
+      </div>
+      <p className="text-xs text-ink-3">{s("capNote")}</p>
+    </section>
+  );
+}
 
 function CheckRow({ c, s, augHalfCredit }: { c: ReconcileCheck; s: ImportStrings; augHalfCredit: boolean }) {
   const st = STATUS[c.status] ?? STATUS.info;

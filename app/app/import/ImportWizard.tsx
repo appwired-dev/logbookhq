@@ -52,6 +52,8 @@ export default function ImportWizard({ locale, augHalfCredit }: { locale: Locale
   const [templateName, setTemplateName] = useState("");
   const [result, setResult] = useState<CommitData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** Set when the free plan's flight limit blocked the save: the reconcile step offers an upgrade instead of a bare error. */
+  const [cap, setCap] = useState<{ flights: number; current: number } | null>(null);
   const [aiNotice, setAiNotice] = useState<AiNotice | null>(null);
   const [busy, setBusy] = useState<Busy>(null);
   const [announce, setAnnounce] = useState("");
@@ -80,7 +82,11 @@ export default function ImportWizard({ locale, augHalfCredit }: { locale: Locale
   async function run<T>(fn: () => Promise<ActionResult<T>>): Promise<T | null> {
     try {
       const r = await fn();
-      if (isActionError(r)) { setError(r.error); return null; }
+      if (isActionError(r)) {
+        setError(r.error);
+        setCap(r.code === "free_cap" ? { flights: r.flights ?? 0, current: r.current ?? 0 } : null);
+        return null;
+      }
       return r;
     } catch (e: unknown) {
       // Server actions are fetched under the hood; flaky mobile connections
@@ -216,6 +222,7 @@ export default function ImportWizard({ locale, augHalfCredit }: { locale: Locale
     if (!file || !analysis || !mapping) return;
     setBusy("commit");
     setError(null);
+    setCap(null);
     const fd = new FormData();
     fd.set("file", upload ?? file);
     fd.set("analysis", JSON.stringify(analysis));
@@ -313,6 +320,7 @@ export default function ImportWizard({ locale, augHalfCredit }: { locale: Locale
               onImport={commit}
               importBusy={busy === "commit"}
               error={error}
+              cap={cap}
               headingRef={headingRef}
             />
           )}

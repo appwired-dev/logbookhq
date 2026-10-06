@@ -1,15 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import type Stripe from "stripe";
-import { stripe, tierForPlan, type Plan } from "@/lib/stripe";
+import { stripe, tierForPlan, PAID_SUB_STATUSES, type Plan } from "@/lib/stripe";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 /**
  * Stripe webhook receiver. Configured in Stripe Dashboard → Developers →
  * Webhooks → Add endpoint pointing at /api/stripe/webhook with these events:
  *
- *   checkout.session.completed      — promote tier on first payment
+ *   checkout.session.completed      — promote tier on first payment; a
+ *                                     Lifetime purchase also stops any running
+ *                                     subscription from renewing
  *   customer.subscription.updated   — track plan changes
- *   customer.subscription.deleted   — downgrade back to free on cancel
+ *   customer.subscription.deleted   — downgrade back to free on cancel, unless
+ *                                     another subscription is still paid
  *
  * The signing secret must be in STRIPE_WEBHOOK_SECRET. Without it we
  * reject every request to prevent spoofing.
@@ -79,6 +82,20 @@ export async function POST(req: NextRequest) {
         // A swallowed error (or 0 rows) would leave a paid user un-upgraded.
         if (error) throw new Error(`checkout upgrade: ${error.message}`);
         if (!count) throw new Error(`checkout upgrade: no profile row for ${userId}`);
+        // Lifetime replaces any subscription: stop it renewing so the customer
+        // is never billed again for a plan they've outgrown. cancel_at_period_end
+        // keeps the period they already paid for; the eventual
+        // subscription.deleted is ignored for lifetime profiles below. Any
+        // refund of that remaining period is a manual decision. A failure here
+        // throws, so Stripe retries the whole (idempotent) handler.
+        if (plan === "lifetime" && stripeCustomerId) {
+          const subs = await stripe.subscriptions.list({ customer: stripeCustomerId, status: "all", limit: 20 });
+          for (const s of subs.data) {
+            if (PAID_SUB_STATUSES.has(s.status) && !s.cancel_at_period_end) {
+              await stripe.subscriptions.update(s.id, { cancel_at_period_end: true });
+            }
+          }
+        }
         break;
       }
       case "customer.subscription.updated": {
@@ -105,8 +122,7 @@ export async function POST(req: NextRequest) {
         // yanks access (and re-applies the 100-flight cap) from a customer who
         // is still effectively subscribed. Downgrade only on terminal states;
         // a true cancel arrives as customer.subscription.deleted.
-        const PAID_STATUSES = ["active", "trialing", "past_due"];
-        const tier = PAID_STATUSES.includes(sub.status) ? tierForPlan(plan) : "free";
+        const tier = PAID_SUB_STATUSES.has(sub.status) ? tierForPlan(plan) : "free";
         const { error, count } = await admin.from("profiles").update({ tier }, { count: "exact" }).eq("id", userId);
         if (error) throw new Error(`subscription update: ${error.message}`);
         if (!count) throw new Error(`subscription update: no profile row for ${userId}`);
@@ -125,7 +141,17 @@ export async function POST(req: NextRequest) {
           .eq("id", userId)
           .single();
         if (current?.tier === "lifetime") break;
-        const { error, count } = await admin.from("profiles").update({ tier: "free" }, { count: "exact" }).eq("id", userId);
+        // A customer can end up with two subscriptions (e.g. one started before
+        // the checkout guard existed). Ending one must not drop a customer who
+        // is still paying for the other.
+        const customerId = typeof sub.customer === "string" ? sub.customer : sub.customer?.id;
+        let stillPaid: Stripe.Subscription | undefined;
+        if (customerId) {
+          const subs = await stripe.subscriptions.list({ customer: customerId, status: "all", limit: 20 });
+          stillPaid = subs.data.find((s) => s.id !== sub.id && PAID_SUB_STATUSES.has(s.status));
+        }
+        const nextTier = stillPaid ? tierForPlan((stillPaid.metadata?.plan ?? "monthly") as Plan) : "free";
+        const { error, count } = await admin.from("profiles").update({ tier: nextTier }, { count: "exact" }).eq("id", userId);
         if (error) throw new Error(`subscription cancel: ${error.message}`);
         if (!count) throw new Error(`subscription cancel: no profile row for ${userId}`);
         break;

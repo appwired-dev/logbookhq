@@ -395,7 +395,7 @@ export function FlightsTable({ rows, agg, s, locale, sortKey, sortDir, onSort, o
       <div
         ref={scrollRef}
         tabIndex={0}
-        className="overflow-auto overscroll-contain scrollbar-always focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:ring-inset"
+        className="relative overflow-auto overscroll-contain scrollbar-always focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:ring-inset"
         style={{ maxHeight: maxHeight != null ? `${maxHeight}px` : "calc(100dvh - 12rem)" }}
       >
         <table

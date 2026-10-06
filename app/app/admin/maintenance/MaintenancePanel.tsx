@@ -349,7 +349,7 @@ function AutoCleanupCard({ o, locale, fmt, data, running, onRun }: {
 
       {due && (
         <>
-          <div className="overflow-x-auto border-t border-border">
+          <div className="relative overflow-x-auto border-t border-border">
             <table className="data-table w-full text-sm">
               <caption className="sr-only">{o("autoTitle")}</caption>
               <thead>
@@ -434,7 +434,7 @@ function StorageCard({ o, fmt, storage }: { o: AdminOpsT; fmt: Fmt; storage: Mai
       </div>
 
       {storage.tables.length > 0 && (
-        <div className="overflow-x-auto border-t border-border">
+        <div className="relative overflow-x-auto border-t border-border">
           <table className="data-table w-full text-sm">
             <caption className="sr-only">{o("dbTitle")}</caption>
             <thead>
@@ -591,7 +591,7 @@ function ActivityCard({ o, s, fmt, locale, audit }: {
       <div className="p-4">
         <CardHeader flush title={<CardTitle icon={Icon.History}>{o("auditTitle")}</CardTitle>} />
       </div>
-      <div className="overflow-x-auto scrollbar-always border-t border-border">
+      <div className="relative overflow-x-auto scrollbar-always border-t border-border">
         <table className="data-table w-full min-w-[560px] text-sm">
           <caption className="sr-only">{o("auditTitle")}</caption>
           <thead>

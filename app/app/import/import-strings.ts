@@ -86,6 +86,14 @@ export const IMPORT_STRINGS = {
   checking:       { en: "Checking…", ko: "확인 중…", zh: "正在核对…", es: "Comprobando…" },
 
   // ---- step 3 · reconcile & import ----
+  capTitle:       { en: "{n} flights checked and ready to save", ko: "{n}개 비행이 확인되어 저장할 준비가 되었습니다", zh: "{n} 次飞行已核对，可以保存", es: "{n} vuelos comprobados y listos para guardar" },
+  capBody:        { en: "The free plan keeps up to {limit} flights. Choose a plan to save your whole logbook — Annual and Lifetime come with a 30-day money-back guarantee.", ko: "무료 플랜은 최대 {limit}개 비행까지 보관합니다. 전체 로그북을 저장하려면 플랜을 선택하세요 — 연간 및 평생 플랜은 30일 환불 보장이 포함됩니다.", zh: "免费方案最多保存 {limit} 次飞行。选择一个方案即可保存完整的飞行日志——年付和终身方案提供 30 天退款保证。", es: "El plan gratuito guarda hasta {limit} vuelos. Elige un plan para guardar todo tu libro de vuelo: Anual y Vitalicio incluyen garantía de devolución de 30 días." },
+  capBodyAppend:  { en: "You already have {current} flights saved; the free plan keeps up to {limit}. Choose a plan to add these too — Annual and Lifetime come with a 30-day money-back guarantee.", ko: "이미 {current}개 비행이 저장되어 있으며 무료 플랜은 최대 {limit}개까지 보관합니다. 이 비행도 추가하려면 플랜을 선택하세요 — 연간 및 평생 플랜은 30일 환불 보장이 포함됩니다.", zh: "你已保存 {current} 次飞行；免费方案最多保存 {limit} 次。选择一个方案即可把这些也加进来——年付和终身方案提供 30 天退款保证。", es: "Ya tienes {current} vuelos guardados; el plan gratuito guarda hasta {limit}. Elige un plan para añadir estos también: Anual y Vitalicio incluyen garantía de devolución de 30 días." },
+  capMonthly:     { en: "Monthly · $4.99/mo", ko: "월간 · 월 $4.99", zh: "月付 · 每月 $4.99", es: "Mensual · $4.99/mes" },
+  capAnnual:      { en: "Annual · $49/yr", ko: "연간 · 연 $49", zh: "年付 · 每年 $49", es: "Anual · $49/año" },
+  capLifetime:    { en: "Lifetime · $249 once", ko: "평생 · $249 1회", zh: "终身 · 一次性 $249", es: "Vitalicio · $249 una vez" },
+  capNote:        { en: "Prices in CAD. After upgrading, import this file again — tick “Remember this layout as a template” and the columns map themselves.", ko: "가격은 캐나다 달러 기준입니다. 업그레이드 후 이 파일을 다시 가져오세요 — “이 레이아웃을 템플릿으로 저장”을 선택하면 열이 자동으로 매핑됩니다.", zh: "价格以加元计。升级后请再次导入此文件——勾选“将此布局保存为模板”，列会自动映射。", es: "Precios en CAD. Después de mejorar tu plan, vuelve a importar este archivo: marca “Recordar esta disposición como plantilla” y las columnas se asignarán solas." },
+  capCompare:     { en: "Compare plans", ko: "플랜 비교", zh: "比较方案", es: "Comparar planes" },
   recognisedAs:   { en: "Recognised as {name} — mapping applied automatically.", ko: "{name}(으)로 인식되어 매핑이 자동 적용되었습니다.", zh: "已识别为 {name}——已自动应用映射。", es: "Reconocido como {name} — asignación aplicada automáticamente." },
   reviewAnyway:   { en: "Review mapping anyway", ko: "그래도 매핑 검토", zh: "仍要检查映射", es: "Revisar la asignación de todos modos" },
   fromTemplate:   { en: "Mapping from template “{name}”", ko: "템플릿 “{name}”의 매핑", zh: "来自模板“{name}”的映射", es: "Asignación de la plantilla “{name}”" },

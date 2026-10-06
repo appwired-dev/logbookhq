@@ -43,6 +43,13 @@ export function checkoutMode(plan: Plan): "subscription" | "payment" {
   return plan === "lifetime" ? "payment" : "subscription";
 }
 
+/**
+ * Subscription statuses that still mean "this customer is paying". past_due is
+ * included on purpose: Stripe is still retrying the card and access continues
+ * through the dunning grace period.
+ */
+export const PAID_SUB_STATUSES: ReadonlySet<string> = new Set(["active", "trialing", "past_due"]);
+
 /** Returns the tier value to set on profiles.tier when this plan is paid. */
 export function tierForPlan(plan: Plan): "pro" | "lifetime" {
   return plan === "lifetime" ? "lifetime" : "pro";

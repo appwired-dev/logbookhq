@@ -130,7 +130,7 @@ export default function PrivacyPage() {
               We don&rsquo;t sell your personal information. We share it only with the service providers we need to
               run the Service:
             </p>
-            <div className="overflow-x-auto mt-3">
+            <div className="relative overflow-x-auto mt-3">
               <table className="w-full text-sm border-collapse">
                 <thead>
                   <tr className="border-b border-slate-200 text-left">

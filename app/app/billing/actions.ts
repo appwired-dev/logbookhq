@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { stripe, PRICE_IDS, checkoutMode, type Plan } from "@/lib/stripe";
+import { stripe, PRICE_IDS, PAID_SUB_STATUSES, checkoutMode, type Plan } from "@/lib/stripe";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3030";
 
@@ -27,6 +27,13 @@ export async function startCheckoutFromForm(formData: FormData) {
  * promote the right profile after payment. The session also creates a
  * Stripe Customer linked to the user's email so we can later open a
  * billing portal session.
+ *
+ * Never sells a second plan on top of one the customer already pays for:
+ *  - Lifetime owners already have everything → their billing card.
+ *  - A live Monthly/Annual subscriber asking for Monthly/Annual → the billing
+ *    portal, which switches the existing subscription instead of adding one.
+ *  - A subscriber buying Lifetime goes through; the webhook then stops the
+ *    old subscription renewing (checkout.session.completed).
  */
 export async function startCheckout(plan: Plan) {
   const priceId = PRICE_IDS[plan];
@@ -39,9 +46,21 @@ export async function startCheckout(plan: Plan) {
   // Reuse an existing Stripe customer if the user has one, otherwise create.
   const { data: profile } = await supabase
     .from("profiles")
-    .select("stripe_customer_id, email")
+    .select("stripe_customer_id, email, tier")
     .eq("id", user.id)
     .single();
+
+  if (profile?.tier === "lifetime") redirect("/app/settings#billing");
+  if (plan !== "lifetime" && profile?.stripe_customer_id) {
+    const subs = await stripe.subscriptions.list({ customer: profile.stripe_customer_id, status: "all", limit: 20 });
+    if (subs.data.some((s) => PAID_SUB_STATUSES.has(s.status))) {
+      const portal = await stripe.billingPortal.sessions.create({
+        customer: profile.stripe_customer_id,
+        return_url: `${APP_URL}/app/settings#billing`,
+      });
+      redirect(portal.url);
+    }
+  }
 
   const session = await stripe.checkout.sessions.create({
     mode: checkoutMode(plan),
