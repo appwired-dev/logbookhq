@@ -38,6 +38,10 @@ export type GlobeStrings = {
   loading: string;
   /** Shown in place of the globe if it fails to render. */
   unavailable: string;
+  /** Marketing globe only (visitor-typed routes); the app never sets these. */
+  yourRoutes?: string;
+  /** `{legs}` / `{km}` are interpolated. */
+  legsKm?: string;
 };
 
 type LocalStrings = {

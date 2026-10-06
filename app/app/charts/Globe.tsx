@@ -52,6 +52,14 @@ export interface GlobeProps {
   locale: Locale;
   /** Kept for WebGLGate compatibility; a 2D canvas never loses a GPU context. */
   onUnavailable?: () => void;
+  /** Shade the night side from the real sun position (default on). */
+  nightShade?: boolean;
+  /** Legs a visitor typed (marketing page): drawn on top, camera fits them. */
+  visitorLegs?: Array<{ from: string; to: string }>;
+  /** Show the route chip strip under the globe on phones (app only; off on the dark marketing page). */
+  chipStrip?: boolean;
+  /** Show the top-routes panel over the stage on md+ (off where the stage is too narrow to share). */
+  routesPanel?: boolean;
 }
 
 // ---------- palette (CSS custom properties, "r g b" triples) ----------
@@ -104,7 +112,7 @@ const NUDGE_DEG_FAST = 20;
 
 interface View { lat: number; lng: number; zoom: number }
 
-export default function FlightGlobe({ airports, arcs: rawArcs, strings, locale }: GlobeProps) {
+export default function FlightGlobe({ airports, arcs: rawArcs, strings, locale, nightShade = true, visitorLegs, chipStrip = true, routesPanel = true }: GlobeProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const tipRef = useRef<HTMLDivElement>(null);
   const hintId = useId();
@@ -192,14 +200,41 @@ export default function FlightGlobe({ airports, arcs: rawArcs, strings, locale }
     return { routes, dots };
   }, [arcs, points, maxCount]);
 
+  // Visitor-typed legs: their own arcs, aircraft and labels, drawn over the sample.
+  const visitor = useMemo(() => {
+    const legs: { arc: ArcDatum; pts: Float32Array }[] = [];
+    const codes = new Map<string, V3>();
+    let km = 0;
+    for (const { from, to } of visitorLegs ?? []) {
+      const a = airports[from], b = airports[to];
+      if (!a || !b || from === to) continue;
+      const A = toVec(a.lat, a.lon), B = toVec(b.lat, b.lon);
+      const w = Math.acos(Math.max(-1, Math.min(1, A[0] * B[0] + A[1] * B[1] + A[2] * B[2])));
+      const sw = Math.sin(w) || 1e-6, lift = 0.03 + 0.18 * (w / Math.PI);
+      const pts = new Float32Array((ARC_SAMPLES + 1) * 3);
+      for (let k = 0; k <= ARC_SAMPLES; k++) {
+        const t = k / ARC_SAMPLES, f1 = Math.sin((1 - t) * w) / sw, f2 = Math.sin(t * w) / sw, r = 1 + lift * Math.sin(Math.PI * t);
+        pts[3 * k] = (f1 * A[0] + f2 * B[0]) * r; pts[3 * k + 1] = (f1 * A[1] + f2 * B[1]) * r; pts[3 * k + 2] = (f1 * A[2] + f2 * B[2]) * r;
+      }
+      const d = Math.round(w * R_EARTH_KM); km += d;
+      legs.push({ arc: { id: `v:${from}-${to}`, from, to, startLat: a.lat, startLng: a.lon, endLat: b.lat, endLng: b.lon, count: 1, km: d }, pts });
+      codes.set(from, A); codes.set(to, B);
+    }
+    return { legs, codes: [...codes.entries()], km };
+  }, [visitorLegs, airports]);
+
   // ---------- live refs read by the render loop ----------
   const view = useRef<View>({ ...home });
   const anim = useRef<{ from: View; to: View; t0: number; dur: number } | null>(null);
   const ui = useRef({ rotateOn: true, selected: null as string | null, reduceMotion: false, coarse: false, armed: false, zoomHot: false, resumeAt: 0 });
   const sceneRef = useRef(scene);
+  const visitorRef = useRef(visitor);
+  const nightRef = useRef(nightShade);
+  useEffect(() => { nightRef.current = nightShade; kick.current(); }, [nightShade]);
   const kick = useRef<() => void>(() => {});
   const hoverArc = useRef<ArcDatum | null>(null);
   useEffect(() => { sceneRef.current = scene; kick.current(); }, [scene]);
+  useEffect(() => { visitorRef.current = visitor; kick.current(); }, [visitor]);
   useEffect(() => { ui.current.rotateOn = rotateOn; kick.current(); }, [rotateOn]);
   useEffect(() => { ui.current.selected = selected; kick.current(); }, [selected]);
   useEffect(() => { ui.current.reduceMotion = reduceMotion; if (reduceMotion) setRotateOn(false); kick.current(); }, [reduceMotion]);
@@ -250,6 +285,20 @@ export default function FlightGlobe({ airports, arcs: rawArcs, strings, locale }
     moveTo({ lat: Math.max(-85, Math.min(85, v.lat + dLat)), lng: wrapDeg(v.lng + dLng), zoom: v.zoom }, 240);
   }, [holdRotation, moveTo]);
 
+  // A visitor drew routes: clear any selection and fit the camera to them.
+  useEffect(() => {
+    if (!visitor.codes.length) return;
+    let x = 0, y = 0, z = 0;
+    for (const [, v] of visitor.codes) { x += v[0]; y += v[1]; z += v[2]; }
+    const c = fromVec([x, y, z]);
+    const [cxv, cyv, czv] = toVec(c.lat, c.lng);
+    let spread = 0;
+    for (const [, v] of visitor.codes) spread = Math.max(spread, Math.acos(Math.max(-1, Math.min(1, v[0] * cxv + v[1] * cyv + v[2] * czv))));
+    setSelected(null);
+    holdRotation(12000);
+    moveTo({ lat: Math.max(-70, Math.min(70, c.lat)), lng: c.lng, zoom: Math.max(ZOOM_MIN, Math.min(1.9, 1.25 / Math.max(0.5, 0.35 + spread * 1.1))) }, 1100);
+  }, [visitor, holdRotation, moveTo]);
+
   const onKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
     const step = e.shiftKey ? NUDGE_DEG_FAST : NUDGE_DEG;
     switch (e.key) {
@@ -266,7 +315,8 @@ export default function FlightGlobe({ airports, arcs: rawArcs, strings, locale }
   tipTextFor.current = (kind, d) => {
     if (kind === "arc") {
       const a = d as ArcDatum;
-      return `${a.from} → ${a.to} · ${flightCount(a.count)} · ${fmt(strings.km, { n: a.km.toLocaleString(locale) })}`;
+      const km = fmt(strings.km, { n: a.km.toLocaleString(locale) });
+      return a.id.startsWith("v:") ? `${a.from} → ${a.to} · ${km}` : `${a.from} → ${a.to} · ${flightCount(a.count)} · ${km}`;
     }
     const p = d as PointDatum;
     return `${p.code} — ${p.name}${p.country ? `, ${p.country}` : ""} · ${flightCount(p.traffic)}`;
@@ -309,7 +359,17 @@ export default function FlightGlobe({ airports, arcs: rawArcs, strings, locale }
     const vis = () => o[0] > 0 || o[3] * o[3] + o[4] * o[4] > 1.0004;
     const DOT_A = [0.18, 0.34, 0.52, 0.72, 0.94];
     const DOT_S = [1.0, 1.25, 1.5, 1.8, 2.1];
-    const bx: number[][] = [[], [], [], [], []], by: number[][] = [[], [], [], [], []];
+    // 5 depth bands × 3 light states (day, twilight, night)
+    const bx: number[][] = Array.from({ length: 15 }, () => []), by: number[][] = Array.from({ length: 15 }, () => []);
+    /** Subsolar point → unit vector (declination + hour angle; equation of time ignored, ±4°). */
+    const sunVec = (): V3 => {
+      const now = new Date();
+      const start = Date.UTC(now.getUTCFullYear(), 0, 0);
+      const day = (now.getTime() - start) / 86400000;
+      const decl = -23.44 * Math.cos(((2 * Math.PI) / 365) * (day + 10));
+      const h = now.getUTCHours() + now.getUTCMinutes() / 60 + now.getUTCSeconds() / 3600;
+      return toVec(decl, wrapDeg(-15 * (h - 12)));
+    };
     /** Screen-space samples of the visible arcs, kept for hover hit-testing. */
     let hitArcs: { arc: ArcDatum; xy: Float32Array; n: number }[] = [];
     let hitDots: { p: PointDatum; x: number; y: number }[] = [];
@@ -332,18 +392,41 @@ export default function FlightGlobe({ airports, arcs: rawArcs, strings, locale }
       g.addColorStop(0, `rgb(${pal.night1})`); g.addColorStop(0.5, `rgb(${pal.night2})`); g.addColorStop(1, `rgb(${pal.night3})`);
       ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fill();
 
+      // night side of the ocean: a soft band across the terminator, along the
+      // projected sun direction (exact on that axis, soft enough elsewhere)
+      const night = nightRef.current;
+      const S3 = night ? sunVec() : ([0, 0, 0] as V3);
+      if (night) {
+        P(S3[0], S3[1], S3[2]);
+        const sx = o[0], spx = o[3], spy = -o[4], sp = Math.hypot(spx, spy);
+        if (sp > 0.01) {
+          const dx = spx / sp, dy = spy / sp, f = Math.max(0, Math.min(1, (1 - sx) / 2));
+          const gn = ctx.createLinearGradient(cx - dx * R, cy - dy * R, cx + dx * R, cy + dy * R);
+          gn.addColorStop(0, "rgba(2,6,14,0.55)"); gn.addColorStop(Math.max(0, f - 0.07), "rgba(2,6,14,0.55)");
+          gn.addColorStop(Math.min(1, f + 0.07), "rgba(2,6,14,0)"); gn.addColorStop(1, "rgba(2,6,14,0)");
+          ctx.fillStyle = gn; ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fill();
+        } else if (sx < 0) {
+          ctx.fillStyle = "rgba(2,6,14,0.55)"; ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fill();
+        }
+      }
+
       if (land) {
-        for (let b = 0; b < 5; b++) { bx[b].length = 0; by[b].length = 0; }
+        for (let b = 0; b < 15; b++) { bx[b].length = 0; by[b].length = 0; }
         const n = land.length / 3;
         for (let i = 0; i < n; i++) {
-          P(land[3 * i], land[3 * i + 1], land[3 * i + 2]);
+          const lx = land[3 * i], ly = land[3 * i + 1], lz = land[3 * i + 2];
+          P(lx, ly, lz);
           if (o[0] <= 0.03 || o[1] < -4 || o[1] > W + 4 || o[2] < -4 || o[2] > H + 4) continue;
-          const b = Math.min(4, (o[0] * 5) | 0); bx[b].push(o[1]); by[b].push(o[2]);
+          const light = night ? lx * S3[0] + ly * S3[1] + lz * S3[2] : 1;
+          const state = light > 0.06 ? 0 : light > -0.06 ? 1 : 2;
+          const b = Math.min(4, (o[0] * 5) | 0) + 5 * state; bx[b].push(o[1]); by[b].push(o[2]);
         }
         const zs = Math.min(1.6, Math.max(1, v.zoom * 0.75));
-        for (let b = 0; b < 5; b++) {
-          ctx.fillStyle = rgba(pal.dots, DOT_A[b]);
-          const z = DOT_S[b] * zs, hz = z / 2, X = bx[b], Y = by[b];
+        for (let b = 0; b < 15; b++) {
+          const d = b % 5, state = (b / 5) | 0;
+          // day: cyan land · twilight: dimmer · night: faint warm "city lights"
+          ctx.fillStyle = state === 0 ? rgba(pal.dots, DOT_A[d]) : state === 1 ? rgba(pal.dots, DOT_A[d] * 0.55) : rgba(pal.trail, DOT_A[d] * 0.3);
+          const z = DOT_S[d] * zs, hz = z / 2, X = bx[b], Y = by[b];
           for (let j = 0; j < X.length; j++) ctx.fillRect(X[j] - hz, Y[j] - hz, z, z);
         }
       }
@@ -394,6 +477,46 @@ export default function FlightGlobe({ airports, arcs: rawArcs, strings, locale }
         ctx.restore();
       }
 
+      // visitor legs: bright, always flying, labelled
+      const vis2 = visitorRef.current;
+      for (const leg of vis2.legs) {
+        const pts = leg.pts, N = ARC_SAMPLES;
+        const xy = new Float32Array((N + 1) * 2);
+        let n = 0, pen = false;
+        ctx.beginPath();
+        for (let k = 0; k <= N; k++) {
+          P(pts[3 * k], pts[3 * k + 1], pts[3 * k + 2]);
+          if (vis()) { if (pen) ctx.lineTo(o[1], o[2]); else ctx.moveTo(o[1], o[2]); pen = true; xy[2 * n] = o[1]; xy[2 * n + 1] = o[2]; n++; }
+          else { pen = false; if (n) { xy[2 * n] = NaN; xy[2 * n + 1] = NaN; n++; } }
+        }
+        ctx.lineWidth = 2.4; ctx.strokeStyle = rgba(pal.sel, 0.95); ctx.stroke();
+        if (n > 1) hitArcs.push({ arc: leg.arc, xy, n });
+        const p = ui.current.reduceMotion ? 0.6 : (hash01(leg.arc.id) + t * 0.12) % 1;
+        const head = p * N, k = Math.min(N - 1, Math.floor(head)), u = head - k;
+        P(pts[3 * k] + (pts[3 * k + 3] - pts[3 * k]) * u, pts[3 * k + 1] + (pts[3 * k + 4] - pts[3 * k + 1]) * u, pts[3 * k + 2] + (pts[3 * k + 5] - pts[3 * k + 2]) * u);
+        if (!vis()) continue;
+        const hx = o[1], hy = o[2];
+        P(pts[3 * (k + 1)], pts[3 * (k + 1) + 1], pts[3 * (k + 1) + 2]);
+        const ang = Math.atan2(o[2] - hy, o[1] - hx), sz = 4.6;
+        ctx.fillStyle = rgba(pal.sel, 0.22); ctx.beginPath(); ctx.arc(hx, hy, sz * 2.3, 0, Math.PI * 2); ctx.fill();
+        ctx.save(); ctx.translate(hx, hy); ctx.rotate(ang); ctx.fillStyle = `rgb(${pal.plane})`;
+        ctx.beginPath(); ctx.moveTo(sz * 1.5, 0); ctx.lineTo(-sz, sz * 0.95); ctx.lineTo(-sz * 0.45, 0); ctx.lineTo(-sz, -sz * 0.95); ctx.closePath(); ctx.fill();
+        ctx.restore();
+      }
+      // Labels never overlap: visitor airports claim their spot first, then the busiest sample airports.
+      const placed: number[] = [];
+      const claim = (x: number, y: number, w: number) => {
+        for (let i = 0; i < placed.length; i += 4) if (x < placed[i + 2] && x + w > placed[i] && y - 11 < placed[i + 3] && y + 2 > placed[i + 1]) return false;
+        placed.push(x, y - 11, x + w, y + 2); return true;
+      };
+      ctx.font = '700 11px "JetBrains Mono", ui-monospace, monospace';
+      for (const [code, cv] of vis2.codes) {
+        P(cv[0], cv[1], cv[2]);
+        if (o[0] <= 0.02) continue;
+        ctx.fillStyle = rgba(pal.sel, 1); ctx.beginPath(); ctx.arc(o[1], o[2], 3.4, 0, Math.PI * 2); ctx.fill();
+        if (claim(o[1] + 7, o[2] - 7, 32)) { ctx.fillStyle = rgba(pal.ink, 0.95); ctx.fillText(code, o[1] + 7, o[2] - 7); }
+      }
+
       // airports
       hitDots = [];
       ctx.font = '600 10px "JetBrains Mono", ui-monospace, monospace';
@@ -409,7 +532,7 @@ export default function FlightGlobe({ airports, arcs: rawArcs, strings, locale }
         }
         ctx.fillStyle = d.p.hub ? rgba(pal.hub, 0.95 * a) : rgba(pal.ink, 0.9 * a);
         ctx.beginPath(); ctx.arc(o[1], o[2], d.r * Math.min(1.6, Math.max(0.8, v.zoom * 0.7)), 0, Math.PI * 2); ctx.fill();
-        if (d.label && o[0] > 0.35 && Math.min(W, H) > 340) { ctx.fillStyle = rgba(pal.ink, 0.78 * a); ctx.fillText(d.p.code, o[1] + 6, o[2] - 6); }
+        if (d.label && o[0] > 0.35 && Math.min(W, H) > 340 && claim(o[1] + 6, o[2] - 6, 30)) { ctx.fillStyle = rgba(pal.ink, 0.78 * a); ctx.fillText(d.p.code, o[1] + 6, o[2] - 6); }
         hitDots.push({ p: d.p, x: o[1], y: o[2] });
       }
 
@@ -430,7 +553,7 @@ export default function FlightGlobe({ airports, arcs: rawArcs, strings, locale }
       ctx.fillStyle = rgba(pal.trail, 0.95);
       ctx.beginPath(); ctx.moveTo(cx - 4, ty - 5); ctx.lineTo(cx + 4, ty - 5); ctx.lineTo(cx, ty); ctx.closePath(); ctx.fill();
       ctx.fillText(String(Math.round(hdg) % 360).padStart(3, "0") + "°", cx, ty - 9);
-      if (W > 420) {
+      if (W >= 980) {
         const dm = (x: number) => { const a = Math.abs(x), d = Math.floor(a), m = Math.floor((a - d) * 60); return `${d}°${String(m).padStart(2, "0")}′`; };
         ctx.fillStyle = rgba(pal.ink, 0.55);
         ctx.fillText(`${v.lat >= 0 ? "N" : "S"} ${dm(v.lat)}  ${v.lng >= 0 ? "E" : "W"} ${dm(v.lng)}  ·  UTC ${new Date().toISOString().slice(11, 19)}Z`, cx, H - 12);
@@ -637,6 +760,13 @@ export default function FlightGlobe({ airports, arcs: rawArcs, strings, locale }
                 })}
               </div>
             </>
+          ) : visitor.legs.length > 0 && strings.yourRoutes && strings.legsKm ? (
+            <>
+              <div className="globe-ink-1 text-xs font-bold tracking-tight">{strings.yourRoutes}</div>
+              <div className="globe-ink-accent mt-0.5 text-2xs uppercase tracking-wider">
+                {fmt(strings.legsKm, { legs: visitor.legs.length.toLocaleString(locale), km: visitor.km.toLocaleString(locale) })}
+              </div>
+            </>
           ) : (
             <>
               <div className="globe-ink-1 text-xs font-bold tracking-tight">{strings.allTimeFlights}</div>
@@ -676,7 +806,7 @@ export default function FlightGlobe({ airports, arcs: rawArcs, strings, locale }
         </div>
 
         {/* Top routes — click to fly */}
-        {topRoutes.length > 0 && (
+        {routesPanel && topRoutes.length > 0 && (
           <nav
             aria-label={strings.topRoutes}
             className="globe-hud absolute right-3 bottom-3 hidden md:block w-56 rounded-control p-3"
@@ -709,8 +839,8 @@ export default function FlightGlobe({ airports, arcs: rawArcs, strings, locale }
         )}
 
         {/* Touch arming + legend. The md right inset clears the top-routes panel. */}
-        <div className="absolute left-3 bottom-3 flex flex-col items-start gap-2
-                        max-w-[calc(100%-1.5rem)] md:max-w-[calc(100%-15.5rem)]">
+        <div className={`absolute left-3 bottom-3 flex flex-col items-start gap-2
+                        max-w-[calc(100%-1.5rem)] ${routesPanel ? "md:max-w-[calc(100%-15.5rem)]" : ""}`}>
           {coarse && (
             <button
               type="button"
@@ -729,7 +859,7 @@ export default function FlightGlobe({ airports, arcs: rawArcs, strings, locale }
 
       {/* Top routes on phones: a horizontal chip strip below the globe (the
           desktop overlay is hidden md:block), so route fly-to stays reachable. */}
-      {topRoutes.length > 0 && (
+      {chipStrip && topRoutes.length > 0 && (
         <nav aria-label={strings.topRoutes} className="md:hidden mt-2 -mx-1 flex gap-1.5 overflow-x-auto overscroll-x-contain px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {topRoutes.map((a) => (
             <button
