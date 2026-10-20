@@ -18,16 +18,21 @@
  *     rows apply keeps (date-bearing, not total rows — never an unlabeled
  *     SUM footer), and (label, number) pairs on the remaining sheets. Labels
  *     that count things ("Total flights", "Number of aircraft") are never
- *     totals.
+ *     totals. A footer cell records the column it sits under; a Totals-sheet
+ *     line that names a flight-sheet column by its header path — with the
+ *     section heading it sits under ("Cross-Country" over "Dual" / "PIC") —
+ *     records that column too, so reconcile compares it with that column
+ *     rather than with whatever its bare label ("Dual") would mean.
  */
 import { detectFormat } from "../import-formats";
 import type {
-  Analysis, CanonicalTarget, Cell, DeclaredTotal, FieldTarget, Grid, HeaderBand, ColumnMapping, ImportTemplate, TotalMeaning, Workbook,
+  Analysis, CanonicalTarget, Cell, FieldTarget, Grid, HeaderBand, ColumnMapping, ImportTemplate, TotalMeaning, Workbook,
 } from "./types";
+import type { DeclaredTotalExt } from "./types-ext";
 import { cellDisplay, decodeText, gridToText, readWorkbook, rowIsEmpty } from "./grid";
 import { detectHeaderBand, looksLikeDataRow } from "./headers";
 import { CONFIDENCE_THRESHOLD, mapColumns } from "./mapping";
-import { SYSTEM_TEMPLATES, fingerprint, pathKey } from "./templates";
+import { SYSTEM_TEMPLATES, fingerprint, normalisePath, pathKey } from "./templates";
 import { facetsOf, facetsOfPath } from "./synonyms";
 import { SUMMABLE_FIELDS } from "./targets";
 import { TOTAL_ROW_RE, collapse, looksLikeExcelSerial, parseDateText, r1, type DateReading } from "./util";
@@ -396,7 +401,7 @@ function siblingColumn(main: HeaderBand, sib: HeaderBand, col: number): number |
 // Declared totals
 // ---------------------------------------------------------------------------
 
-function meaningOfColumn(mapping: ColumnMapping, col: number): TotalMeaning | undefined {
+export function meaningOfColumn(mapping: ColumnMapping, col: number): TotalMeaning | undefined {
   const a = mapping.columns.find((c) => c.col === col);
   if (!a) return undefined;
   if (a.target.kind === "time") return { kind: "time", category: a.target.category, condition: a.target.condition, role: a.target.role };
@@ -407,6 +412,13 @@ function meaningOfColumn(mapping: ColumnMapping, col: number): TotalMeaning | un
     }
   }
   return undefined;
+}
+
+/** What a figure declared for these columns means under `mapping`: their shared meaning, or undefined when they disagree or mean nothing. */
+export function meaningOfColumns(mapping: ColumnMapping, cols: number[]): TotalMeaning | undefined {
+  const [first, ...rest] = cols.map((c) => meaningOfColumn(mapping, c));
+  if (!first || !rest.every((m) => m && JSON.stringify(m) === JSON.stringify(first))) return undefined;
+  return first;
 }
 
 /**
@@ -468,9 +480,12 @@ export function namesAllCategories(label: string): boolean {
 
 const INSTRUMENT_COMPOSITE: FieldTarget[] = ["actual_inst", "hood_inst", "sim_inst"];
 
-/** Best-effort meaning of a free-standing label such as "Total PIC" or "ME Night", plus the composite it names, if any. */
+/**
+ * Best-effort meaning of a free-standing label such as "Total PIC" or "ME
+ * Night" (or a "Section › Label" path), plus the composite it names, if any.
+ */
 export function classifyDeclaredLabel(label: string): { meaning?: TotalMeaning; composite?: FieldTarget[] } {
-  const f = facetsOfPath([label]);
+  const f = facetsOfPath(label.split(" › "));
   const cat = namesAllCategories(label) ? null : f.cat;
   const field = (name: FieldTarget): { meaning: TotalMeaning } => ({ meaning: { kind: "field", field: name } });
 
@@ -520,8 +535,71 @@ function footerRow(grid: Grid, dataStart: number): FooterRow | null {
   return null;
 }
 
-function collectDeclaredTotals(workbook: Workbook, sheetIndex: number, header: HeaderBand, mapping: ColumnMapping, sheets: SheetScan): DeclaredTotal[] {
-  const out: DeclaredTotal[] = [];
+/** The number a Totals-sheet label stands for: the first number within three cells to its right, before any other text. */
+function valueRightOf(row: Cell[], c: number): number | null {
+  for (let k = c + 1; k < Math.min(row.length, c + 4); k++) {
+    const v = row[k];
+    if (v.kind === "number") return v.value;
+    if (v.kind !== "empty") return null;
+  }
+  return null;
+}
+
+/** How far up a Totals-sheet label's block is searched for its section heading. */
+const MAX_SECTION_ROWS = 40;
+
+/**
+ * The section heading a Totals-sheet label sits under: walking up its
+ * column past the other (label, number) lines of its block, the first text
+ * cell that is not itself a label ("Cross-Country" over "Dual" / "PIC"). A
+ * blank or numeric cell ends the block with no heading.
+ */
+function sectionHeading(g: Grid, r: number, c: number): string | null {
+  for (let k = r - 1; k >= Math.max(0, r - MAX_SECTION_ROWS); k--) {
+    const row = g.rows[k];
+    const cell = row?.[c];
+    if (!cell || cell.kind !== "text") return null;
+    if (valueRightOf(row, c) != null) continue;
+    return cleanLabel(cell.value) || null;
+  }
+  return null;
+}
+
+/**
+ * The flight-sheet columns a Totals-sheet line names: those whose header path
+ * ends with `path` ("Cross-Country › Dual", "IFR"), provided they all share
+ * one header path — a leaf several different columns end with ("Dual" under
+ * Day, Night and Cross-Country) names none of them. Repeats of one header
+ * come back together.
+ */
+function namedColumns(header: HeaderBand, path: string[]): number[] {
+  const want = normalisePath(path);
+  if (want.length === 0) return [];
+  const hits = header.paths.filter((p) => {
+    const have = normalisePath(p.path);
+    return have.length >= want.length && want.every((s, i) => have[have.length - want.length + i] === s);
+  });
+  if (hits.length === 0 || new Set(hits.map((p) => pathKey(p.path))).size > 1) return [];
+  return hits.map((p) => p.col);
+}
+
+/**
+ * One Totals-sheet line. When its section heading and label name flight-sheet
+ * columns, it is labeled with that path and means what those columns are
+ * mapped to ("Cross-Country › Dual" → cross-country time, not the Dual total;
+ * "Instrument › IFR" → that column, not actual + hood + sim).
+ */
+function totalsSheetLine(label: string, value: number, section: string | null, header: HeaderBand, mapping: ColumnMapping): DeclaredTotalExt {
+  const path = section ? [section, label] : [label];
+  const cols = namedColumns(header, path);
+  const shown = cols.length > 0 ? path.join(" › ") : label;
+  const byColumn = cols.length > 0 ? meaningOfColumns(mapping, cols) : undefined;
+  const { meaning, composite } = byColumn ? { meaning: byColumn, composite: undefined } : classifyDeclaredLabel(shown);
+  return { source: "totals-sheet", label: shown, value, meaning, ...(composite ? { composite } : {}), ...(cols.length > 0 ? { cols } : {}) };
+}
+
+function collectDeclaredTotals(workbook: Workbook, sheetIndex: number, header: HeaderBand, mapping: ColumnMapping, sheets: SheetScan): DeclaredTotalExt[] {
+  const out: DeclaredTotalExt[] = [];
   const grid = workbook.sheets[sheetIndex];
   if (!grid) return out;
   const labelOf = (col: number) => header.paths.find((p) => p.col === col)?.label || `column ${col + 1}`;
@@ -544,7 +622,7 @@ function collectDeclaredTotals(workbook: Workbook, sheetIndex: number, header: H
         if (cell.kind !== "number") return;
         const meaning = meaningOfColumn(mapping, col);
         if (!meaning) return;
-        out.push({ source: "footer-row", label: `${labelCell.value} › ${labelOf(col)}`, value: cell.value, meaning });
+        out.push({ source: "footer-row", label: `${labelCell.value} › ${labelOf(col)}`, value: cell.value, meaning, cols: [col] });
       });
     }
   } else {
@@ -564,7 +642,7 @@ function collectDeclaredTotals(workbook: Workbook, sheetIndex: number, header: H
           const sc = siblingColumn(header, f.band, col);
           sum += sc != null ? f.footer.cells.get(sc) ?? 0 : 0;
         }
-        out.push({ source: "footer-row", label: `${main.label} › ${labelOf(col)} (${siblings.length + 1} sheets)`, value: sum, meaning });
+        out.push({ source: "footer-row", label: `${main.label} › ${labelOf(col)} (${siblings.length + 1} sheets)`, value: sum, meaning, cols: [col] });
       }
     }
   }
@@ -599,27 +677,22 @@ function collectDeclaredTotals(workbook: Workbook, sheetIndex: number, header: H
   // Other sheets: (label, number) pairs — never a sibling or another dated logbook sheet.
   workbook.sheets.forEach((g, i) => {
     if (i === sheetIndex || skip.has(i)) return;
-    for (const row of g.rows) {
+    g.rows.forEach((row, r) => {
       for (let c = 0; c < row.length; c++) {
         const cell = row[c];
         if (cell.kind !== "text") continue;
         const label = cleanLabel(cell.value);
         if (!label || label.length > 60) continue;
-        let value: number | null = null;
-        for (let k = c + 1; k < Math.min(row.length, c + 4); k++) {
-          const v = row[k];
-          if (v.kind === "number") { value = v.value; break; }
-          if (v.kind !== "empty") break;
-        }
+        const value = valueRightOf(row, c);
         if (value == null) continue;
         if (isRecencyLabel(label)) continue;
-        const { meaning, composite } = classifyDeclaredLabel(label);
+        const { meaning } = classifyDeclaredLabel(label);
         // Landings / approaches keep their field meaning above; anything else that counts things is not a total.
         if (!meaning && isCountLabel(label)) continue;
         if (!meaning && !TOTAL_ROW_RE.test(label) && !/total|합계|총계|总计|總計|合计/i.test(label)) continue;
-        out.push({ source: "totals-sheet", label, value, meaning, ...(composite ? { composite } : {}) });
+        out.push(totalsSheetLine(label, value, sectionHeading(g, r, c), header, mapping));
       }
-    }
+    });
   });
   return out;
 }

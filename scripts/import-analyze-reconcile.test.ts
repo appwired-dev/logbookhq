@@ -5,7 +5,8 @@
  * Total column (R17), the tolerance floor and off-row pointer (R18),
  * declared figures in minutes (R29), skipped undated rows explaining a gap
  * (R30), unrecognised columns for the arbiter (R33), the instrument
- * invariant (R10) and message keys on every fixed check.
+ * invariant (R10), declared figures tied to their own column (R38) and
+ * message keys on every fixed check.
  *
  *   npm run test:import
  *
@@ -17,7 +18,7 @@ import assert from "node:assert/strict";
 import * as XLSX from "xlsx";
 import {
   analyzeWorkbook, applyMapping, readWorkbook, reconcile,
-  type Analysis, type ApplyResult, type ReconcileCheck, type ReconcileReport,
+  type Analysis, type ApplyResult, type CanonicalTarget, type ColumnMapping, type DeclaredTotalExt, type ReconcileCheck, type ReconcileReport,
 } from "../lib/import";
 import { isCountLabel, isDateBearing, type AnalysisExt } from "../lib/import/analyze";
 import { isMinutesLabel } from "../lib/import/reconcile";
@@ -47,11 +48,18 @@ function test(name: string, fn: () => void): void {
 
 type Raw = string | number | Date | null;
 
-function xlsx(sheets: { name: string; rows: Raw[][] }[]): Uint8Array {
+function xlsx(sheets: { name: string; rows: Raw[][]; merges?: XLSX.Range[] }[]): Uint8Array {
   const wb = XLSX.utils.book_new();
-  for (const s of sheets) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(s.rows, { cellDates: true }), s.name);
+  for (const s of sheets) {
+    const ws = XLSX.utils.aoa_to_sheet(s.rows, { cellDates: true });
+    if (s.merges) ws["!merges"] = s.merges;
+    XLSX.utils.book_append_sheet(wb, ws, s.name);
+  }
   return new Uint8Array(XLSX.write(wb, { type: "array", bookType: "xlsx", cellDates: true }) as ArrayBuffer);
 }
+
+/** A merged range on one row, columns `from`…`to`. */
+const merged = (row: number, from: number, to: number): XLSX.Range => ({ s: { r: row, c: from }, e: { r: row, c: to } });
 
 const enc = (text: string) => new TextEncoder().encode(text);
 const csv = (lines: string[]) => enc(lines.join("\n"));
@@ -570,6 +578,178 @@ test("R10: instrument (actual + hood) above flight time is clamped by apply and 
   assert.equal(cc.status, "info");
   assert.equal(cc.messageKey, "instrument_clamped");
   assert.equal(cc.explanation, "2 rows had instrument time above flight time; clamped to the flight time.");
+});
+
+// ---------------------------------------------------------------------------
+// R38 — a figure declared for a column is compared with that column
+// ---------------------------------------------------------------------------
+
+/**
+ * A 3-row header band: "Single-Engine" over Day/Night × Dual/PIC,
+ * "Cross-Country" over Dual/PIC, "Instrument" over IMC/Hood/IFR (IFR all
+ * zero), merged the way a real sheet merges them. 3.2 h Dual and 5 h PIC in
+ * all; cross-country 2 h Dual + 3.9 h PIC; IMC 1.5 h, hood 1.8 h. The footer
+ * row declares every column.
+ */
+const XC_HEADER: Raw[][] = [
+  ["Date", "Type", "Reg", "Route", "Single-Engine", null, null, null, "Cross-Country", null, "Instrument", null, null, "Total"],
+  [null, null, null, null, "Day", null, "Night", null, "Dual", "PIC", "IMC", "Hood", "IFR", null],
+  [null, null, null, null, "Dual", "PIC", "Dual", "PIC", null, null, null, null, null, null],
+];
+const XC_ROWS: Raw[][] = [
+  [new Date(2024, 2, 5), "C172", "C-GABC", "CYVR-CYCD", 2.0, null, null, null, 2.0, null, null, 1.0, 0, 2.0],
+  [new Date(2024, 2, 6), "C172", "C-GABC", "CYVR-CYVR", 1.2, null, null, null, null, null, null, 0.8, 0, 1.2],
+  [new Date(2024, 2, 7), "C172", "C-GABC", "CYVR-CYXX", null, 1.0, null, 0.5, null, 1.5, 0.5, null, 0, 1.5],
+  [new Date(2024, 2, 8), "PA28", "C-GXYZ", "CYVR-CYYJ", null, 2.4, null, null, null, 2.4, 1.0, null, 0, 2.4],
+  [new Date(2024, 2, 9), "C172", "C-GABC", "CYVR-CYVR", null, 1.1, null, null, null, null, null, null, 0, 1.1],
+];
+const XC_FOOTER: Raw[] = ["Totals", null, null, null, 3.2, 4.5, 0, 0.5, 2.0, 3.9, 1.5, 1.8, 0, 8.2];
+const XC_MERGES = [merged(0, 4, 7), merged(0, 8, 9), merged(0, 10, 12), merged(1, 4, 5), merged(1, 6, 7)];
+/** The workbook's summary sheet: section headings over (label, number) lines, merged like the real one. */
+const XC_SUMMARY: Raw[][] = [
+  [],
+  [null, "Instrument", null, null, "Cross-Country", null, null, null],
+  [null, "IMC", 1.5, null, "Dual", null, null, 2.0],
+  [null, "Hood", 1.8, null, "PIC", null, null, 3.9],
+  [null, "IFR", 0, null, "Cross-Country Total", null, null, 5.9],
+  [null, "Instrument Total", 3.3],
+];
+const XC_SUMMARY_MERGES = [merged(1, 1, 2), merged(1, 4, 7), merged(2, 4, 6), merged(3, 4, 6), merged(4, 4, 6)];
+
+const xcWorkbook = (logbook: { rows: Raw[][]; merges: XLSX.Range[] }, summary: Raw[][] = XC_SUMMARY, summaryMerges = XC_SUMMARY_MERGES) =>
+  xlsx([{ name: "Logbook", ...logbook }, { name: "Total", rows: summary, merges: summaryMerges }]);
+const XC_LOGBOOK = { rows: [...XC_HEADER, ...XC_ROWS, XC_FOOTER], merges: XC_MERGES };
+
+const sheetLine = (a: Analysis, label: string) =>
+  a.declaredTotals.find((d) => d.source === "totals-sheet" && d.label === label) as DeclaredTotalExt | undefined;
+const numbers = (c: ReconcileCheck) => [c.expected, c.actual, c.status];
+
+/** The wizard's step 2: the same mapping with some columns retargeted. */
+function remap(mapping: ColumnMapping, targets: Record<number, CanonicalTarget>): ColumnMapping {
+  return { ...mapping, columns: mapping.columns.map((c) => (targets[c.col] ? { ...c, target: targets[c.col], source: "user" as const } : c)) };
+}
+
+test("R38: summary lines under a section heading (\"Cross-Country\" › \"Dual\", \"Instrument\" › \"IFR\") are compared with that column, not a role or instrument grand total", () => {
+  const { analysis, report } = run("xc-summary.xlsx", xcWorkbook(XC_LOGBOOK));
+  assert.deepEqual(report.summary.byRole, { DUAL: 3.2, PIC: 5 }, "precondition: the Dual / PIC role totals differ from the cross-country columns");
+
+  const dualLine = sheetLine(analysis, "Cross-Country › Dual");
+  assert.ok(dualLine, `no "Cross-Country › Dual" line (have: ${analysis.declaredTotals.map((d) => d.label).join(" | ")})`);
+  assert.deepEqual(dualLine.cols, [8]);
+  assert.deepEqual(dualLine.meaning, { kind: "field", field: "xc_time" });
+  const ifrLine = sheetLine(analysis, "Instrument › IFR");
+  assert.deepEqual(ifrLine?.cols, [12]);
+  assert.deepEqual(ifrLine?.meaning, { kind: "field", field: "actual_inst" });
+  assert.equal(ifrLine?.composite, undefined, "a line naming one column is not actual + hood + sim");
+  assert.equal(sheetLine(analysis, "Cross-Country Total")?.cols, undefined, "a section total names no single column");
+
+  const dual = check(report, "declared:field:xc_time|totals-sheet|col:8");
+  assert.equal(dual.label, "Cross-Country › Dual");
+  assert.deepEqual(numbers(dual), [2, 2, "match"], dual.explanation);
+  assert.deepEqual(numbers(check(report, "declared:field:xc_time|totals-sheet|col:9")), [3.9, 3.9, "match"]);
+  const ifr = check(report, "declared:field:actual_inst|totals-sheet|col:12");
+  assert.deepEqual(numbers(ifr), [0, 0, "match"], ifr.explanation);
+  assert.deepEqual(numbers(check(report, "declared:field:actual_inst|totals-sheet|col:10")), [1.5, 1.5, "match"]);
+  assert.deepEqual(numbers(check(report, "declared:field:xc_time|totals-sheet")), [5.9, 5.9, "match"], "the section total still covers both columns");
+  const inst = check(report, "declared:composite:actual_inst+hood_inst+sim_inst|totals-sheet");
+  assert.equal(inst.vars?.declaredLabel, "Instrument Total", "the section's own total, no longer displaced by the IFR line");
+  assert.deepEqual(numbers(inst), [3.3, 3.3, "match"]);
+  assert.ok(!ids(report).some((id) => id.startsWith("declared:time:any:any:")), `role totals compared: ${ids(report).join(", ")}`);
+  assert.deepEqual(numbers(check(report, "declared:field:xc_time|footer-row")), [5.9, 5.9, "match"], "the footer row agrees");
+  assert.equal(report.ok, true, mismatches(report));
+});
+
+/** The same logbook as a CSV: 2-row header band, footer totals row with IMC's cell left blank. */
+const XC_CSV = [
+  "Date,Type,Reg,Route,Dual,PIC,Cross-Country,,Instrument,,,Total",
+  ",,,,,,Dual,PIC,IMC,Hood,IFR,",
+  "2024-03-05,C172,C-GABC,CYVR-CYCD,2.0,,2.0,,,1.0,0,2.0",
+  "2024-03-06,C172,C-GABC,CYVR-CYVR,1.2,,,,,0.8,0,1.2",
+  "2024-03-07,C172,C-GABC,CYVR-CYXX,,1.5,,1.5,0.5,,0,1.5",
+  "2024-03-08,PA28,C-GXYZ,CYVR-CYYJ,,2.4,,2.4,1.0,,0,2.4",
+  "2024-03-09,C172,C-GABC,CYVR-CYVR,,1.1,,,,,0,1.1",
+  "Totals,,,,3.2,5.0,2.0,3.9,,1.8,0,8.2",
+];
+
+test("R38: a footer cell under one of a field's columns is compared with that column, as the wizard maps it now", () => {
+  const { analysis, workbook, report } = run("xc-footer.csv", csv(XC_CSV));
+  const ifrFooter = analysis.declaredTotals.find((d) => d.label === "Totals › Instrument › IFR") as DeclaredTotalExt | undefined;
+  assert.deepEqual(ifrFooter?.cols, [10], "a footer cell records its column");
+  const inst = check(report, "declared:field:actual_inst|footer-row");
+  assert.deepEqual(numbers(inst), [0, 0, "match"], `the IFR footer's 0 against the IFR column, not IMC + IFR: ${inst.explanation}`);
+  assert.deepEqual(numbers(check(report, "declared:field:xc_time|footer-row")), [5.9, 5.9, "match"]);
+  assert.equal(report.ok, true, mismatches(report));
+
+  // Step 2: the user ignores the all-zero IFR column — its footer figure goes with it.
+  const edited = remap(analysis.mapping, { 10: { kind: "ignore" } });
+  const after = reconcile(applyMapping(workbook, analysis, edited), analysis, edited);
+  assert.ok(!ids(after).includes("declared:field:actual_inst|footer-row"), `a footer under an ignored column is still compared: ${ids(after).join(", ")}`);
+  assert.equal(after.ok, true, mismatches(after));
+});
+
+test("R38: a footer column the wizard remaps from Dual / PIC time to cross-country is compared as cross-country, not against the Dual total", () => {
+  // "Away" is not cross-country vocabulary: analyze reads "Away › Dual" as Dual time.
+  const { analysis, workbook, report } = run("away.csv", csv([
+    "Date,Type,Reg,Route,Single-Engine,,Away,,Total",
+    ",,,,Dual,PIC,Dual,PIC,",
+    "2024-03-05,C172,C-GABC,CYVR-CYCD,2.0,,2.0,,2.0",
+    "2024-03-06,C172,C-GABC,CYVR-CYVR,1.2,,,,1.2",
+    "2024-03-07,C172,C-GABC,CYVR-CYXX,,1.5,,1.5,1.5",
+    "2024-03-08,PA28,C-GXYZ,CYVR-CYYJ,,2.4,,2.4,2.4",
+    "2024-03-09,C172,C-GABC,CYVR-CYVR,,1.1,,,1.1",
+    "Totals,,,,3.2,5.0,2.0,3.9,8.2",
+  ]));
+  assert.deepEqual(analysis.mapping.columns.filter((c) => c.col === 6 || c.col === 7).map((c) => c.target.kind), ["time", "time"], "precondition: analyze reads the Away columns as role time");
+  // Under that mapping the footer really is a Dual total that disagrees — rightly flagged, pointing at the mapping.
+  const before = check(report, "declared:time:any:any:dual|footer-row");
+  assert.equal(before.label, "Totals › Away › Dual");
+  assert.deepEqual(numbers(before), [2, 3.2, "mismatch"]);
+  assert.equal(before.suggestion?.kind, "review_mapping");
+
+  const xc: CanonicalTarget = { kind: "field", field: "xc_time" };
+  const edited = remap(analysis.mapping, { 6: xc, 7: xc });
+  const after = reconcile(applyMapping(workbook, analysis, edited), analysis, edited);
+  assert.deepEqual(after.summary.byRole, { DUAL: 3.2, PIC: 5 });
+  const footer = check(after, "declared:field:xc_time|footer-row");
+  assert.equal(footer.label, "Totals › Away (2 columns)");
+  assert.deepEqual(numbers(footer), [5.9, 5.9, "match"], footer.explanation);
+  assert.ok(!ids(after).some((id) => id.startsWith("declared:time:any:any:")), `the Away footers still compared as role totals: ${ids(after).join(", ")}`);
+  assert.equal(after.ok, true, mismatches(after));
+});
+
+test("R38: genuine gaps still show — a doubled column, a summary line off its column, a bare \"Dual\" against the Dual total", () => {
+  // A copy of "Cross-Country › Dual" (same header, no footer cell) doubles that column's hours.
+  const dup = (r: Raw[], v: Raw): Raw[] => [...r.slice(0, 10), v, ...r.slice(10)];
+  const doubled = {
+    rows: [dup(XC_HEADER[0], null), dup(XC_HEADER[1], "Dual"), dup(XC_HEADER[2], null), ...XC_ROWS.map((r) => dup(r, r[8])), dup(XC_FOOTER, null)],
+    merges: [merged(0, 4, 7), merged(0, 8, 10), merged(0, 11, 13), merged(1, 4, 5), merged(1, 6, 7)],
+  };
+  const d = run("xc-doubled.xlsx", xcWorkbook(doubled));
+  assert.equal(d.analysis.header.paths[10].label, "Cross-Country › Dual");
+  assert.deepEqual(d.analysis.mapping.columns.find((c) => c.col === 10)?.target, { kind: "field", field: "xc_time" }, "precondition: the copy stays mapped");
+  assert.deepEqual(sheetLine(d.analysis, "Cross-Country › Dual")?.cols, [8, 10], "the summary line names both copies of its header");
+  assert.deepEqual(numbers(check(d.report, "declared:field:xc_time|totals-sheet|col:8+10")), [2, 4, "mismatch"]);
+  const footer = check(d.report, "declared:field:xc_time|footer-row");
+  assert.deepEqual(numbers(footer), [5.9, 7.9, "mismatch"], "the copy counts against the footer's Cross-Country › Dual cell");
+  assert.equal(footer.suggestion?.kind, "review_mapping");
+  assert.deepEqual(numbers(check(d.report, "declared:field:xc_time|totals-sheet")), [5.9, 7.9, "mismatch"]);
+
+  // A summary figure that disagrees with its own column.
+  const off = XC_SUMMARY.map((r) => [...r]);
+  off[3][7] = 30;
+  const o = run("xc-summary-off.xlsx", xcWorkbook(XC_LOGBOOK, off));
+  const pic = check(o.report, "declared:field:xc_time|totals-sheet|col:9");
+  assert.deepEqual(numbers(pic), [30, 3.9, "mismatch"]);
+  assert.equal(pic.messageKey, "declared_mismatch");
+
+  // Without a heading a bare "Dual" is the Dual total; a bare "IFR" still names its one column.
+  const flat = (dual: number) => run("xc-flat.xlsx", xcWorkbook(XC_LOGBOOK, [["Dual", dual], ["IFR", 0]], []));
+  const f = flat(3.2);
+  assert.deepEqual(sheetLine(f.analysis, "Dual")?.cols, undefined, "\"Dual\" ends three different headers — it names none of them");
+  assert.deepEqual(numbers(check(f.report, "declared:time:any:any:dual|totals-sheet")), [3.2, 3.2, "match"]);
+  assert.deepEqual(numbers(check(f.report, "declared:field:actual_inst|totals-sheet|col:12")), [0, 0, "match"]);
+  assert.equal(f.report.ok, true, mismatches(f.report));
+  assert.equal(check(flat(2).report, "declared:time:any:any:dual|totals-sheet").status, "mismatch", "2 h is not the 3.2 h Dual total");
 });
 
 // ---------------------------------------------------------------------------

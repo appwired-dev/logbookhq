@@ -32,6 +32,15 @@
  * the source columns whose header facets match; a facet with no matching
  * column is reported as "info" rather than compared against the wrong thing.
  *
+ * A figure declared for particular columns — a footer cell, or a Totals-sheet
+ * line that names a column by its header path ("Cross-Country › Dual",
+ * "Instrument › IFR") — means what those columns are mapped to NOW (the
+ * wizard's mapping, not the one analyze guessed), and a field figure is
+ * compared with those columns: 13.2 under "Cross-Country › Dual" is that
+ * column's sum, not the Dual role total, and a 0 under an all-zero IFR column
+ * is not the instrument grand total. Another column mapped to the same field
+ * under the same header is counted too — a doubled column still shows.
+ *
  * A cross-country column that matches its declared total can still differ
  * from LogbookHQ's own figure, which credits whole flights (day + night of
  * every flight flagged cross-country) while a sheet may log only the
@@ -49,10 +58,11 @@ import type {
   Analysis, ApplyResult, ColumnMapping, DeclaredTotal, FieldTarget, ReconcileCheck, ReconcileReport,
   TimeCategory, TimeCondition, TimeRole, TotalMeaning,
 } from "./types";
-import type { ApplyResultExt } from "./types-ext";
+import type { ApplyResultExt, DeclaredTotalExt } from "./types-ext";
 import { sourceRowGroups } from "./apply";
-import { isCountLabel, type AnalysisExt } from "./analyze";
+import { classifyDeclaredLabel, isCountLabel, meaningOfColumns, type AnalysisExt } from "./analyze";
 import { SUMMABLE_FIELDS } from "./targets";
+import { pathKey } from "./templates";
 import { facetsOfPath, type Facets } from "./synonyms";
 import { parseDateText, r1, todayISO } from "./util";
 
@@ -218,7 +228,10 @@ export function reconcile(
   const full = r1(flights.reduce((s, f) => s + credited(f, false), 0));
   const half = r1(flights.reduce((s, f) => s + credited(f, true), 0));
   // A running-total column is not a per-row total: its sum means nothing.
-  const declaredPool = cumulative ? analysis.declaredTotals.filter((d) => d.source !== "total-column") : analysis.declaredTotals;
+  const declaredPool = resolveDeclared(
+    cumulative ? analysis.declaredTotals.filter((d) => d.source !== "total-column") : analysis.declaredTotals,
+    mapping,
+  );
   const grand = pickGrandTotal(declaredPool);
   if (grand) {
     checks.push(grandCheck(grand, full, half, ctx));
@@ -485,6 +498,26 @@ function sourceLabel(d: DeclaredTotal): string {
   return d.source === "totals-sheet" ? `"${d.label}"` : d.source === "footer-row" ? `footer "${d.label}"` : `sum of "${d.label}" column`;
 }
 
+/**
+ * Figures declared for particular columns take their meaning from what those
+ * columns are mapped to now: analyze read them against its own guess, and the
+ * user (or the AI arbiter) may have remapped them since. A footer cell under
+ * a column mapped to nothing says nothing; a Totals-sheet line whose columns
+ * are mapped to nothing falls back to what its label says.
+ */
+function resolveDeclared(declared: DeclaredTotal[], mapping: ColumnMapping): DeclaredTotalExt[] {
+  return declared.map((d: DeclaredTotalExt) => {
+    // The analysis is echoed back by the client: anything but column indices is no column at all.
+    const cols = Array.isArray(d.cols) ? d.cols.filter((c) => Number.isInteger(c)) : [];
+    if (cols.length === 0) return { ...d, cols: undefined };
+    const meaning = meaningOfColumns(mapping, cols);
+    if (d.source === "footer-row") return { ...d, cols, meaning };
+    if (meaning) return { ...d, cols, meaning, composite: undefined };
+    const byLabel = classifyDeclaredLabel(d.label);
+    return { ...d, cols, meaning: byLabel.meaning, composite: byLabel.composite };
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Grand-total selection + check
 // ---------------------------------------------------------------------------
@@ -567,12 +600,13 @@ function grandCheck(grand: DeclaredTotal, full: number, half: number, ctx: Ctx):
  * has six cross-country columns — Day/Night × FO/PIC/AUG) is a single total:
  * the cells are summed before comparing, since apply sums those columns per
  * row. Totals-sheet lines for the same field but different facets ("X-Country
- * PIC (Day)", "X-Country (Night)") stay separate; any other duplicate keeps
- * its first occurrence.
+ * PIC (Day)", "X-Country (Night)") or naming different columns ("Instrument ›
+ * IMC", "Instrument › IFR") stay separate; any other duplicate keeps its
+ * first occurrence.
  */
 function groupDeclared(declared: DeclaredTotal[]): Map<string, DeclaredTotal> {
-  const groups = new Map<string, { total: DeclaredTotal; labels: string[] }>();
-  for (const d of declared) {
+  const groups = new Map<string, { total: DeclaredTotalExt; labels: string[] }>();
+  for (const d of declared as DeclaredTotalExt[]) {
     if (!d.meaning || d.meaning.kind === "grand_total") continue;
     if (d.source === "total-column") continue;
     const key = declaredKey(d, d.meaning);
@@ -580,6 +614,7 @@ function groupDeclared(declared: DeclaredTotal[]): Map<string, DeclaredTotal> {
     if (!g) { groups.set(key, { total: { ...d }, labels: [d.label] }); continue; }
     if (d.source === "footer-row" && d.meaning.kind === "field" && SUMMABLE_FIELDS.has(d.meaning.field)) {
       g.total.value = r1(g.total.value + d.value);
+      g.total.cols = [...(g.total.cols ?? []), ...(d.cols ?? [])];
       g.labels.push(d.label);
     }
   }
@@ -591,8 +626,9 @@ function groupDeclared(declared: DeclaredTotal[]): Map<string, DeclaredTotal> {
   return out;
 }
 
-function declaredKey(d: DeclaredTotal, m: TotalMeaning): string {
+function declaredKey(d: DeclaredTotalExt, m: TotalMeaning): string {
   const base = `${d.composite ? `composite:${d.composite.join("+")}` : meaningKey(m)}|${d.source}`;
+  if (d.source === "totals-sheet" && m.kind === "field" && d.cols && d.cols.length > 0) return `${base}|col:${d.cols.join("+")}`;
   if (d.source === "totals-sheet" && m.kind === "field" && !d.composite) {
     const lf = labelFacets(d.label, m.field);
     if (lf.cat || lf.cond || lf.role) return `${base}|${lf.cat ?? "any"}:${lf.cond ?? "any"}:${lf.role ?? "any"}`;
@@ -690,6 +726,12 @@ class ColumnIndex {
 
   isSicColumn(col: number): boolean { return this.facets(col).role === "sic"; }
 
+  /** Two columns under the same (normalised, non-empty) header path — a repeated or copied column. */
+  samePath(a: number, b: number): boolean {
+    const key = pathKey(this.paths.get(a) ?? []);
+    return key !== "" && key === pathKey(this.paths.get(b) ?? []);
+  }
+
   /** Time columns that can feed a (category, condition, role) bucket. */
   timeColsFor(m: Extract<TotalMeaning, { kind: "time" }>): number[] {
     return this.times
@@ -779,8 +821,10 @@ function fieldCheck(id: string, d: DeclaredTotal, field: FieldTarget, flights: P
     return compare({ id, label: d.label, declared, unit, primary: computed, textCells: cols.textCells(mapped), skippedTotals: cols.skipped(mapped), skippedWhere: "those columns", context, minutesLabel: minutes, vars });
   }
 
-  // Column-wise: the label's facets pick the source columns ("X-Country PIC (Day)" → Cross Country › Day › PIC).
-  const matched = hasFacets(lf) ? mapped.filter((c) => cols.matches(c, lf)) : mapped;
+  // Column-wise: the columns the figure was declared for, else the label's facets pick them
+  // ("X-Country PIC (Day)" → Cross Country › Day › PIC).
+  const own = ownColumns(d, mapped, cols);
+  const matched = own.length > 0 ? own : hasFacets(lf) ? mapped.filter((c) => cols.matches(c, lf)) : mapped;
   if (matched.length === 0) return notCompared(id, d, unit);
   const fullSum = r1(matched.reduce((s, c) => s + cols.sum(c), 0));
   const halfSum = r1(matched.reduce((s, c) => s + cols.sum(c) * (cols.isSicColumn(c) ? 0.5 : 1), 0));
@@ -796,6 +840,19 @@ function fieldCheck(id: string, d: DeclaredTotal, field: FieldTarget, flights: P
     textCells: cols.textCells(matched), skippedTotals: cols.skipped(matched), skippedWhere: "those columns", note: via, context, minutesLabel: minutes, vars,
   });
   return field === "xc_time" && check.status === "match" ? wholeFlightXc(check, flights, lf, fullSum, via) : check;
+}
+
+/**
+ * The mapped columns a figure declared for particular columns stands
+ * against: those columns (while still mapped to the field) plus any other
+ * column mapped to the field under the same header — a repeated column is
+ * imported twice, so it must count against the figure. Empty when the figure
+ * names no column of the field.
+ */
+function ownColumns(d: DeclaredTotal, mapped: number[], cols: ColumnIndex): number[] {
+  const declared = ((d as DeclaredTotalExt).cols ?? []).filter((c) => mapped.includes(c));
+  if (declared.length === 0) return [];
+  return mapped.filter((c) => declared.includes(c) || declared.some((o) => cols.samePath(c, o)));
 }
 
 /**
