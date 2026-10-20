@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbo --port 3030",
+    "prebuild": "tsx scripts/migration-grants.test.ts",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
@@ -25,7 +26,8 @@
     "test:stats": "tsx scripts/site-stats.test.ts",
     "test:admin-i18n": "tsx scripts/admin-i18n.test.ts",
     "test:pins": "tsx scripts/admin-traffic-pins.test.ts",
-    "test:country": "tsx scripts/country-features.test.ts"
+    "test:country": "tsx scripts/country-features.test.ts",
+    "test:grants": "tsx scripts/migration-grants.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.98.0",
