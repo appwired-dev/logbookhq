@@ -43,6 +43,7 @@ export const PUBLIC_PAGES = [
   "/faa-easa-logbook",
   "/uk-caa-pilot-logbook",
   "/icao-pilot-logbook",
+  "/tcexamprep",
 ] as const;
 
 /** Never counted: the signed-in app, auth and recovery flows, APIs. */
