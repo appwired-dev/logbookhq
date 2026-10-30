@@ -446,7 +446,10 @@ const r1 = (n: number) => Math.round(n * 10) / 10;
  * Windows are INCLUSIVE at both ends: a 28-day window ending 2026-01-28 starts
  * 2026-01-01 and covers 28 calendar dates (not 29).
  */
-export function flightTimeWindowStart(w: FlightTimeWindow, today: Date): Date {
+export function flightTimeWindowStart(
+  w: Pick<FlightTimeWindow, "days" | "basis" | "months">,
+  today: Date,
+): Date {
   const start = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   switch (w.basis ?? "rolling-days") {
     case "calendar-year":
@@ -477,6 +480,27 @@ export function flightTimeWindowStart(w: FlightTimeWindow, today: Date): Date {
 export function flightTimeHours(f: Flight): number {
   if (f.category === "SIM") return 0;
   return (Number(f.day_time) || 0) + (Number(f.night_time) || 0);
+}
+
+/**
+ * Flight time logged inside `w` for the window ending on `end`, unrounded.
+ * Both ends inclusive: a flight dated exactly on the window's first date
+ * counts, a flight dated after `end` does not. The dashboard limits card and
+ * the charts page's rolling line both sum through here, so they cannot
+ * disagree about which dates a window covers.
+ */
+export function flightTimeInWindow(
+  flights: Flight[],
+  w: Pick<FlightTimeWindow, "days" | "basis" | "months">,
+  end: Date,
+): number {
+  const startIso = localIso(flightTimeWindowStart(w, end));
+  const endIso = localIso(end);
+  let used = 0;
+  for (const f of flights) {
+    if (f.date >= startIso && f.date <= endIso) used += flightTimeHours(f);
+  }
+  return used;
 }
 
 /**
@@ -534,11 +558,7 @@ export function computeCurrencyForRegime(
   // flight dated in the future (after `today`) does not.
   const windows: CurrencyWindow[] = set.flightTimeWindows.map((w) => {
     const startIso = localIso(flightTimeWindowStart(w, today));
-    let used = 0;
-    for (const f of flights) {
-      if (f.date >= startIso && f.date <= todayIso) used += flightTimeHours(f);
-    }
-    used = r1(used);
+    const used = r1(flightTimeInWindow(flights, w, today));
     return {
       label: w.label,
       days: w.days,
