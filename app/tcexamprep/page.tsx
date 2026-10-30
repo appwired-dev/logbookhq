@@ -57,12 +57,12 @@ const LEDGER: { job: string; byHand: string; here: string }[] = [
   {
     job: "Expiries",
     byHand: "Remember the date on your medical.",
-    here: "Medical, licence, ratings, passport and recurrent checks, each with its expiry date, flagged before it lapses.",
+    here: "Medical, licence, type ratings, IPCs, recurrent training and passport, each with its expiry date, flagged before it lapses.",
   },
   {
     job: "Finding a flight",
     byHand: "Flip pages.",
-    here: "Search by aircraft, registration, route, crew or remarks; filter by year, category and role; sort the columns.",
+    here: "Search by aircraft, registration, route, crew or remarks; filter by year, category and role; sort by column in the full table view.",
   },
   {
     job: "Showing your time",
@@ -71,8 +71,8 @@ const LEDGER: { job: string; byHand: string; here: string }[] = [
   },
   {
     job: "Moving in",
-    byHand: "Retype everything.",
-    here: "Import CSV, Excel or Apple Numbers files, with profiles for ForeFlight, LogTen Pro, MyFlightbook, Pilot Logbook HQ exports and Apple Numbers logbooks. Before anything is saved, the import checks its totals against any your sheet declares.",
+    byHand: "Retype another app’s export or your spreadsheet.",
+    here: "Import CSV, Excel or Apple Numbers files. Built-in profiles read ForeFlight, LogTen Pro, MyFlightbook and Pilot Logbook HQ exports and a common three-row Apple Numbers layout; any other sheet is matched column by column for you to confirm. Before anything is saved, the import checks its totals against any your sheet declares.",
   },
   {
     job: "Limits, later",
@@ -106,7 +106,7 @@ export default function TcExamPrepLandingPage() {
             </div>
           </div>
           <p className="lp-mono mt-4 text-xs" style={{ color: "var(--lp-ink-3)" }}>
-            Free up to 100 flights &middot; then $4.99/mo &middot; no card to start
+            Free up to 100 flights &middot; then $4.99/mo CAD &middot; no card to start
           </p>
         </section>
 
@@ -162,7 +162,7 @@ export default function TcExamPrepLandingPage() {
             </div>
             <div className={s.totalsCell}>
               <div className="lp-mono text-xs uppercase tracking-[0.14em]" style={{ color: "var(--lp-ink-3)" }}>After that</div>
-              <div className={`${s.totalsFig} mt-2`}>$4.99<span className="lp-mono text-base" style={{ color: "var(--lp-ink-3)" }}> / month</span></div>
+              <div className={`${s.totalsFig} mt-2`}>$4.99<span className="lp-mono text-base" style={{ color: "var(--lp-ink-3)" }}> CAD / month</span></div>
               <p className="mt-2 text-sm" style={{ color: "var(--lp-ink-2)" }}>
                 Annual and lifetime plans are on the <Link className="lp-link underline underline-offset-2" href="/pricing">pricing page</Link>.
               </p>

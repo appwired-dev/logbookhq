@@ -7,8 +7,9 @@ import s from "./tcexamprep.module.css";
 /**
  * The hero of /tcexamprep: an open logbook. Left page, a ruled paper page
  * closing on the three totals rows every paper logbook ends with; right page,
- * the same totals as the dashboard keeps them. "Log the next flight" writes a
- * line in and both pages carry it forward.
+ * its running totals in the figures the app shows (total, PIC, night,
+ * cross-country, instrument) and the passenger-recency count. "Log the next
+ * flight" writes a line in and both pages carry it forward.
  *
  * Sample data only — a made-up student's page, not anyone's real logbook — and
  * nothing is sent or saved. Deterministic (no clock), so the static render and
@@ -76,12 +77,12 @@ function useCountUp(target: number, reduce: boolean): number {
   return shown;
 }
 
-function Tile({ label, value, big = false, count = false, reduce }: { label: string; value: number; big?: boolean; count?: boolean; reduce: boolean }) {
+function Tile({ label, value, big = false, reduce }: { label: string; value: number; big?: boolean; reduce: boolean }) {
   const v = useCountUp(value, reduce);
   return (
     <div className={`${s.tile} ${big ? s.tileBig : ""}`}>
       <div className={s.tileLabel}>{label}</div>
-      <div className={s.tileVal}>{count ? Math.round(v) : v.toFixed(1)}{!count && <span className={s.unit}>h</span>}</div>
+      <div className={s.tileVal}>{v.toFixed(1)}<span className={s.unit}>h</span></div>
     </div>
   );
 }
@@ -98,10 +99,11 @@ export function LogbookSpread() {
   const total = round1(toDate.dual + toDate.pic);
   const full = count === ENTRIES.length;
 
-  // Passenger recency under CARs 401.05: take-offs and landings in the six
-  // months (180 days) to the latest entry. Brought-forward pages are older.
+  // Passenger recency under CARs 401.05: take-offs and landings in the 180
+  // days ending on the latest entry, as lib/currency-rules.ts counts them.
+  // Brought-forward pages are older.
   const last = rows[rows.length - 1].date;
-  const recent = rows.filter((r) => daysBetween(r.date, last) <= 180).reduce((t, r) => t + r.ldg, 0);
+  const recent = rows.filter((r) => daysBetween(r.date, last) < 180).reduce((t, r) => t + r.ldg, 0);
 
   const logNext = () =>
     setPage((p) => (p.count >= ENTRIES.length ? { count: START, justAdded: null } : { count: p.count + 1, justAdded: p.count }));
@@ -113,7 +115,7 @@ export function LogbookSpread() {
   ];
 
   return (
-    <figure className={s.spread} aria-label="Sample logbook: a paper page and the same totals as Pilot Logbook HQ keeps them">
+    <figure className={s.spread} aria-label="Sample logbook: a paper page and its running totals">
       <div className={s.paper}>
         <div className={`${s.pageHead} ${s.printed}`}>
           <span>Pilot&rsquo;s log &middot; {YEAR}</span>
@@ -178,12 +180,10 @@ export function LogbookSpread() {
         </div>
         <div className={s.tiles} aria-live="polite">
           <Tile big label="Total time" value={total} reduce={reduce} />
-          <Tile label="Dual" value={toDate.dual} reduce={reduce} />
           <Tile label="PIC" value={toDate.pic} reduce={reduce} />
           <Tile label="Night" value={toDate.night} reduce={reduce} />
           <Tile label="Cross-country" value={toDate.xc} reduce={reduce} />
           <Tile label="Instrument" value={toDate.inst} reduce={reduce} />
-          <Tile count label="Ldg · 6 mo" value={recent} reduce={reduce} />
         </div>
         <div className={s.status}>
           <span className={s.dot} aria-hidden />
