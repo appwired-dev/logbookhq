@@ -27,7 +27,8 @@
     "test:admin-i18n": "tsx scripts/admin-i18n.test.ts",
     "test:pins": "tsx scripts/admin-traffic-pins.test.ts",
     "test:country": "tsx scripts/country-features.test.ts",
-    "test:grants": "tsx scripts/migration-grants.test.ts"
+    "test:grants": "tsx scripts/migration-grants.test.ts",
+    "test:pdf": "tsx scripts/pdf-export.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.98.0",

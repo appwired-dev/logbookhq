@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getLocale } from "@/lib/i18n-server";
+import { isFreeTier } from "@/lib/limits";
 import { openBillingPortal } from "@/app/app/billing/actions";
 import { stripe } from "@/lib/stripe";
 import { Card, CardHeader, Icon, Pill, buttonClass } from "@/components/ui";
@@ -63,7 +64,7 @@ export default async function SettingsPage() {
           flightCount={flightCount ?? 0}
           defaultName={profile?.full_name ?? ""}
           defaultLicense={profile?.license_number ?? ""}
-          avatarUrl={profile?.avatar_url ?? null}
+          isPaid={!isFreeTier(profile?.tier)}
           locale={locale}
         />
       }
