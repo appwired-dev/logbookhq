@@ -23,6 +23,10 @@
  *      takes no options and reads day_time + night_time as logged, so a SIC row
  *      counts for its full block time (that 50 % convention lives in
  *      lib/derive.ts `creditedHours`, for experience totals only).
+ *   7. The charts page's rolling 365-day line (app/app/charts/rolling-series.ts)
+ *      sums the same window as the dashboard's 365-day bar — 365 dates, not
+ *      366 — so the line can't sit above the bar against the same ceiling, and
+ *      its first and last points land on the right months in any time zone.
  *
  * Pure and offline — no fixtures, no network, no database.
  */
@@ -32,6 +36,7 @@ import {
   REGIME_RULES, resolveRuleSet, ruleSetsFor, yearlyCeiling,
   type FlightTimeWindow, type Regime,
 } from "../lib/currency-rules";
+import { rollingFlightTimeSeries } from "../app/app/charts/rolling-series";
 import type { Flight } from "../lib/types";
 
 // ---------------------------------------------------------------------------
@@ -398,6 +403,79 @@ test("citations: TC flight time is CAR 700.27(1)(a-c); EASA/UK flight time is OR
   assert.deepEqual(ca, [[365, "CAR 700.27(1)(c)"], [90, "CAR 700.27(1)(b)"], [28, "CAR 700.27(1)(a)"]]);
   for (const r of ["EASA", "UKCAA"] as const) {
     for (const w of ruleSetsFor(r)[0].flightTimeWindows) assert.match(w.citation ?? "", /^ORO\.FTL\.210\(b\)\([123]\)/, `${r} ${w.label}`);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// 7. The charts page's rolling line agrees with the dashboard's 365-day bar
+// ---------------------------------------------------------------------------
+
+/** The chart's value for `month` ("YYYY-MM") — the 365 days ending on its 1st. */
+function chartPoint(flights: Flight[], month: string): number {
+  const p = rollingFlightTimeSeries(flights).find((x) => x.date === month);
+  assert.ok(p, `no chart point for ${month}`);
+  return p.hours;
+}
+
+/** The dashboard's CA 365-day bar (CAR 700.27(1)(c)) with `today` = `iso`. */
+function dashboard365(flights: Flight[], iso: string): number {
+  return windowWithMaxOn(flights, "CA", day(iso), 1000).used;
+}
+
+test("chart = dashboard at the 365-day edge: today − 364 d counts, today − 365 d and − 366 d do not", () => {
+  // 2026-03-01 is both the chart's "2026-03" point and the dashboard's today.
+  // `later` only stretches the series past that point; it is after today, so
+  // neither surface counts it.
+  const later = flight("2026-03-20", 1);
+  const back364 = flight("2025-03-02", 3); // the 365th date: the window's first day
+  const back365 = flight("2025-03-01", 9); // the 366th date: the chart used to count it
+  const back366 = flight("2025-02-28", 5);
+
+  for (const [f, expected] of [[back364, 3], [back365, 0], [back366, 0]] as const) {
+    const flights = [f, later];
+    assert.equal(dashboard365(flights, "2026-03-01"), expected, `dashboard, flight on ${f.date}`);
+    assert.equal(chartPoint(flights, "2026-03"), expected, `chart, flight on ${f.date}`);
+  }
+
+  const all = [back366, back365, back364, later];
+  assert.equal(chartPoint(all, "2026-03"), dashboard365(all, "2026-03-01"));
+  assert.equal(chartPoint(all, "2026-03"), 3);
+});
+
+test("chart = dashboard at every monthly point over three years (leap day, sim sessions)", () => {
+  const iso = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const flights: Flight[] = [];
+  // A flight every third day (2024-02-29 is one of them); every seventh is a sim session.
+  const d = day("2023-01-02");
+  for (let i = 0; d <= day("2026-02-27"); i++, d.setDate(d.getDate() + 3)) {
+    flights.push(flight(iso(d), 0.5 + (i % 7) * 0.5, i % 7 === 3 ? { category: "SIM" } : {}));
+  }
+  const points = rollingFlightTimeSeries(flights);
+  assert.ok(points.length >= 24, `expected two years of points, got ${points.length}`);
+  for (const p of points) {
+    assert.equal(p.hours, dashboard365(flights, `${p.date}-01`), `chart vs dashboard on ${p.date}-01`);
+  }
+});
+
+test("series edges are local calendar dates: first and newest flight on the 1st, in every time zone", () => {
+  // Parsed as UTC, "2026-03-01" is 28 Feb west of Greenwich: the series began a
+  // month early and dropped the newest flight's month. TZ is pinned per zone so
+  // this fails on any machine, not only one in the Americas.
+  const flights = [flight("2025-03-01", 2), flight("2025-09-10", 4), flight("2026-03-01", 6)];
+  const prev = process.env.TZ;
+  try {
+    for (const tz of ["America/Vancouver", "Pacific/Pago_Pago", "UTC", "Asia/Tokyo", "Pacific/Kiritimati"]) {
+      process.env.TZ = tz;
+      const points = rollingFlightTimeSeries(flights);
+      assert.deepEqual(points.map((p) => p.date), ["2026-03"], `${tz}: one point, a year after the first flight`);
+      // The window ending 2026-03-01 starts 2025-03-02: the first flight is out, the newest is in.
+      assert.equal(points[0].hours, 10, `${tz}: hours`);
+      assert.equal(points[0].hours, dashboard365(flights, "2026-03-01"), `${tz}: chart vs dashboard`);
+    }
+  } finally {
+    if (prev === undefined) delete process.env.TZ;
+    else process.env.TZ = prev;
   }
 });
 

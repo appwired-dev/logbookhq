@@ -10,7 +10,7 @@ import type { FlightDerived, Role } from "@/lib/types";
 import type { Airport } from "@/lib/airports";
 import type { Locale } from "@/lib/i18n";
 import type { LucideIcon } from "@/components/ui/icons";
-import { REGIME_RULES, flightTimeHours, yearlyCeiling, type Regime } from "@/lib/currency-rules";
+import { REGIME_RULES, yearlyCeiling, type Regime } from "@/lib/currency-rules";
 import { creditedHours } from "@/lib/derive";
 import { useReducedMotion } from "@/lib/use-reduced-motion";
 import FlowSankey, {
@@ -49,17 +49,12 @@ function RoutesFallback({ arcs, strings, locale }: {
 }
 import TypeHoursChart, { type TypeHoursRow } from "./CustomBars";
 import { fmt, getChartsStrings, type GlobeStrings } from "./charts-strings";
+import { rollingFlightTimeSeries } from "./rolling-series";
 import { GlobeBoundary } from "@/components/WebGLGate";
 
 const noop = () => {};
 
 const r1 = (n: number) => Math.round(n * 10) / 10;
-function iso(d: Date) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
 
 /**
  * Recharts renders the tooltip into a plain <div>, so the design tokens reach
@@ -207,34 +202,9 @@ export default function ChartsClient({
       .map(([name, hours]) => ({ name, hours: r1(hours) }));
   }, [flights, augHalfCredit]);
 
-  const rolling = useMemo(() => {
-    if (flights.length === 0) return [] as { date: string; hours: number }[];
-    const sorted = [...flights].sort((a, b) => a.date.localeCompare(b.date));
-    const first = new Date(sorted[0].date);
-    const last = new Date(sorted[sorted.length - 1].date);
-    const points: { date: string; hours: number }[] = [];
-    const cursor = new Date(first.getFullYear(), first.getMonth(), 1);
-    cursor.setMonth(cursor.getMonth() + 12);
-    while (cursor <= last) {
-      const end = new Date(cursor);
-      const start = new Date(cursor);
-      start.setDate(start.getDate() - 365);
-      const startIso = iso(start);
-      const endIso = iso(end);
-      let hours = 0;
-      // Same rule as the dashboard limits card: simulator sessions never count
-      // toward flight time, and the window is inclusive at both ends
-      // (lib/currency-rules `flightTimeHours` / `computeCurrencyForRegime`).
-      // Counting sim here would draw a line the limits card contradicts.
-      for (const f of sorted) {
-        if (f.date > endIso) break;
-        if (f.date >= startIso) hours += flightTimeHours(f);
-      }
-      points.push({ date: endIso.slice(0, 7), hours: r1(hours) });
-      cursor.setMonth(cursor.getMonth() + 1);
-    }
-    return points;
-  }, [flights]);
+  // Same 365-date window and sim exclusion as the dashboard limits card — see
+  // ./rolling-series and lib/currency-rules `flightTimeInWindow`.
+  const rolling = useMemo(() => rollingFlightTimeSeries(flights), [flights]);
 
   // Regime-aware ceiling for the rolling 365-day total, from the same helper the
   // limits card uses, so the two surfaces can never drift apart.
