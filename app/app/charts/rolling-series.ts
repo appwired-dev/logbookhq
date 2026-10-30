@@ -1,4 +1,5 @@
 import { flightTimeInWindow } from "@/lib/currency-rules";
+import { parseLocalDate } from "@/lib/dates";
 import type { Flight } from "@/lib/types";
 
 const r1 = (n: number) => Math.round(n * 10) / 10;
@@ -25,8 +26,10 @@ const ROLLING_YEAR = { days: 365 };
 export function rollingFlightTimeSeries(flights: Flight[]): { date: string; hours: number }[] {
   if (flights.length === 0) return [];
   const sorted = [...flights].sort((a, b) => a.date.localeCompare(b.date));
-  const first = new Date(sorted[0].date);
-  const last = new Date(sorted[sorted.length - 1].date);
+  // Local calendar dates, not `new Date(iso)` (UTC midnight — the previous
+  // day in the Americas, which shifted the series a month at either edge).
+  const first = parseLocalDate(sorted[0].date);
+  const last = parseLocalDate(sorted[sorted.length - 1].date);
   const points: { date: string; hours: number }[] = [];
   const cursor = new Date(first.getFullYear(), first.getMonth(), 1);
   cursor.setMonth(cursor.getMonth() + 12);

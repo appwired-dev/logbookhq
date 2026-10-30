@@ -25,7 +25,8 @@
  *      lib/derive.ts `creditedHours`, for experience totals only).
  *   7. The charts page's rolling 365-day line (app/app/charts/rolling-series.ts)
  *      sums the same window as the dashboard's 365-day bar — 365 dates, not
- *      366 — so the line can't sit above the bar against the same ceiling.
+ *      366 — so the line can't sit above the bar against the same ceiling, and
+ *      its first and last points land on the right months in any time zone.
  *
  * Pure and offline — no fixtures, no network, no database.
  */
@@ -454,6 +455,27 @@ test("chart = dashboard at every monthly point over three years (leap day, sim s
   assert.ok(points.length >= 24, `expected two years of points, got ${points.length}`);
   for (const p of points) {
     assert.equal(p.hours, dashboard365(flights, `${p.date}-01`), `chart vs dashboard on ${p.date}-01`);
+  }
+});
+
+test("series edges are local calendar dates: first and newest flight on the 1st, in every time zone", () => {
+  // Parsed as UTC, "2026-03-01" is 28 Feb west of Greenwich: the series began a
+  // month early and dropped the newest flight's month. TZ is pinned per zone so
+  // this fails on any machine, not only one in the Americas.
+  const flights = [flight("2025-03-01", 2), flight("2025-09-10", 4), flight("2026-03-01", 6)];
+  const prev = process.env.TZ;
+  try {
+    for (const tz of ["America/Vancouver", "Pacific/Pago_Pago", "UTC", "Asia/Tokyo", "Pacific/Kiritimati"]) {
+      process.env.TZ = tz;
+      const points = rollingFlightTimeSeries(flights);
+      assert.deepEqual(points.map((p) => p.date), ["2026-03"], `${tz}: one point, a year after the first flight`);
+      // The window ending 2026-03-01 starts 2025-03-02: the first flight is out, the newest is in.
+      assert.equal(points[0].hours, 10, `${tz}: hours`);
+      assert.equal(points[0].hours, dashboard365(flights, "2026-03-01"), `${tz}: chart vs dashboard`);
+    }
+  } finally {
+    if (prev === undefined) delete process.env.TZ;
+    else process.env.TZ = prev;
   }
 });
 
