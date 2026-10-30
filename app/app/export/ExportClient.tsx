@@ -3,6 +3,7 @@
 import { useId, useMemo, useState } from "react";
 import Link from "next/link";
 import type { PdfLayout } from "@/lib/pdf/LogbookPDF";
+import { inDateRange, PdfExportError, requestLogbookPdf } from "@/lib/pdf/export-request";
 import { exportFlightsCsv } from "@/lib/csv-export";
 import { computeTotals } from "@/lib/derive";
 import { makeT, type Locale } from "@/lib/i18n";
@@ -34,8 +35,13 @@ function downloadBlob(blob: Blob, fileName: string) {
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
-export default function ExportClient({ flights, defaultName, defaultLicense, avatarUrl, isPaid, locale }: {
-  flights: FlightDerived[]; defaultName: string; defaultLicense: string; avatarUrl: string | null; isPaid: boolean; locale: Locale;
+/**
+ * `isPaid` only chooses what to show (Generate vs the upgrade prompt). The PDF
+ * itself is rendered by POST /api/export/pdf, which checks the plan again on
+ * the server, so flipping this prop in devtools gets a 403, not a PDF.
+ */
+export default function ExportClient({ flights, defaultName, defaultLicense, isPaid, locale }: {
+  flights: FlightDerived[]; defaultName: string; defaultLicense: string; isPaid: boolean; locale: Locale;
 }) {
   const t = makeT(locale);
   const s = exportStrings(locale);
@@ -50,11 +56,7 @@ export default function ExportClient({ flights, defaultName, defaultLicense, ava
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  const filtered = useMemo(() => flights.filter((f) => {
-    if (from && f.date < from) return false;
-    if (to && f.date > to) return false;
-    return true;
-  }), [flights, from, to]);
+  const filtered = useMemo(() => flights.filter((f) => inDateRange(f, from, to)), [flights, from, to]);
   const totals = useMemo(() => computeTotals(filtered), [filtered]);
   const n = filtered.length;
   const stamp = () => new Date().toISOString().slice(0, 10);
@@ -70,28 +72,13 @@ export default function ExportClient({ flights, defaultName, defaultLicense, ava
         const win = window.open("", "_blank");
         let blob: Blob;
         try {
-          // Lazy-load the PDF toolchain only when generating a PDF; keeps
-          // ~400KB gzip out of the Export route's initial bundle.
-          const [{ pdf }, { LogbookPDF }] = await Promise.all([
-            import("@react-pdf/renderer"),
-            import("@/lib/pdf/LogbookPDF"),
-          ]);
-          blob = await pdf(
-            <LogbookPDF
-              flights={filtered}
-              totals={totals}
-              pilotName={name}
-              licenseNumber={license}
-              fromDate={from}
-              toDate={to}
-              generatedAt={new Date().toLocaleString()}
-              avatarUrl={avatarUrl ?? undefined}
-              layout={layout}
-            />,
-          ).toBlob();
+          blob = await requestLogbookPdf({
+            layout, from, to, pilotName: name, licenseNumber: license,
+            generatedAt: new Date().toLocaleString(),
+          });
         } catch (e) {
           win?.close();
-          throw e;
+          throw e instanceof PdfExportError && e.status === 403 ? new Error(s("pdfLockedBody")) : e;
         }
         if (win) {
           const url = URL.createObjectURL(blob);

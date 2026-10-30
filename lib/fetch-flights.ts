@@ -10,15 +10,17 @@ const PAGE = 1000;
 
 export async function fetchAllFlights(
   supabase: SupabaseClient,
-  opts: { orderAsc?: boolean } = {},
+  // `userId` adds an explicit user_id filter on top of RLS, for callers that
+  // want the row scope stated in the query as well as enforced by the policy.
+  opts: { orderAsc?: boolean; userId?: string } = {},
 ): Promise<Flight[]> {
   const ascending = opts.orderAsc ?? false;
   const all: Flight[] = [];
   let from = 0;
   while (true) {
-    const { data, error } = await supabase
-      .from("flights")
-      .select("*")
+    let query = supabase.from("flights").select("*");
+    if (opts.userId) query = query.eq("user_id", opts.userId);
+    const { data, error } = await query
       .order("date", { ascending })
       .order("id", { ascending })
       .range(from, from + PAGE - 1);

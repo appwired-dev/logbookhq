@@ -10,7 +10,7 @@ export default async function ExportPage() {
   const { data: { user } } = await supabase.auth.getUser();
   const { data: profile } = await supabase
     .from("profiles")
-    .select("full_name, license_number, avatar_url, tier")
+    .select("full_name, license_number, tier")
     .eq("id", user!.id)
     .single();
 
@@ -21,7 +21,6 @@ export default async function ExportPage() {
       flights={flights}
       defaultName={profile?.full_name ?? ""}
       defaultLicense={profile?.license_number ?? ""}
-      avatarUrl={profile?.avatar_url ?? null}
       isPaid={!isFreeTier(profile?.tier)}
       locale={locale}
     />
